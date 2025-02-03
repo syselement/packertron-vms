@@ -1,2 +1,171 @@
 # packertron-vms
-Automated VM deployment with Packer, Vagrant, Ansible across hypervisors
+
+**Automated VM deployment with Packer, Vagrant, Ansible across hypervisors**
+
+`packertron-vms` is a **collection of templates for automated VM deployment** using **Packer and Vagrant**. It simplifies the process of creating, provisioning, and managing virtual machines across **VMware Workstation** (with future support for Proxmox eventually, and Ansible automation).
+
+## 🚀 Features
+
+- Automated VM builds using **Packer**
+- Provisioning with **Vagrant**
+- Support for **multiple OS images** (Windows, Ubuntu, Kali Linux, etc)
+- Customizable **HCL templates and scripts**
+- Hypervisor-agnostic **VM automation**
+
+------
+
+## 🛠 Requirements
+
+Ensure you have the following installed before proceeding:
+
+### **System Requirements**
+
+- **Windows 10/11** or **Linux**
+- **VMware Workstation Pro** (or Proxmox in future support)
+
+### **Software Dependencies**
+
+- **[Chocolatey](https://chocolatey.org/)** (Windows package manager)
+- **[VMware Workstation](https://support.broadcom.com/group/ecx/downloads)**
+- **[HashiCorp Packer](https://www.packer.io/)**
+- **[HashiCorp Vagrant](https://developer.hashicorp.com/vagrant/install?product_intent=vagrant)**
+- **[Vagrant VMware Utility](https://developer.hashicorp.com/vagrant/docs/providers/vmware/vagrant-vmware-utility)**
+- **[Vagrant VMware Plugin](https://developer.hashicorp.com/vagrant/docs/providers/vmware/installation)**
+- **[Visual Studio Code](https://code.visualstudio.com/)**
+
+------
+
+## 🔧 Installation
+
+### **1️⃣ Install Chocolatey (Windows Users Only)**
+
+Open **PowerShell as Administrator** and run:
+
+```powershell
+Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
+```
+
+Verify installation:
+
+```powershell
+choco -?
+```
+
+### **2️⃣ Install Dependencies**
+
+```powershell
+choco install vmwareworkstation packer vagrant jq vscode -y
+```
+
+### **3️⃣ Install Vagrant VMware Plugin**
+
+```powershell
+choco install vagrant-vmware-utility -y
+vagrant plugin install vagrant-vmware-desktop
+```
+
+### **4️⃣ Clone packertron-vms Repository**
+
+```bash
+git clone https://github.com/syselement/packertron-vms.git
+cd packertron-vms
+```
+
+------
+
+## 📁 Directory Structure
+
+```
+packertron-vms/
+├── Win2025/
+│   ├── config/          # Configuration files (autounattend.xml, unattend.xml)
+│   ├── scripts/         # Automation scripts (Powershell, Batch)
+│   ├── variables.pkrvars.hcl  # Packer variables
+│   ├── win2025.pkr.hcl  # Packer HCL template
+│   ├── vagrantfile      # Vagrant configuration
+│   ├── output/          # VM build output
+├── ISO/
+│   ├── windows/         # Windows ISO storage
+│   ├── linux/           # Linux ISO storage
+└── .gitignore           # Ignore unnecessary files (ISO, temp builds)
+```
+
+------
+
+## 🚀 Build & Deploy VMs
+
+### **1️⃣ Open Visual Studio Code**
+
+```powershell
+cd packertron-vms
+code .
+```
+
+### **2️⃣ Packer: Initialize & Build Windows Server 2025**
+
+```powershell
+cd Win2025
+packer init .
+packer validate --var-file="winserver2025.pkrvars.hcl" win2025.pkr.hcl
+packer build --var-file="winserver2025.pkrvars.hcl" win2025.pkr.hcl
+```
+
+### **3️⃣ Deploy VM with Vagrant**
+
+```powershell
+cd Win2025
+vagrant up
+```
+
+### **4️⃣ Manage VM Lifecycle**
+
+```powershell
+# Shut down VM
+vagrant halt
+
+# Restart VM
+vagrant up
+
+# Destroy VM
+vagrant destroy -f
+```
+
+------
+
+## 🛠 Troubleshooting
+
+- **VMware Workstation Not Detected?** Ensure it is installed and running.
+
+- ISO Checksum Mismatch?
+
+   Run:
+
+  ```powershell
+  Get-FileHash C:\ISO\windows\your_iso.iso
+  ```
+
+- Vagrant Plugin Issues?
+
+   Reinstall:
+
+  ```powershell
+  vagrant plugin repair
+  ```
+
+------
+
+## 📜 License
+
+MIT License - See [LICENSE](#LICENSE.txt) for details.
+
+## 🤝 Contributing
+
+Pull requests and improvements are welcome! Ensure your code follows the repo’s standards.
+
+## 🌍 Future Roadmap
+
+✅ Proxmox Support ✅ Ubuntu & Kali Linux Packer Builds ✅ Integration with Ansible for Advanced Provisioning
+
+------
+
+🚀 **Happy Virtualizing with packertron-vms!**
