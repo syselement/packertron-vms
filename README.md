@@ -156,7 +156,7 @@ vagrant destroy -f
 
 ## 📜 License
 
-MIT License - See [LICENSE](#LICENSE.txt) for details.
+MIT License - See [LICENSE](LICENSE.txt) for details.
 
 ## 🤝 Contributing
 
