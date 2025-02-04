@@ -1,0 +1,49 @@
+# Source: https://github.com/automatesql/Automated-Sandbox-Framework/blob/main/vagrantfile
+
+Vagrant.configure("2") do |config|
+
+  machines = [ 
+           { name: "win2025srv01", memory: 4096, cpus: 2, vnet: "VMnet8", nat_device: "vmnet8" }
+    ]
+  
+  #config.vm.usable_port_range = 8500..8999
+  config.vm.communicator = "winssh"
+  config.vm.guest = :windows
+  config.vm.box = "C:/AutomatedSandbox/Win2025/output/win2025_gui.box"
+  config.vm.synced_folder ".", "/vagrant", disabled: true
+  config.ssh.username = "Administrator"
+  config.ssh.password = "packer"
+  config.winssh.connect_timeout = 30
+
+  #Loop through the machines and configure each one
+  machines.each do |machine|
+    
+    config.vm.define machine[:name] do |node|
+      node.vm.provision "shell",
+      path: "vagrant/install_utils.ps1",
+      privileged: false
+
+      node.vm.provision "shell", 
+      run: "once",
+      name: "Set hostname",
+      inline: "powershell rename-computer -NewName '#{machine[:name]}' -Restart",
+      privileged: true
+    
+      node.vm.provider "vmware_desktop" do |mybasebox|
+        mybasebox.gui = true
+        mybasebox.allowlist_verified = :disable_warning
+        mybasebox.nat_device = machine[:nat_device]
+        mybasebox.vmx["displayname"] = machine[:name]
+        mybasebox.vmx["memsize"] = machine[:memory]
+        mybasebox.vmx["numvcpus"] = machine[:cpus]
+        mybasebox.vmx["cpuid.coresPerSocket"] = machine[:cpus]
+        mybasebox.vmx["vvtd.enable"] = "TRUE" # If you require nested virtualization, leave this set to TRUE.
+        mybasebox.vmx["vhv.enable"] = "TRUE" # If you require nested virtualization, leave this set to TRUE.
+        mybasebox.vmx["vpmc.enable"] = "FALSE"
+        mybasebox.vmx["ethernet0.connectiontype"] = "custom"
+        mybasebox.vmx["ethernet0.vnet"] = machine[:vnet]
+      end
+    end
+  end
+end
+
