@@ -11,7 +11,7 @@
 > The setup and deployment instructions in this README file are currently being tested and refined.
 > Expect updates and improvements as I validate each step.  
 
-`packertron-vms` is a **collection of templates for automated VM deployment**, designed for home lab environments and testing setups. Using **Packer and Vagrant**, it simplifies the creation, provisioning, and management of virtual machines. The templates currently support **VMware Workstation** (future plans include **Ansible** automation and expanding hypervisor support (**VirtualBox**, **Proxmox**, etc.).
+`packertron-vms` is a **collection of templates for automated VM deployment**, designed for home lab environments and testing setups. Using **Packer and Vagrant**, it simplifies the creation, provisioning, and management of virtual machines. The templates currently support **VMware Workstation** (future plans include **Ansible** automation and expanding hypervisor support like **VirtualBox**, **Proxmox**, etc).
 
 ---
 
