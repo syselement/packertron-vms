@@ -13,7 +13,28 @@
 
 ## 📖 Table of Contents
 
-[TOC]
+- [packertron-vms](#packertron-vms)
+  - [📖 Table of Contents](#-table-of-contents)
+  - [🚀 Features](#-features)
+  - [🛠 Requirements](#-requirements)
+    - [**System Requirements**](#system-requirements)
+    - [**Software Dependencies**](#software-dependencies)
+  - [🔧 Installation](#-installation)
+    - [**1️⃣ Install Chocolatey (Windows Users Only)**](#1️⃣-install-chocolatey-windows-users-only)
+    - [**2️⃣ Install Dependencies**](#2️⃣-install-dependencies)
+    - [**3️⃣ Install Vagrant VMware Plugin**](#3️⃣-install-vagrant-vmware-plugin)
+    - [**4️⃣ Clone packertron-vms Repository**](#4️⃣-clone-packertron-vms-repository)
+  - [📁 Directory Structure](#-directory-structure)
+  - [🚀 Build \& Deploy VMs](#-build--deploy-vms)
+    - [**1️⃣ Open Visual Studio Code**](#1️⃣-open-visual-studio-code)
+    - [**2️⃣ Packer: Initialize \& Build Windows Server 2025**](#2️⃣-packer-initialize--build-windows-server-2025)
+    - [**3️⃣ Deploy VM with Vagrant**](#3️⃣-deploy-vm-with-vagrant)
+    - [**4️⃣ Manage VM Lifecycle**](#4️⃣-manage-vm-lifecycle)
+  - [🛠 Troubleshooting](#-troubleshooting)
+  - [📜 License](#-license)
+  - [🤝 Contributing](#-contributing)
+  - [🌍 Future Roadmap](#-future-roadmap)
+
 
 ---
 
