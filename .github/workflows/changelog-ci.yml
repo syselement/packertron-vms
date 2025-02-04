@@ -8,6 +8,8 @@ on:
     types: [created, edited]
   push:
     branches: [$default-branch]
+    paths-ignore:
+      - '.github/workflows/**'  # Ignore changes to workflow files
 
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
@@ -29,3 +31,4 @@ jobs:
         with:
           github-token: ${{ secrets.github_token }}
           skip-git-pull: "true"
+          version-file: 'version.yaml'
