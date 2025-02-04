@@ -18,11 +18,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
-      - name: "✅ Checkout repo"
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: "✏️ Generate changelog"
-        uses: janheinrichmerker/action-github-changelog-generator@v2.4
+      - name: "✏️ Conventional Changelog Action"
+        uses: TriPSs/conventional-changelog-action@v6.0.0
         with:
-          token: ${{ secrets.GITHUB_TOKEN }} 
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          skip-git-pull: "true"
