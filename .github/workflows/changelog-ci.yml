@@ -7,7 +7,8 @@ on:
   release:
     types: [created, edited]
   push:
-    branches: [$default-branch]
+    branches:
+      - main
     paths-ignore:
       - '.github/workflows/**'  # Ignore changes to workflow files
 
