@@ -2,7 +2,12 @@
 
 **Automated VM deployment with Packer, Vagrant, Ansible across hypervisors**
 
-`packertron-vms` is a **collection of templates for automated VM deployment** using **Packer and Vagrant**. It simplifies the process of creating, provisioning, and managing virtual machines across **VMware Workstation** (with future support for Proxmox eventually, and Ansible automation).
+> [!WARNING]
+> 🚧 **Project instructions and commands under review** 🚧  
+> The setup and deployment instructions are currently being tested and refined.  
+> Expect updates and improvements as I validate each step.  
+
+`packertron-vms` is a **collection of templates for automated VM deployment**, designed for home lab environments and testing setups. Using **Packer and Vagrant**, it simplifies the creation, provisioning, and management of virtual machines. The templates currently support **VMware Workstation** (with planned enhancements for **Ansible** automation and additional hypervisors like **VirtualBox**, **Proxmox**, and more).
 
 ## 🚀 Features
 
