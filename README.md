@@ -9,6 +9,14 @@
 
 `packertron-vms` is a **collection of templates for automated VM deployment**, designed for home lab environments and testing setups. Using **Packer and Vagrant**, it simplifies the creation, provisioning, and management of virtual machines. The templates currently support **VMware Workstation** (with planned enhancements for **Ansible** automation and additional hypervisors like **VirtualBox**, **Proxmox**, and more).
 
+---
+
+## 📖 Table of Contents
+
+[TOC]
+
+---
+
 ## 🚀 Features
 
 - Automated VM builds using **Packer**
@@ -89,9 +97,6 @@ packertron-vms/
 │   ├── win2025.pkr.hcl  # Packer HCL template
 │   ├── vagrantfile      # Vagrant configuration
 │   ├── output/          # VM build output
-├── ISO/
-│   ├── windows/         # Windows ISO storage
-│   ├── linux/           # Linux ISO storage
 └── .gitignore           # Ignore unnecessary files (ISO, temp builds)
 ```
 
@@ -169,7 +174,7 @@ Pull requests and improvements are welcome! Ensure your code follows the repo’
 
 ## 🌍 Future Roadmap
 
-✅ Proxmox Support ✅ Ubuntu & Kali Linux Packer Builds ✅ Integration with Ansible for Advanced Provisioning
+✅ Proxmox support ✅ Ubuntu & Kali Linux Packer builds ✅ Integration with Ansible for advanced provisioning
 
 ------
 
