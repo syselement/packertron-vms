@@ -1,6 +1,10 @@
 # packertron-vms
 
-**Automated VM deployment with Packer, Vagrant, Ansible across hypervisors**
+> **Automated VM deployment with Packer, Vagrant, Ansible across hypervisors**
+
+[![syselement - packertron-vms](https://img.shields.io/static/v1?label=syselement&message=packertron-vms&color=blue&logo=github)](https://github.com/syselement/packertron-vms) [![stars - packertron-vms](https://img.shields.io/github/stars/syselement/packertron-vms?style=social)](https://github.com/syselement/packertron-vms) [![forks - packertron-vms](https://img.shields.io/github/forks/syselement/packertron-vms?style=social)](https://github.com/syselement/packertron-vms) [![License](https://img.shields.io/badge/License-MIT-orange)](#-license "Go to license section")
+
+[![Package - Packer](https://img.shields.io/badge/Packer->=1.11.2-blue?logo=packer&logoColor=white)](https://developer.hashicorp.com/packer "Go to Packer homepage") [![Package - Vagrant](https://img.shields.io/badge/Vagrant->=2.4.3-blue?logo=vagrant&logoColor=white)](https://developer.hashicorp.com/vagrant "Go to Vagrant homepage") [![Package - VMware Workstation Pro](https://img.shields.io/badge/VMwareWorkstationPro->17.x-blue?logo=vmware&logoColor=white)](https://www.vmware.com/products/desktop-hypervisor/workstation-and-fusion "Go to VMware Workstation homepage")
 
 > [!WARNING]
 > 🚧 **Project instructions and commands under review** 🚧  
@@ -187,7 +191,7 @@ vagrant destroy -f
 
 ## 📜 License
 
-MIT License - See [LICENSE](LICENSE) for details.
+Released under [MIT](/LICENSE) by [@syselement](https://github.com/syselement).
 
 ## 🤝 Contributing
 
