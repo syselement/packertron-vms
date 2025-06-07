@@ -93,6 +93,9 @@ choco -?
 
 ```powershell
 choco install vmwareworkstation packer vagrant jq vscode -y
+
+# To upgrade
+choco upgrade all
 ```
 
 ### **3️⃣ Install Vagrant VMware Plugin**
