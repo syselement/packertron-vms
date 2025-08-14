@@ -8,3 +8,7 @@ crash.log
 # For built boxes
 *.box
 */output
+
+# FreeFileSync
+*.ffs_lock
+*.ffs_db

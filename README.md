@@ -21,19 +21,19 @@
   - [📖 Table of Contents](#-table-of-contents)
   - [🚀 Features](#-features)
   - [🛠 Requirements](#-requirements)
-    - [**System Requirements**](#system-requirements)
-    - [**Software Dependencies**](#software-dependencies)
+    - [System Requirements](#system-requirements)
+    - [Software Dependencies](#software-dependencies)
   - [🔧 Installation](#-installation)
-    - [**1️⃣ Install Chocolatey (Windows Users Only)**](#1️⃣-install-chocolatey-windows-users-only)
-    - [**2️⃣ Install Dependencies**](#2️⃣-install-dependencies)
-    - [**3️⃣ Install Vagrant VMware Plugin**](#3️⃣-install-vagrant-vmware-plugin)
-    - [**4️⃣ Clone packertron-vms Repository**](#4️⃣-clone-packertron-vms-repository)
+    - [1️⃣ Install Chocolatey (Windows Users Only)](#1️⃣-install-chocolatey-windows-users-only)
+    - [2️⃣ Install Dependencies](#2️⃣-install-dependencies)
+    - [3️⃣ Install Vagrant VMware Plugin](#3️⃣-install-vagrant-vmware-plugin)
+    - [4️⃣ Clone packertron-vms Repository](#4️⃣-clone-packertron-vms-repository)
   - [📁 Directory Structure](#-directory-structure)
   - [🚀 Build \& Deploy VMs](#-build--deploy-vms)
-    - [**1️⃣ Open Visual Studio Code**](#1️⃣-open-visual-studio-code)
-    - [**2️⃣ Packer: Initialize \& Build Windows Server 2025**](#2️⃣-packer-initialize--build-windows-server-2025)
-    - [**3️⃣ Deploy VM with Vagrant**](#3️⃣-deploy-vm-with-vagrant)
-    - [**4️⃣ Manage VM Lifecycle**](#4️⃣-manage-vm-lifecycle)
+    - [1️⃣ Open Visual Studio Code](#1️⃣-open-visual-studio-code)
+    - [2️⃣ Packer: Initialize \& Build Windows Server 2025](#2️⃣-packer-initialize--build-windows-server-2025)
+    - [3️⃣ Deploy VM with Vagrant](#3️⃣-deploy-vm-with-vagrant)
+    - [4️⃣ Manage VM Lifecycle](#4️⃣-manage-vm-lifecycle)
   - [🛠 Troubleshooting](#-troubleshooting)
   - [📜 License](#-license)
   - [🤝 Contributing](#-contributing)
@@ -56,26 +56,26 @@
 
 Ensure you have the following installed before proceeding:
 
-### **System Requirements**
+### System Requirements
 
 - **Windows 10/11** or **Linux**
 - **VMware Workstation Pro** (or Proxmox in future support)
 
-### **Software Dependencies**
+### Software Dependencies
 
-- **[Chocolatey](https://chocolatey.org/)** (Windows package manager)
-- **[VMware Workstation](https://support.broadcom.com/group/ecx/downloads)**
-- **[HashiCorp Packer](https://www.packer.io/)**
-- **[HashiCorp Vagrant](https://developer.hashicorp.com/vagrant/install?product_intent=vagrant)**
-- **[Vagrant VMware Utility](https://developer.hashicorp.com/vagrant/docs/providers/vmware/vagrant-vmware-utility)**
-- **[Vagrant VMware Plugin](https://developer.hashicorp.com/vagrant/docs/providers/vmware/installation)**
-- **[Visual Studio Code](https://code.visualstudio.com/)**
+- [Chocolatey](https://chocolatey.org/) (Windows package manager)
+- [VMware Workstation](https://support.broadcom.com/group/ecx/free-downloads)
+- [HashiCorp Packer](https://www.packer.io/)
+- [HashiCorp Vagrant](https://developer.hashicorp.com/vagrant/install?product_intent=vagrant)
+- [Vagrant VMware Utility](https://developer.hashicorp.com/vagrant/docs/providers/vmware/vagrant-vmware-utility)
+- [Vagrant VMware Plugin](https://developer.hashicorp.com/vagrant/docs/providers/vmware/installation)
+- [Visual Studio Code](https://code.visualstudio.com/)
 
 ------
 
 ## 🔧 Installation
 
-### **1️⃣ Install Chocolatey (Windows Users Only)**
+### 1️⃣ Install Chocolatey (Windows Users Only)
 
 Open **PowerShell as Administrator** and run:
 
@@ -89,7 +89,7 @@ Verify installation:
 choco -?
 ```
 
-### **2️⃣ Install Dependencies**
+### 2️⃣ Install Dependencies
 
 ```powershell
 choco install vmwareworkstation packer vagrant jq vscode -y
@@ -98,14 +98,18 @@ choco install vmwareworkstation packer vagrant jq vscode -y
 choco upgrade all
 ```
 
-### **3️⃣ Install Vagrant VMware Plugin**
+The latest **VMware Workstation Pro** version installer can be found at the [official Broadcom link](https://support.broadcom.com/group/ecx/productdownloads?subfamily=VMware%20Workstation%20Pro&freeDownloads=true) (login necessary for free download).
+
+- More info at my wiki about the tool -> [vmware-workstation.md · syselement/blog](https://github.com/syselement/blog/blob/main/home-lab/hypervisors/vmware/vmware-workstation.md)
+
+### 3️⃣ Install Vagrant VMware Plugin
 
 ```powershell
 choco install vagrant-vmware-utility -y
 vagrant plugin install vagrant-vmware-desktop
 ```
 
-### **4️⃣ Clone packertron-vms Repository**
+### 4️⃣ Clone packertron-vms Repository
 
 ```bash
 git clone https://github.com/syselement/packertron-vms.git
@@ -132,30 +136,36 @@ packertron-vms/
 
 ## 🚀 Build & Deploy VMs
 
-### **1️⃣ Open Visual Studio Code**
+### 1️⃣ Open Visual Studio Code
 
 ```powershell
 cd packertron-vms
 code .
 ```
 
-### **2️⃣ Packer: Initialize & Build Windows Server 2025**
+### 2️⃣ Packer: Initialize & Build Windows Server 2025
+
+Setup the necessary variables inside the `Win2025\winserver2025.pkrvars.hcl` file, adjusting them accordingly based on your ISO folder, name and checksum.
+
+Open VMware Workstation Pro (before running Packer build).
+
+Proceed with Packer initialize and build.
 
 ```powershell
 cd Win2025
 packer init .
-packer validate --var-file="winserver2025.pkrvars.hcl" win2025.pkr.hcl
-packer build --var-file="winserver2025.pkrvars.hcl" win2025.pkr.hcl
+packer validate --var-file="winserver2025.pkrvars.hcl" "win2025.pkr.hcl"
+packer build --var-file="winserver2025.pkrvars.hcl" "win2025.pkr.hcl"
 ```
 
-### **3️⃣ Deploy VM with Vagrant**
+### 3️⃣ Deploy VM with Vagrant
 
 ```powershell
 cd Win2025
 vagrant up
 ```
 
-### **4️⃣ Manage VM Lifecycle**
+### 4️⃣ Manage VM Lifecycle
 
 ```powershell
 # Shut down VM
@@ -203,7 +213,7 @@ Pull requests and improvements are welcome! Ensure your code follows the repo’
 ## 🌍 Future Roadmap
 
 - ✅ Proxmox support
-- ✅ Ubuntu & Kali Linux Packer builds
+- ✅ Win11, Ubuntu & Kali Linux Packer builds
 - ✅ Integration with Ansible for advanced provisioning
 
 ------

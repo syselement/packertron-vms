@@ -2,7 +2,7 @@
 # Run only when sysprep has completed successfully
 $regPath = "HKLM:\SYSTEM\Setup\Status\SysprepStatus"
 
-#remove the startup.cmd file 
+# Remove the startup.cmd file 
 $filePath = "$env:APPDATA\Microsoft\Windows\Start Menu\Programs\Startup\startup.cmd"
 
 # Query the CleanupState and GeneralizationState from the registry
@@ -23,7 +23,7 @@ if ($cleanupState -eq 2 -and $generalizationState -eq 7) {
    Set-ItemProperty "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Advanced" "HideFileExt" 0
    Set-ItemProperty "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Advanced" "HideDrivesWithNoMedia" 0
    Set-ItemProperty "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Advanced" "ShowSyncProviderNotifications" 0
-    
+
    # Setting default explorer view to This PC
    Set-ItemProperty "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" "LaunchTo" 1
 
@@ -36,7 +36,7 @@ if ($cleanupState -eq 2 -and $generalizationState -eq 7) {
       New-Item -Path "HKLM:\Software\Policies\Microsoft\" -Name "Edge" -Force
    }
    New-ItemProperty -Path "HKLM:\SOFTWARE\Policies\Microsoft\Edge" -Name "HideFirstRunExperience" -Value 1 -PropertyType DWORD -Force
-  
+
    # Configure basic telemetry settings
    if (!(Test-Path "HKLM:\Software\Policies\Microsoft\Windows\DataCollection")) {
       New-Item -Path "HKLM:\Software\Policies\Microsoft\Windows" -Name "DataCollection" -Force
@@ -58,7 +58,7 @@ else {
    Write-Host "Conditions not met. CleanupState: $cleanupState, GeneralizationState: $generalizationState"
 }
 
-#verify if the firewall rule was added and enabled. If it has, there's no need to keep the startup.cmd file or this one.
+# Verify if the firewall rule was added and enabled. If it has, there's no need to keep the startup.cmd file or this one.
 $firewallRuleName = "Allow SSH"
 $ruleExists = Get-NetFirewallRule -DisplayName $firewallRuleName
 

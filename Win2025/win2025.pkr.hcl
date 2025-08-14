@@ -33,6 +33,7 @@ source "vmware-iso" "winsrv2025" {
   boot_command     = ["<spacebar>"]
   boot_wait        = "${var.boot_wait}"
   communicator     = "ssh"
+  cpus             = "${var.numvcpus}"
   disk_size        = "${var.disk_size}"
   disk_type_id     = "0"
   floppy_files     = ["config/autounattend.xml","scripts/packer_shutdown.bat"]
@@ -40,22 +41,21 @@ source "vmware-iso" "winsrv2025" {
   headless         = false
   iso_checksum     = "${var.iso_checksum}"
   iso_url          = "${var.iso_url}"
+  memory           = "${var.memsize}"
   shutdown_command = "A:/packer_shutdown.bat" 
   shutdown_timeout = "30m"
   skip_compaction  = false
   vm_name          = "${var.vm_name}"
   vmx_data = {
     firmware            = "efi"
-    memsize             = "${var.memsize}"
-    numvcpus            = "${var.numvcpus}"
     "scsi0.virtualDev"  = "lsisas1068"
     "virtualHW.version" = "21"
+    "isolation.tools.hgfs.disable" = "TRUE"
   }
   ssh_password     = "${var.ssh_password}"
   ssh_port         = 22
   ssh_timeout      = "30m"
   ssh_username     = "${var.ssh_username}"
- 
 }
 
 # A build block invokes sources and runs provisioning steps on them.
@@ -105,7 +105,7 @@ build {
 
   provisioner "powershell" {
     scripts = ["scripts/win_updates.ps1"]
- }
+  }
 
   provisioner "windows-restart" {
     restart_timeout = "30m"

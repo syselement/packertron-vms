@@ -2,28 +2,37 @@
 
 Vagrant.configure("2") do |config|
 
-  machines = [ 
-           { name: "win2025srv01", memory: 4096, cpus: 2, vnet: "VMnet8", nat_device: "vmnet8" }
-    ]
+  machines = [
+      { name: "win2025srv01", memory: 4096, cpus: 2, vnet: "VMnet8", nat_device: "vmnet8" }
+  ]
   
-  #config.vm.usable_port_range = 8500..8999
+
+  # Find the newest .box file in the output folder
+  latest_box = Dir[File.expand_path("output/*.box", __dir__)]
+                .max_by { |f| File.mtime(f) }
+  if latest_box.nil?
+    raise "No .box file found in output/. Build your box first with Packer."
+  end
+  # Configure the Vagrant box
+  config.vm.box     = "win2025_gui"
+  config.vm.box_url = "file://#{latest_box.gsub("\\", "/")}"
   config.vm.communicator = "winssh"
   config.vm.guest = :windows
-  config.vm.box = "C:/AutomatedSandbox/Win2025/output/win2025_gui.box"
   config.vm.synced_folder ".", "/vagrant", disabled: true
   config.ssh.username = "Administrator"
   config.ssh.password = "packer"
   config.winssh.connect_timeout = 30
+  #config.vm.usable_port_range = 8500..8999
 
-  #Loop through the machines and configure each one
+
+  # Loop through the machines and configure each one
   machines.each do |machine|
-    
     config.vm.define machine[:name] do |node|
       node.vm.provision "shell",
       path: "vagrant/install_utils.ps1",
       privileged: false
 
-      node.vm.provision "shell", 
+      node.vm.provision "shell",
       run: "once",
       name: "Set hostname",
       inline: "powershell rename-computer -NewName '#{machine[:name]}' -Restart",
@@ -42,6 +51,7 @@ Vagrant.configure("2") do |config|
         mybasebox.vmx["vpmc.enable"] = "FALSE"
         mybasebox.vmx["ethernet0.connectiontype"] = "custom"
         mybasebox.vmx["ethernet0.vnet"] = machine[:vnet]
+        mybasebox.vmx["isolation.tools.hgfs.disable"] = "TRUE"
       end
     end
   end
