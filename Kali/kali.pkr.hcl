@@ -12,10 +12,6 @@ packer {
       version = ">= 1.2.1"
       source  = "github.com/hashicorp/proxmox"
     }
-    keepass = {
-      version = ">= 0.3.0"
-      source  = "github.com/chunqi/keepass"
-    }
   }
 }
 
