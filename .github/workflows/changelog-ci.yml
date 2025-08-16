@@ -30,6 +30,7 @@ jobs:
       - name: "✏️ Conventional Changelog Action"
         uses: TriPSs/conventional-changelog-action@v6.0.0
         with:
-          github-token: ${{ secrets.github_token }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
           skip-git-pull: "true"
           version-file: 'version.yaml'
+          version-path: 'version'
