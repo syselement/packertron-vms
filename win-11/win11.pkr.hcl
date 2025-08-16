@@ -1,5 +1,7 @@
-# Source: https://github.com/mttaggart/seclab/blob/main/Packer/win-11-ws/config.pkr.hcl
-# This file is used to configure the Packer build for Windows 11 Workstation.
+# Sources:
+# https://github.com/mttaggart/seclab/blob/main/Packer/win-11-ws/config.pkr.hcl
+# https://github.com/ibeerens/packer/blob/main/workstation/windows10/windows.json.pkr.hcl
+# https://github.com/ibeerens/packer/blob/main/hyper-v/windows11/windows.json.pkr.hcl
 
 # Packer configuration file for Windows 11 Workstation
 
