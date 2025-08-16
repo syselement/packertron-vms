@@ -1,3 +1,12 @@
+# [0.4.0](https://github.com/syselement/packertron-vms/compare/v0.3.0...v0.4.0) (2025-08-16)
+
+
+### Features
+
+* Ubuntu Desktop placeholder files [TO DO] ([0b081a1](https://github.com/syselement/packertron-vms/commit/0b081a19840d988a09d0c4a02eb47f009c6a534b))
+
+
+
 # [0.3.0](https://github.com/syselement/packertron-vms/compare/v0.2.0...v0.3.0) (2025-08-16)
 
 
