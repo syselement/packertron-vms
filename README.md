@@ -214,9 +214,12 @@ Pull requests and improvements are welcome! Ensure your code follows the repo’
 
 ## 🌍 Future Roadmap
 
-- ✅ Proxmox support
-- ✅ Win11, Ubuntu & Kali Linux Packer builds
-- ✅ Integration with Ansible for advanced provisioning
+- [ ] Proxmox support
+- [ ] O.S Packer builds:
+  - [ ] Win11
+  - [ ] Ubuntu Server/Desktop
+  - [ ] Kali Linux
+- [ ] Integration with **Ansible** for advanced provisioning
 
 ------
 
