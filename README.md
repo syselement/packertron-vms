@@ -122,7 +122,7 @@ cd packertron-vms
 
 ```
 packertron-vms/
-├── Win2025/
+├── win-srv-2025/
 │   ├── config/          # Configuration files (autounattend.xml, unattend.xml)
 │   ├── output/          # VM build output
 │   ├── scripts/         # Automation scripts (Powershell, Batch)
@@ -147,14 +147,14 @@ code .
 
 ### 2️⃣ Packer: Initialize & Build Windows Server 2025
 
-Setup the necessary variables inside the `Win2025\winserver2025.pkrvars.hcl` file, adjusting them accordingly based on your ISO folder, name and checksum.
+Setup the necessary variables inside the `win-srv-2025\winserver2025.pkrvars.hcl` file, adjusting them accordingly based on your ISO folder, name and checksum.
 
 Open VMware Workstation Pro (before running Packer build).
 
 Proceed with Packer initialize and build.
 
 ```powershell
-cd Win2025
+cd win-srv-2025
 packer init .
 packer validate --var-file="winserver2025.pkrvars.hcl" "winserver2025.pkr.hcl"
 packer build --var-file="winserver2025.pkrvars.hcl" "winserver2025.pkr.hcl"
@@ -163,7 +163,7 @@ packer build --var-file="winserver2025.pkrvars.hcl" "winserver2025.pkr.hcl"
 ### 3️⃣ Deploy VM with Vagrant
 
 ```powershell
-cd Win2025
+cd win-srv-2025
 vagrant up
 ```
 
