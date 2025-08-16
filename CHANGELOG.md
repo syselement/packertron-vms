@@ -1,3 +1,12 @@
+## [0.4.1](https://github.com/syselement/packertron-vms/compare/v0.4.0...v0.4.1) (2025-08-16)
+
+
+### Bug Fixes
+
+* dir names changed ([de8a201](https://github.com/syselement/packertron-vms/commit/de8a201e4d3f51a9e0a6969a885bb031afe3c849))
+
+
+
 # [0.4.0](https://github.com/syselement/packertron-vms/compare/v0.3.0...v0.4.0) (2025-08-16)
 
 
