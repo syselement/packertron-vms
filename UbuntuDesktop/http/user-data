@@ -1,0 +1,95 @@
+#cloud-config
+autoinstall:
+  version: 1
+  locale: en_US
+  keyboard:
+    layout: it
+  ssh:
+    install-server: true
+    allow-pw: true
+    disable_root: true
+    ssh_quiet_keygen: true
+    allow_public_ssh_keys: true
+  packages:
+    - open-vm-tools
+    - sudo
+  storage:
+    layout:
+      name: direct
+    swap:
+      size: 0
+  user-data:
+    package_upgrade: false
+    timezone: Europe/Rome
+    users:
+      - name: ubuntu
+        passwd: "$6$rounds=4096$4SY5kMDOITTy3R6s$vgp01IwfMWJRYxY1pa.D6xS.TEzGkMpVqxZtxPQrYuHzvywq2sSw/Z.yEmG3hsWnERCorBbN7tdMttVTcj4u61"
+        groups: [adm, sudo]
+        lock-passwd: false
+        sudo: ALL=(ALL) NOPASSWD:ALL
+        shell: /bin/bash
+
+
+
+#########
+#cloud-config
+autoinstall:
+  version: 1
+  identity:
+    hostname: ubuntu-server
+    # Generate with `mkpasswd -m sha-512`
+    password: '$6$9xa2L/Jtd/BUMqh4$trKWwbPGdJDpU.R8UrEW9eXDi.joNBkVyS2XLqbetw2Hp7uUPEJVbwn7Jq2Ddt0P0wWiM1B9lbZ8dff5WlYpF0'
+    username: ubuntu
+
+  ssh:
+    install-server: true
+    allow-pw: yes
+
+  locale: en_US
+
+  keyboard:
+    layout: us
+
+  storage:
+    layout:
+      name: lvm
+
+  snaps:
+    - name: juju
+    - name: lxd
+
+  packages:
+    - net-tools
+
+###############################
+#cloud-config
+autoinstall:
+  version: 1
+  keyboard:
+    layout: fr
+    variant: latin9
+  locale: fr_FR.UTF-8
+  timezone: Europe/Paris
+  network:
+    version: 2
+    ethernets:
+      ens33:
+        dhcp4: true
+  identity:
+    hostname: ubuntu-server
+    password: $6$CD480CfTpjbwtUJw$FEfHQiF341m7S4O08y.FDpAYuNxArl29f6vJJZPkrUzE6ffywxHNuZjTAvGaPnlFSQ2IjEYWG4DLmnudi2Cda1
+    realname: ubuntu User
+    username: ubuntu
+  ssh:
+    install-server: true
+    allow-pw: true
+  codecs:
+    install: false
+  drivers:
+    install: false
+  packages:
+    - open-vm-tools
+  storage:
+    layout:
+      name: lvm
+  updates: security
