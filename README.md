@@ -124,11 +124,13 @@ cd packertron-vms
 packertron-vms/
 ├── Win2025/
 │   ├── config/          # Configuration files (autounattend.xml, unattend.xml)
-│   ├── scripts/         # Automation scripts (Powershell, Batch)
-│   ├── variables.pkrvars.hcl  # Packer variables
-│   ├── win2025.pkr.hcl  # Packer HCL template
-│   ├── vagrantfile      # Vagrant configuration
 │   ├── output/          # VM build output
+│   ├── scripts/         # Automation scripts (Powershell, Batch)
+│   ├── vagrant/         # Vagrant Automation scripts (Powershell, Batch)
+│   ├── README.md        # Readme file
+│   ├── Vagrantfile      # Vagrant configuration
+│   ├── winserver2025.pkr.hcl      # Packer HCL template
+│   ├── winserver2025.pkrvars.hcl  # Packer variables
 └── .gitignore           # Ignore unnecessary files (ISO, temp builds)
 ```
 
@@ -154,8 +156,8 @@ Proceed with Packer initialize and build.
 ```powershell
 cd Win2025
 packer init .
-packer validate --var-file="winserver2025.pkrvars.hcl" "win2025.pkr.hcl"
-packer build --var-file="winserver2025.pkrvars.hcl" "win2025.pkr.hcl"
+packer validate --var-file="winserver2025.pkrvars.hcl" "winserver2025.pkr.hcl"
+packer build --var-file="winserver2025.pkrvars.hcl" "winserver2025.pkr.hcl"
 ```
 
 ### 3️⃣ Deploy VM with Vagrant
