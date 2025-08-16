@@ -1,3 +1,17 @@
+# [0.3.0](https://github.com/syselement/packertron-vms/compare/v0.2.0...v0.3.0) (2025-08-16)
+
+
+### Bug Fixes
+
+* CI quick fix ([1682164](https://github.com/syselement/packertron-vms/commit/1682164425d860d69f77b3e3dab9333bc42002bb))
+
+
+### Features
+
+* Kali hcl placeholder files ([c85f4a7](https://github.com/syselement/packertron-vms/commit/c85f4a795075c7742f71c5a348e2c8f9441a1d96))
+
+
+
 # [0.2.0](https://github.com/syselement/packertron-vms/compare/v0.1.0...v0.2.0) (2025-08-16)
 
 
