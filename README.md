@@ -92,7 +92,11 @@ choco -?
 ### 2️⃣ Install Dependencies
 
 ```powershell
-choco install vmwareworkstation packer vagrant jq vscode -y
+choco install packer vagrant jq vscode -y
+
+# choco install vmwareworkstation
+# ^^ may not work anymore since vmwareworkstation URL is broken
+# install with official installer - read bellow
 
 # To upgrade
 choco upgrade all
@@ -102,10 +106,16 @@ The latest **VMware Workstation Pro** version installer can be found at the [off
 
 - More info at my wiki about the tool -> [vmware-workstation.md · syselement/blog](https://github.com/syselement/blog/blob/main/home-lab/hypervisors/vmware/vmware-workstation.md)
 
-### 3️⃣ Install Vagrant VMware Plugin
+### 3️⃣ Install Vagrant VMware Plugins
+
+- **Requirement**: [Install Vagrant VMware Utility](https://developer.hashicorp.com/vagrant/install/vmware) using the binary (for Win).
+- Install `vagrant-vmware-desktop` plugin
 
 ```powershell
-choco install vagrant-vmware-utility -y
+# choco install vagrant-vmware-utility -y
+# ^^ may not work anymore since vmwareworkstation dependency URL is broken
+# ^^ use binary
+
 vagrant plugin install vagrant-vmware-desktop
 ```
 
