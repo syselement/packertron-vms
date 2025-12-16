@@ -1,0 +1,49 @@
+# Vagrantfile for Ubuntu 24.04 x64 Desktop VMware VM
+
+Vagrant.configure("2") do |config|
+  config.vm.box = "ubuntu-24.04-x64-desktop-template-vmware"
+  config.vm.hostname = "ubuntu24-desktop"
+
+  # VMware provider settings
+  config.vm.provider "vmware_desktop" do |v|
+    v.gui = true
+    #  VMX settings can be set here if needed
+    v.vmx["memsize"]  = "8192"
+    v.vmx["numvcpus"] = "4"
+  end
+end
+
+#################################
+
+cpus = 2
+description = "Ubuntu Desktop 22.04"
+memory = 4096
+
+Vagrant.configure("2") do |config|
+
+  config.ssh.password = "vagrant"
+  config.ssh.username = "vagrant"
+
+  config.vm.define "ubuntu" do |os|
+    os.vm.box="Megabyte/Ubuntu-Desktop"
+    os.vm.hostname = "vagrant-ubuntu"
+
+    os.vm.provider "vmware_workstation" do |v|
+      v.gui = true
+      v.vmx["ethernet0.virtualDev"] = "vmxnet3"
+      v.vmx["gui.fitGuestUsingNativeDisplayResolution"] = "TRUE"
+      v.vmx["gui.fullScreenAtPowerOn"] = "TRUE"
+      v.vmx["gui.lastPoweredViewMode"] = "fullscreen"
+      v.vmx["gui.viewModeAtPowerOn"] = "fullscreen"
+      v.vmx["memsize"] = memory.to_s
+      v.vmx["mks.enable3d"] = "TRUE"
+      v.vmx["mks.forceDiscreteGPU"] = "TRUE"
+      v.vmx["numvcpus"] = cpus.to_s
+      v.vmx["RemoteDisplay.vnc.enabled"] = "TRUE"
+      v.vmx["RemoteDisplay.vnc.port"] = "5900"
+      v.vmx["sound.autodetect"] = "TRUE"
+      v.vmx["sound.present"] = "TRUE"
+      v.vmx["sound.startConnected"] = "TRUE"
+    end
+  end
+ends

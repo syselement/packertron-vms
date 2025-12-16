@@ -12,17 +12,68 @@ packer {
   }
 }
 
-variable "box_output" {}
-variable "boot_wait" {}
-variable "disk_size" {}
-variable "iso_checksum" {}
-variable "iso_url" {}
-variable "memsize" {}
-variable "numvcpus" {}
-variable "vm_name" {}
-variable "ssh_password" {}
-variable "ssh_username" {}
+# -------------------------------------------------
 
+# Variables
+variable "box_output" {
+  type        = string
+  description = "The output path for the box file"
+  default     = ""
+}
+
+variable "vm_disk_size" {
+  type        = string
+  description = "The disk size for the VM in MB"
+  default     = "61440"
+}
+
+# Windows Server 2025 ISO details
+# Use Get-FileHash to generate the ISO checksum
+# Example: Get-FileHash .\26100.1742.240906-0331.ge_release_svc_refresh_SERVER_EVAL_x64FRE_en-us.iso
+variable "iso_checksum" {
+  type        = string
+  description = "The checksum for the ISO file"
+  default     = "D0EF4502E350E3C6C53C15B1B3020D38A5DED011BF04998E950720AC8579B23D"
+}
+
+variable "iso_url" {
+  type        = string
+  description = "A URL to the ISO file"
+  default     = "https://software-static.download.prss.microsoft.com/dbazure/888969d5-f34g-4e03-ac9d-1f9786c66749/26100.1742.240906-0331.ge_release_svc_refresh_SERVER_EVAL_x64FRE_en-us.iso"
+}
+
+variable "vm_memory" {
+  type        = string
+  description = "The memory size for the VM in MB"
+  default     = "8192"
+}
+
+variable "vm_cpu_cores" {
+  type        = string
+  description = "The number of vCPUs for the VM"
+  default     = "4"
+}
+
+variable "ssh_password" {
+  type        = string
+  description = "The password for SSH access"
+  sensitive   = true
+  default     = "packer"
+}
+
+variable "ssh_username" {
+  type        = string
+  description = "The username for SSH access"
+  default     = "Administrator"
+}
+
+variable "vm_name" {
+  type        = string
+  description = "The name of the virtual machine"
+  default     = "Win2025VM"
+}
+
+# -------------------------------------------------
 # Source blocks are generated from your builders; a source can be referenced in build blocks.
 # A build block runs provisioner and post-processors on a source.
 # Read the documentation for source blocks here:
@@ -31,33 +82,33 @@ variable "ssh_username" {}
 # Source block
 source "vmware-iso" "winsrv2025" {
   boot_command     = ["<spacebar>"]
-  boot_wait        = "${var.boot_wait}"
+  boot_wait        = "2s"
   communicator     = "ssh"
-  cpus             = "${var.numvcpus}"
-  disk_size        = "${var.disk_size}"
+  cpus             = var.vm_cpu_cores
+  disk_size        = var.vm_disk_size
   disk_type_id     = "0"
   floppy_files     = ["config/autounattend.xml","scripts/packer_shutdown.bat"]
   guest_os_type    = "windows2022srvnext-64"
   headless         = false
-  iso_checksum     = "${var.iso_checksum}"
-  iso_url          = "${var.iso_url}"
-  memory           = "${var.memsize}"
+  iso_checksum     = var.iso_checksum
+  iso_url          = var.iso_url
+  memory           = var.vm_memory
   shutdown_command = "A:/packer_shutdown.bat" 
   shutdown_timeout = "30m"
   skip_compaction  = false
-  vm_name          = "${var.vm_name}"
+  version            = "21" # https://knowledge.broadcom.com/external/article?articleNumber=315655
+  vm_name          = var.vm_name
   vmx_data = {
     firmware            = "efi"
-    "scsi0.virtualDev"  = "lsisas1068"
-    "virtualHW.version" = "21"
     "isolation.tools.hgfs.disable" = "TRUE"
   }
-  ssh_password     = "${var.ssh_password}"
+  ssh_password     = var.ssh_password
   ssh_port         = 22
   ssh_timeout      = "30m"
-  ssh_username     = "${var.ssh_username}"
+  ssh_username     = var.ssh_username
 }
 
+# -------------------------------------------------
 # A build block invokes sources and runs provisioning steps on them.
 # The documentation for build blocks can be found here:
 # https://www.packer.io/docs/templates/hcl_templates/blocks/build
@@ -117,7 +168,7 @@ build {
   }
 
   post-processor "vagrant" {
-    compression_level = 6
+    compression_level = 9
     output            = "${var.box_output}"
   }
 

@@ -1,0 +1,59 @@
+#cloud-config
+#
+# Do not alter first line of this file.
+# https://cloudinit.readthedocs.io/en/latest/
+
+autoinstall:
+  # version is an Autoinstall required field.
+  version: 1
+
+  # Configure locale, keyboard and timezone
+  locale: en_US
+  keyboard:
+    layout: it
+  timezone: Europe/Rome
+
+  # Set the installation source
+  # IMPORTANT: verify this value from the ISO at: casper/install-sources.yaml
+  source:
+    id: ubuntu-desktop
+
+  # Configure the storage layout
+  storage:
+    layout:
+      name: lvm
+
+  # Configure the initial user for the system and hostname
+  # Password needs to be generated with
+  #   openssl passwd -6 -stdin <<< 'packer'
+  # or
+  #   mkpasswd -m sha-512 packer
+  identity:
+    hostname: ubuntu2404-desktop
+    username: syselement
+    password: "$6$OxXY0.ndy/Q1c4mU$A6QNNCNXD24WVyJXm5gpHd5tq7tjLhJKAf1wAoG0yjsFdO0vFCs02JBtKRUqT0ivHXDdzFtKhs66jvL/x0rKM1" # password: packer
+
+  # Configure OpenSSH server - install (Internet access is required) and configure authorized keys
+  ssh:
+    install-server: true
+    authorized-keys:
+      - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPA3hxPOnJAjCFoZMz8mcT+fZTy5j0vjLWPGVM2vaA88
+    allow-pw: true
+
+  # Packages to install (via apt-get install) and 
+  packages:
+    - open-vm-tools
+
+  # Update the APT package database and upgrade installed packages automatically on first boot
+  # package_update: true
+  # package_upgrade: true
+
+  # Shell commands to run after the installation has completed successfully and any updates and packages installed, just before the system reboots
+  # The commands are run in the installer environment with the installed system mounted at /target
+  late-commands:
+    - curtin in-target -- systemctl enable ssh
+    - curtin in-target -- truncate -s 0 /etc/machine-id /var/lib/dbus/machine-id
+    - echo 'syselement ALL=(ALL) NOPASSWD:ALL' > /target/etc/sudoers.d/syselement
+    - chmod 0440 /target/etc/sudoers.d/syselement
+
+# Validate this file with `sudo cloud-init schema --config-file user-data --annotate`

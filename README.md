@@ -166,8 +166,7 @@ Proceed with Packer initialize and build.
 ```powershell
 cd win-srv-2025
 packer init .
-packer validate --var-file="winserver2025.pkrvars.hcl" "winserver2025.pkr.hcl"
-packer build --var-file="winserver2025.pkrvars.hcl" "winserver2025.pkr.hcl"
+packer build .
 ```
 
 ### 3️⃣ Deploy VM with Vagrant
