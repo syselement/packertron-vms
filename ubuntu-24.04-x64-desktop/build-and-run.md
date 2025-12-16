@@ -28,3 +28,9 @@ vagrant up
 
 # Destroy VM
 vagrant destroy -f
+
+
+
+# fix disk lv
+
+sudo lvextend -r -l +100%FREE /dev/ubuntu-vg/ubuntu-lv

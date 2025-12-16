@@ -3,10 +3,12 @@ set -euo pipefail
 
 export DEBIAN_FRONTEND=noninteractive
 
+# Update and upgrade the system
 echo "[update] apt update / dist-upgrade"
 apt-get update -y
 apt-get dist-upgrade -y
 
+# Install baseline tools
 echo "[update] install baseline tools"
 apt-get install -y --no-install-recommends \
   net-tools unzip
@@ -15,10 +17,12 @@ apt-get install -y --no-install-recommends \
 echo "[update] install VMware tools"
 apt-get install -y --no-install-recommends \
   open-vm-tools open-vm-tools-desktop || apt-get install -y --no-install-recommends open-vm-tools
-
-# Enable/start the correct service if present
 if systemctl list-unit-files | grep -q '^open-vm-tools\.service'; then
   systemctl enable --now open-vm-tools.service
 fi
+
+# Expand LVM root to use all free space
+echo "[update] expand LVM root to use all free space (if any)"
+lvextend -r -l +100%FREE /dev/ubuntu-vg/ubuntu-lv || true
 
 echo "[update] done updating system and installing necessary packages"

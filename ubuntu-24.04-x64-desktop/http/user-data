@@ -59,4 +59,5 @@ autoinstall:
     - echo 'syselement ALL=(ALL) NOPASSWD:ALL' > /target/etc/sudoers.d/syselement
     - chmod 0440 /target/etc/sudoers.d/syselement
 
+
 # Validate this file with `sudo cloud-init schema --config-file user-data --annotate`
