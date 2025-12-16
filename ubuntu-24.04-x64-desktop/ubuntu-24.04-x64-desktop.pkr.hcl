@@ -88,7 +88,6 @@ source "vmware-iso" "ubuntu2404_desktop" {
   vhv_enabled        = true
   vm_name            = var.vm_name
   usb                = true
-  sound              = true
 
   # Communicator configuration
   communicator   = "ssh"

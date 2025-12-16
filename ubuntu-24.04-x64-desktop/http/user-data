@@ -2,6 +2,9 @@
 #
 # Do not alter first line of this file.
 # https://cloudinit.readthedocs.io/en/latest/
+# For autoinstall specific documentation see:
+# https://canonical-subiquity.readthedocs-hosted.com/en/latest/reference/autoinstall-reference.html
+#
 
 autoinstall:
   # version is an Autoinstall required field.
@@ -22,6 +25,7 @@ autoinstall:
   storage:
     layout:
       name: lvm
+      sizing-policy: all
 
   # Configure the initial user for the system and hostname
   # Password needs to be generated with

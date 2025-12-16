@@ -1,55 +1,34 @@
 # Vagrantfile for Ubuntu 24.04 x64 Desktop VMware VM
 
-description = "Ubuntu Desktop 24.04"
+description = "Ubuntu-Desktop-24"
 
 Vagrant.configure("2") do |config|
   # Configure the Vagrant box
-  config.vm.box = "ubuntu-24.04-x64-desktop-template-vmware"
-  config.vm.hostname = "ubuntu24-desktop"
-  config.ssh.username = "syselement"
-  config.ssh.password = "packer"
-  config.ssh.keep_alive = true
+  config.vm.box              = "ubuntu-24.04-x64-desktop-template-vmware"
+  config.vm.box_url = "file://#{File.expand_path("output/ubuntu-24.04-x64-desktop-template-vmware.box", __dir__)}"
+  config.vm.hostname         = "ubuntu24-desktop"
+  config.ssh.username        = "syselement"
+  config.ssh.password        = "packer"
+  config.ssh.keep_alive      = true
   config.ssh.connect_timeout = 30
-  config.ssh.retry_limit = 60
   config.vm.synced_folder ".", "/vagrant", disabled: true
 
   # VMware provider settings
   config.vm.provider "vmware_desktop" do |v|
     v.gui = true
     #  VMX settings can be set here if needed
-    v.vmx["memsize"]  = "8192"
-    v.vmx["numvcpus"] = "4"
-    v.vmx["ethernet0.connectionType"] = "nat"
-    v.vmx["ethernet0.present"]        = "TRUE"
-    v.vmx["tools.syncTime"] = "TRUE"
-    v.vmx["vhv.enable"]     = "TRUE" # Enable nested virtualization
-    v.vmx["hgfs.linkrootshare"] = "FALSE"
-    v.vmx["hgfs.maprootshare"] = "FALSE"
+    v.vmx["displayname"]                  = description
+    v.vmx["ethernet0.connectionType"]     = "nat"
+    v.vmx["ethernet0.present"]            = "TRUE"
+    v.vmx["hgfs.linkrootshare"]           = "FALSE"
+    v.vmx["hgfs.maprootshare"]            = "FALSE"
+    v.vmx["isolation.tools.hgfs.disable"] = "TRUE"
+    v.vmx["memsize"]                      = "8192"
+    v.vmx["numvcpus"]                     = "4"
+    v.vmx["sound.autodetect"]             = "TRUE"
+    v.vmx["sound.present"]                = "TRUE"
+    v.vmx["sound.startConnected"]         = "TRUE"
+    v.vmx["tools.syncTime"]               = "TRUE"
+    v.vmx["vhv.enable"]                   = "TRUE" # Enable nested virtualization
   end
 end
-
-#################################
-
-  config.vm.define "ubuntu" do |os|
-    os.vm.box="Megabyte/Ubuntu-Desktop"
-    os.vm.hostname = "vagrant-ubuntu"
-
-    os.vm.provider "vmware_workstation" do |v|
-      v.gui = true
-      v.vmx["ethernet0.virtualDev"] = "vmxnet3"
-      v.vmx["gui.fitGuestUsingNativeDisplayResolution"] = "TRUE"
-      v.vmx["gui.fullScreenAtPowerOn"] = "TRUE"
-      v.vmx["gui.lastPoweredViewMode"] = "fullscreen"
-      v.vmx["gui.viewModeAtPowerOn"] = "fullscreen"
-      v.vmx["memsize"] = memory.to_s
-      v.vmx["mks.enable3d"] = "TRUE"
-      v.vmx["mks.forceDiscreteGPU"] = "TRUE"
-      v.vmx["numvcpus"] = cpus.to_s
-      v.vmx["RemoteDisplay.vnc.enabled"] = "TRUE"
-      v.vmx["RemoteDisplay.vnc.port"] = "5900"
-      v.vmx["sound.autodetect"] = "TRUE"
-      v.vmx["sound.present"] = "TRUE"
-      v.vmx["sound.startConnected"] = "TRUE"
-    end
-  end
-ends
