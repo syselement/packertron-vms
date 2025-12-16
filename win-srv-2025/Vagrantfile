@@ -6,7 +6,6 @@ Vagrant.configure("2") do |config|
       { name: "win2025srv01", memory: 4096, cpus: 2, vnet: "VMnet8", nat_device: "vmnet8" }
   ]
   
-
   # Find the newest .box file in the output folder
   latest_box = Dir[File.expand_path("output/*.box", __dir__)]
                 .max_by { |f| File.mtime(f) }
@@ -23,7 +22,6 @@ Vagrant.configure("2") do |config|
   config.ssh.password = "packer"
   config.winssh.connect_timeout = 30
   #config.vm.usable_port_range = 8500..8999
-
 
   # Loop through the machines and configure each one
   machines.each do |machine|
@@ -46,7 +44,6 @@ Vagrant.configure("2") do |config|
         mybasebox.vmx["memsize"] = machine[:memory]
         mybasebox.vmx["numvcpus"] = machine[:cpus]
         mybasebox.vmx["cpuid.coresPerSocket"] = machine[:cpus]
-        mybasebox.vmx["vvtd.enable"] = "TRUE" # If you require nested virtualization, leave this set to TRUE.
         mybasebox.vmx["vhv.enable"] = "TRUE" # If you require nested virtualization, leave this set to TRUE.
         mybasebox.vmx["vpmc.enable"] = "FALSE"
         mybasebox.vmx["ethernet0.connectiontype"] = "custom"

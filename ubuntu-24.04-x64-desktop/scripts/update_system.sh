@@ -1,16 +1,24 @@
-#!/bin/bash -eux
+#!/usr/bin/env bash
+set -euo pipefail
 
-# Source: https://github.com/ynlamy/packer-ubuntuserver24_04
+export DEBIAN_FRONTEND=noninteractive
 
-echo "Updating the system..."
-apt -qq -y update &> /dev/null
-apt -qq -y dist-upgrade &> /dev/null
+echo "[update] apt update / dist-upgrade"
+apt-get update -y
+apt-get dist-upgrade -y
 
-echo "Installing packages..."
-apt -qq -y install locate open-vm-tools net-tools unzip &> /dev/null
-systemctl enable open-vm-tools
-systemctl start open-vm-tools
+echo "[update] install baseline tools"
+apt-get install -y --no-install-recommends \
+  net-tools unzip
 
-echo "Setting up locate database..."
-updatedb
-echo "System update completed."
+# VMware tools for Desktop guests: open-vm-tools + desktop integration
+echo "[update] install VMware tools"
+apt-get install -y --no-install-recommends \
+  open-vm-tools open-vm-tools-desktop || apt-get install -y --no-install-recommends open-vm-tools
+
+# Enable/start the correct service if present
+if systemctl list-unit-files | grep -q '^open-vm-tools\.service'; then
+  systemctl enable --now open-vm-tools.service
+fi
+
+echo "[update] done updating system and installing necessary packages"

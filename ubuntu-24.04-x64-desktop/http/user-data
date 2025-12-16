@@ -41,8 +41,8 @@ autoinstall:
     allow-pw: true
 
   # Packages to install (via apt-get install) and 
-  packages:
-    - open-vm-tools
+  # packages:
+  #   - open-vm-tools
 
   # Update the APT package database and upgrade installed packages automatically on first boot
   # package_update: true
@@ -51,7 +51,6 @@ autoinstall:
   # Shell commands to run after the installation has completed successfully and any updates and packages installed, just before the system reboots
   # The commands are run in the installer environment with the installed system mounted at /target
   late-commands:
-    - curtin in-target -- systemctl enable ssh
     - curtin in-target -- truncate -s 0 /etc/machine-id /var/lib/dbus/machine-id
     - echo 'syselement ALL=(ALL) NOPASSWD:ALL' > /target/etc/sudoers.d/syselement
     - chmod 0440 /target/etc/sudoers.d/syselement

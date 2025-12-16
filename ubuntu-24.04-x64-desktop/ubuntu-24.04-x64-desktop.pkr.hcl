@@ -35,18 +35,18 @@ variable "vm_name" {
 }
 
 variable "vm_cpu_cores" {
-  type    = string
-  default = "4"
+  type    = number
+  default = 4
 }
 
 variable "vm_memory" {
-  type    = string
-  default = "8192"
+  type    = number
+  default = 8192
 }
 
 variable "vm_disk_size" {
-  type    = string
-  default = "61440" # Size in MB
+  type    = number
+  default = 61440 # Size in MB
 }
 
 variable "ssh_username" {
@@ -75,6 +75,7 @@ source "vmware-iso" "ubuntu2404_desktop" {
   # ISO configuration
   iso_checksum = var.iso_checksum
   iso_url      = var.iso_url
+  output_directory   = "${var.output_dir}/${var.vm_name}"
 
   # VM Hardware configuration
   cpus               = var.vm_cpu_cores
@@ -83,7 +84,6 @@ source "vmware-iso" "ubuntu2404_desktop" {
   disk_type_id       = "0"
   guest_os_type      = "ubuntu-64"
   memory             = var.vm_memory
-  output_directory   = "${var.output_dir}/${var.vm_name}"
   version            = "21" # https://knowledge.broadcom.com/external/article?articleNumber=315655
   vhv_enabled        = true
   vm_name            = var.vm_name
