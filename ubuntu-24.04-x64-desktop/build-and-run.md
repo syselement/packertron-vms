@@ -14,8 +14,16 @@ packer build .
 
 ---
 
-# TO DO
-# vagrant box add --name ubuntu2404-desktop-vmware .\output\ubuntu-24.04-x64-desktop-template-vmware.box
+# VAGRANT
+## SCRIPT POST INSTALL
+
+# fix disk lv to do with vagrant
+
+# Expand LVM root to use all free space
+echo "[update] expand LVM root to use all free space (if any)"
+sudo lvextend -r -l +100%FREE /dev/ubuntu-vg/ubuntu-lv
+
+
 
 vagrant up --provider vmware_desktop
 
@@ -30,7 +38,3 @@ vagrant up
 vagrant destroy -f
 
 
-
-# fix disk lv
-
-sudo lvextend -r -l +100%FREE /dev/ubuntu-vg/ubuntu-lv

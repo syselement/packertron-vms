@@ -21,8 +21,4 @@ if systemctl list-unit-files | grep -q '^open-vm-tools\.service'; then
   systemctl enable --now open-vm-tools.service
 fi
 
-# Expand LVM root to use all free space
-echo "[update] expand LVM root to use all free space (if any)"
-lvextend -r -l +100%FREE /dev/ubuntu-vg/ubuntu-lv || true
-
 echo "[update] done updating system and installing necessary packages"
