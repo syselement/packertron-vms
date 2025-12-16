@@ -12,3 +12,7 @@ crash.log
 # FreeFileSync
 *.ffs_lock
 *.ffs_db
+
+# Temporary files
+*.tmp
+*.temp
