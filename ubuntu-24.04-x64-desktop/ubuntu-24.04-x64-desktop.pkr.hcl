@@ -72,46 +72,36 @@ locals {
 
 # Source block
 source "vmware-iso" "ubuntu2404_desktop" {
-  # ISO configuration
-  iso_checksum = var.iso_checksum
-  iso_url      = var.iso_url
-  output_directory   = "${var.output_dir}/${var.vm_name}"
-
-  # VM Hardware configuration
-  cpus               = var.vm_cpu_cores
-  disk_adapter_type  = "scsi"
-  disk_size          = var.vm_disk_size
-  disk_type_id       = "0"
-  guest_os_type      = "ubuntu-64"
-  memory             = var.vm_memory
-  version            = "21" # https://knowledge.broadcom.com/external/article?articleNumber=315655
-  vhv_enabled        = true
-  vm_name            = var.vm_name
-  usb                = true
-
-  # Communicator configuration
-  communicator   = "ssh"
-  ssh_username   = var.ssh_username
-  ssh_password   = var.ssh_password
-  ssh_timeout    = "30m"
-
-  # Shutdown configuration
-  shutdown_command = "echo '${var.ssh_password}' | sudo -S shutdown -P now"
-  shutdown_timeout = "10m"
-  skip_compaction = false
-
-  # VMware + Packer HTTP server to provide user-data/meta-data/scripts
-  http_directory = local.http_dir
-
-  # Boot configuration
   # Ubuntu 24.04 Desktop autoinstall via NoCloud-Net and local HTTP server
-  boot_wait = "5s"
+  boot_wait              = "5s"
   boot_command = [
     "e<wait>",
     "<down><down><down><end>",
     " autoinstall ds=nocloud-net\\;s=http://{{ .HTTPIP }}:{{ .HTTPPort }}/ ---",
     "<f10><wait>"
   ]
+  communicator           = "ssh"
+  cpus                   = var.vm_cpu_cores
+  disk_adapter_type      = "scsi"
+  disk_size              = var.vm_disk_size
+  disk_type_id           = "0"
+  guest_os_type          = "ubuntu-64"
+  http_directory         = local.http_dir
+  iso_checksum           = var.iso_checksum
+  iso_url                = var.iso_url
+  memory                 = var.vm_memory
+  output_directory       = "${var.output_dir}/${var.vm_name}"
+  shutdown_command       = "echo '${var.ssh_password}' | sudo -S shutdown -P now"
+  shutdown_timeout       = "10m"
+  skip_compaction        = false
+  ssh_password           = var.ssh_password
+  ssh_timeout            = "30m"
+  ssh_username           = var.ssh_username
+  usb                    = true
+  vhv_enabled            = true # Enable nested virtualization
+  version                = "21"
+  vm_name                = var.vm_name
+  hgfs_enabled          = false
 }
 
 # Build block

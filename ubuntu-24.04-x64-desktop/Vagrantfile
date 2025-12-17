@@ -23,7 +23,7 @@ Vagrant.configure("2") do |config|
     v.vmx["hgfs.linkrootshare"]           = "FALSE"
     v.vmx["hgfs.maprootshare"]            = "FALSE"
     v.vmx["isolation.tools.hgfs.disable"] = "TRUE"
-    v.vmx["memsize"]                      = "8192"
+    v.vmx["memsize"]                      = "16384" # 16 GB RAM
     v.vmx["numvcpus"]                     = "4"
     v.vmx["sound.autodetect"]             = "TRUE"
     v.vmx["sound.present"]                = "TRUE"
