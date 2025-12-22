@@ -1,13 +1,22 @@
+# Install Windows Updates using PSWindowsUpdate module and a scheduled task.
+# Adapted from various sources listed below.
+#
 # Source: https://github.com/hashicorp/best-practices/blob/master/packer/scripts/windows/install_windows_updates.ps1 - deprecated repo
 # Source: https://github.com/eaksel/packer-Win2022/blob/main/scripts/win-update.ps1
-# Silence progress bars in PowerShell, which can sometimes feed back strange XML data to the Packer output.
+#
 
+# Silence progress bars in PowerShell, which can sometimes feed back strange XML data to the Packer output.
 $ProgressPreference = "SilentlyContinue"
 
 Write-Output "***** Starting PSWindowsUpdate Installation"
 
-Install-PackageProvider -Name NuGet -MinimumVersion 2.8.5.201 -Force
-Install-Module -Name PSWindowsUpdate -Force
+Install-PackageProvider -Name NuGet -MinimumVersion 2.8.5.201 -Force -Confirm:$false -ErrorAction Stop
+try {
+    Set-PSRepository -Name PSGallery -InstallationPolicy Trusted -ErrorAction Stop
+} catch {
+    Write-Output "***** Unable to set PSGallery as Trusted; continuing"
+}
+Install-Module -Name PSWindowsUpdate -Force -Confirm:$false -ErrorAction Stop
 
 if (Get-ChildItem "C:\Program Files\WindowsPowerShell\Modules\PSWindowsUpdate") {
     Write-Output "***** PSWindowsUpdate installed successfully"
@@ -61,22 +70,24 @@ try {
     Write-Output "***** The Windows Update log will be displayed below this message. No additional output indicates no updates were needed."
     do {
         sleep 1
-        if ((Test-Path C:\Windows\Temp\PSWindowsUpdate.log) -and $script:reader -eq $null) {
+        if ((Test-Path C:\Windows\Temp\PSWindowsUpdate.log) -and $null -eq $script:reader) {
             $script:stream = New-Object System.IO.FileStream -ArgumentList "C:\Windows\Temp\PSWindowsUpdate.log", "Open", "Read", "ReadWrite"
             $script:reader = New-Object System.IO.StreamReader $stream
         }
-        if ($script:reader -ne $null) {
-            $line = $Null
-            do {$script:reader.ReadLine()
-                $line = $script:reader.ReadLine()
+        if ($null -ne $script:reader) {
+            while ($null -ne ($line = $script:reader.ReadLine())) {
                 Write-Output $line
-            } while ($line -ne $null)
+            }
         }
     } while ($Scheduler.GetRunningTasks(0) | Where-Object {$_.Name -eq $TaskName})
 } finally {
-    $RootFolder.DeleteTask($TaskName,0)
-    [System.Runtime.Interopservices.Marshal]::ReleaseComObject($Scheduler) | Out-Null
-    if ($script:reader -ne $null) {
+    if ($null -ne $RootFolder) {
+        $RootFolder.DeleteTask($TaskName,0)
+    }
+    if ($null -ne $Scheduler) {
+        [System.Runtime.Interopservices.Marshal]::ReleaseComObject($Scheduler) | Out-Null
+    }
+    if ($null -ne $script:reader) {
         $script:reader.Close()
         $script:stream.Dispose()
     }

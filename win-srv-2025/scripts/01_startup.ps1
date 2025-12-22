@@ -2,10 +2,10 @@
 # Run only when sysprep has completed successfully
 $regPath = "HKLM:\SYSTEM\Setup\Status\SysprepStatus"
 
-# Remove the startup.cmd file 
+# Verify the startup.cmd file after successful execution
 $filePath = "$env:APPDATA\Microsoft\Windows\Start Menu\Programs\Startup\startup.cmd"
 
-# Query the CleanupState and GeneralizationState from the registry
+# Query the CleanupState and GeneralizationState from the registry to determine if sysprep has completed
 $cleanupState = Get-ItemProperty -Path $regPath -Name CleanupState | Select-Object -ExpandProperty CleanupState
 $generalizationState = Get-ItemProperty -Path $regPath -Name GeneralizationState | Select-Object -ExpandProperty GeneralizationState
 

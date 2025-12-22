@@ -120,7 +120,7 @@ build {
   provisioner "powershell" {
     only         = ["vmware-iso.winsrv2025"]
     pause_before = "1m0s"
-    scripts      = ["scripts/vmware_tools.ps1"]
+    scripts      = ["scripts/00_vmware_tools.ps1"]
   }
 
   provisioner "file" {
@@ -133,12 +133,12 @@ build {
   }
 
   provisioner "file" {
-    source = "scripts/startup.cmd"
+    source = "scripts/01_startup.cmd"
     destination = "c:/tmp/startup.cmd"
   }
 
   provisioner "file" {
-    source = "scripts/complete_config.ps1"
+    source = "scripts/01_startup.ps1"
     destination = "c:/tmp/startup.ps1"
   }
 
@@ -147,7 +147,7 @@ build {
   }
 
   provisioner "powershell" {
-    scripts = ["scripts/win_updates.ps1"]
+    scripts = ["scripts/02_win_updates.ps1"]
   }
 
   provisioner "windows-restart" {
@@ -155,7 +155,7 @@ build {
   }
 
   provisioner "powershell" {
-    scripts = ["scripts/win_updates.ps1"]
+    scripts = ["scripts/02_win_updates.ps1"]
   }
 
   provisioner "windows-restart" {
@@ -164,7 +164,7 @@ build {
 
   provisioner "powershell" {
     pause_before = "1m0s"
-    scripts      = ["scripts/cleanup.ps1"]
+    scripts      = ["scripts/03_cleanup.ps1"]
   }
 
   post-processor "vagrant" {
