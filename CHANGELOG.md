@@ -1,3 +1,12 @@
+## [0.4.2](https://github.com/syselement/packertron-vms/compare/v0.4.1...v0.4.2) (2025-12-22)
+
+
+### Bug Fixes
+
+* Refactor provisioning scripts and cleanup: update .gitignore, remove obsolete scripts, and enhance system update and cleanup processes ([b044d77](https://github.com/syselement/packertron-vms/commit/b044d7796a785ed161dabb7485aa83245a24ae03))
+
+
+
 ## [0.4.1](https://github.com/syselement/packertron-vms/compare/v0.4.0...v0.4.1) (2025-08-16)
 
 
@@ -44,15 +53,6 @@
 
 * version.yaml new file ([5ce57b9](https://github.com/syselement/packertron-vms/commit/5ce57b96bdbf4bac32683c17dcf2858f4fa88b1b))
 * Win fixed VM parameters ([0145556](https://github.com/syselement/packertron-vms/commit/0145556ab77a01174ceb0586e66debfb42e60b7a))
-
-
-
-# [0.1.0](https://github.com/syselement/packertron-vms/compare/1a8ada6e141ae642c5903d54def8072449bb885b...v0.1.0) (2025-02-04)
-
-
-### Features
-
-* **packaging:** add configurations for Windows Server 2025 provisioning and deploy ([1a8ada6](https://github.com/syselement/packertron-vms/commit/1a8ada6e141ae642c5903d54def8072449bb885b))
 
 
 
