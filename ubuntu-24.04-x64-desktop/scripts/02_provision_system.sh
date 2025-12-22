@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+#
+# Install various developer tools: Docker, OpenTofu, Ansible, Packer, VS Code 
+
 set -euo pipefail
 
 export DEBIAN_FRONTEND=noninteractive
@@ -16,6 +19,38 @@ if [[ -f "$MARKER" ]]; then
 fi
 
 echo "[20-tools] start: $(date -Is)"
+
+# --- apt reliability / base packages ---
+echo "[10-hygiene] apt update/dist-upgrade"
+apt-get update -y
+apt-get dist-upgrade -y
+
+echo "[10-hygiene] install baseline packages"
+apt-get install -y --no-install-recommends \
+  apt-transport-https \
+  bash-completion \
+  build-essential \
+  ca-certificates \
+  curl \
+  git \
+  gnupg \
+  jq \
+  lsb-release \
+  net-tools \
+  openssh-client \
+  python3 \
+  python3-pip \
+  python3-venv \
+  software-properties-common \
+  tmux \
+  unzip \
+  vim \
+  wget \
+  zip
+
+# --- time sync ---
+echo "[10-hygiene] enable NTP"
+timedatectl set-ntp true || true
 
 # Detect codename/arch for repos
 CODENAME="$(. /etc/os-release && echo "$VERSION_CODENAME")"

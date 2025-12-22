@@ -13,6 +13,8 @@ crash.log
 *.ffs_lock
 *.ffs_db
 
-# Temporary files
+# Temporary files and directories
 *.tmp
 *.temp
+tmp/
+temp/

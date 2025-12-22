@@ -13,7 +13,7 @@ Repeatable Ubuntu 24.04 desktop build for VMware Workstation with optional Vagra
 cd ubuntu-24.04-x64-desktop
 packer init .
 packer validate ./ubuntu-24.04-x64-desktop.pkr.hcl
-packer build ./ubuntu-24.04-x64-desktop.pkr.hcl
+packer build .
 ```
 Artifacts land in `output/` (e.g., `ubuntu-24.04-x64-desktop-template-vmware.box`).
 
