@@ -33,9 +33,11 @@ Vagrant.configure("2") do |config|
       node.vm.provision "shell",
       run: "once",
       name: "Set hostname",
-      inline: "powershell rename-computer -NewName '#{machine[:name]}' -Restart",
-      privileged: true
-    
+      inline: "powershell Rename-Computer -NewName '#{machine[:name]}' -Force -Restart",
+      privileged: true,
+      reboot: true
+
+      # VMware provider settings
       node.vm.provider "vmware_desktop" do |mybasebox|
         mybasebox.gui = true
         mybasebox.allowlist_verified = :disable_warning

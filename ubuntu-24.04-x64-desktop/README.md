@@ -31,16 +31,13 @@ Artifacts land in `output/` (e.g., `ubuntu-24.04-x64-desktop-template-vmware.box
 
 ## Use with Vagrant (VMware provider)
 ```powershell
-vagrant box add --name ubuntu-24.04-desktop output/<box>.box
-vagrant init ubuntu-24.04-desktop
 vagrant up --provider=vmware_desktop
 ```
 Vagrant/VMware will manage VMX adjustments during `vagrant up`; no manual VMX edits needed when using Vagrant.
 
 ## Customize
 - Final/default Packer variables: `ubuntu-24.04-x64-desktop.auto.pkrvars.hcl` (auto-loaded). Override via `-var "key=value"`.
-- `scripts/` is used during the Packer build for preseed/install automation.
-- `provision/` holds custom scripts for final Ubuntu Desktop provisioning after VMware import; extend or add your own.
+- `scripts/` are used during the Packer build for preseed/install automation and for final Ubuntu Desktop provisioning after VMware import.
 
 ## Troubleshoot fast
 - SSH issues: check VMware network mode (NAT vs bridged) and VMware services.

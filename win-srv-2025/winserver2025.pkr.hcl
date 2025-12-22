@@ -100,6 +100,7 @@ source "vmware-iso" "winsrv2025" {
   vm_name          = var.vm_name
   vmx_data = {
     firmware            = "efi"
+    "scsi0.virtualDev"  = "lsisas1068" # Autounattend requires SCSI hard disk controller to be LSI Logic SAS
     "isolation.tools.hgfs.disable" = "TRUE"
   }
   ssh_password     = var.ssh_password
@@ -120,25 +121,27 @@ build {
   provisioner "powershell" {
     only         = ["vmware-iso.winsrv2025"]
     pause_before = "1m0s"
-    scripts      = ["scripts/00_vmware_tools.ps1"]
+    scripts      = ["scripts/01_vmware_tools.ps1"]
   }
 
+  # Copy unattend.xml to the VM for the final sysprep shutdown step in the packer_shutdown.bat script
   provisioner "file" {
     source = "config/unattend.xml"
     destination = "C:/Windows/Panther/unattend.xml"
   }
 
+  # Startup scripts used in the unattend.xml to run during first boot after complete deployment/sysprep
   provisioner "powershell" {
     inline = ["New-Item -Path 'c:/' -Name 'tmp' -ItemType 'directory'"]
   }
 
   provisioner "file" {
-    source = "scripts/01_startup.cmd"
+    source = "scripts/04_startup.cmd"
     destination = "c:/tmp/startup.cmd"
   }
 
   provisioner "file" {
-    source = "scripts/01_startup.ps1"
+    source = "scripts/04_startup.ps1"
     destination = "c:/tmp/startup.ps1"
   }
 
@@ -146,6 +149,7 @@ build {
     restart_timeout = "30m"
   }
 
+  # First round of Windows Updates
   provisioner "powershell" {
     scripts = ["scripts/02_win_updates.ps1"]
   }
@@ -154,6 +158,7 @@ build {
     restart_timeout = "30m"
   }
 
+  # Second round of Windows Updates
   provisioner "powershell" {
     scripts = ["scripts/02_win_updates.ps1"]
   }
@@ -162,6 +167,7 @@ build {
     restart_timeout = "30m"
   }
 
+  # Final cleanup before packaging the box
   provisioner "powershell" {
     pause_before = "1m0s"
     scripts      = ["scripts/03_cleanup.ps1"]

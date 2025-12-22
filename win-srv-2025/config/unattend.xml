@@ -73,7 +73,7 @@
                     <Description>Set ssh default shell to PowerShell</Description>
                     <Order>1</Order>
                 </SynchronousCommand>
-                 <SynchronousCommand wcm:action="add">
+                <SynchronousCommand wcm:action="add">
                     <CommandLine>cmd.exe /c move C:\tmp\startup.cmd "%AppData%\Microsoft\Windows\Start Menu\Programs\Startup\"</CommandLine>
                     <Description>Copy startup.cmd to startup folder</Description>
                     <Order>2</Order>

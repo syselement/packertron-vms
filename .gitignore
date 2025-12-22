@@ -16,5 +16,7 @@ crash.log
 # Temporary files and directories
 *.tmp
 *.temp
+*tmp*
+*temp*
 tmp/
 temp/
