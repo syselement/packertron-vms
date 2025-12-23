@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Install baseline + developer tools: Docker, OpenTofu, Ansible, Packer, VS Code
+# Install baseline + developer tools on Ubuntu 24.04 Desktop
 #
 set -euo pipefail
 
@@ -23,7 +23,6 @@ START_TS="$(date +%s)"
 
 CODENAME="$(. /etc/os-release && echo "$VERSION_CODENAME")"
 ARCH="$(dpkg --print-architecture)"
-
 echo "[provision-system] distro codename=${CODENAME} arch=${ARCH}"
 
 # --- Update system and install baseline packages ---
@@ -139,28 +138,30 @@ if id "$USER_NAME" >/dev/null 2>&1; then
   usermod -aG docker "$USER_NAME" || true
 fi
 
-# --- hygiene after installs ---
+# --- Cleanup ---
 echo "[provision-system] apt cleanup"
 apt-get -y autoremove --purge
 apt-get -y clean
 rm -rf /var/lib/apt/lists/*
 
-# --- validate ---
+# --- Validate ---
 echo "[provision-system] validate"
-echo "tofu:    $(tofu --version | head -n1 || true)"
-echo "packer:  $(packer --version || true)"
 echo "ansible: $(ansible --version | head -n1 || true)"
-echo "docker:  $(docker --version || true)"
-echo "compose: $(docker compose version 2>/dev/null || true)"
 CODE_VER="$(sudo -u "$USER_NAME" -H bash -lc 'code --version 2>/dev/null | head -n1 || true')"
 echo "code:    ${CODE_VER}"
+echo "compose: $(docker compose version 2>/dev/null || true)"
+echo "docker:  $(docker --version || true)"
+echo "packer:  $(packer --version || true)"
+echo "tofu:    $(tofu --version | head -n1 || true)"
 
 # --- done ---
 echo "[provision-system] done: $(date -Is)"
 END_TS="$(date +%s)"
 ELAPSED="$((END_TS - START_TS))"
 printf '[provision-system] elapsed: %02d:%02d:%02d\n' "$((ELAPSED / 3600))" "$((ELAPSED % 3600 / 60))" "$((ELAPSED % 60))"
-echo "LOG: ${LOG}"
+echo "[provision-system] LOG: ${LOG}"
 echo "################################"
 echo "# Provision System Complete"
+echo "[provision-system] rebooting"
+reboot
 echo "################################"
