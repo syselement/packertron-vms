@@ -5,15 +5,16 @@
 set -euo pipefail
 
 export DEBIAN_FRONTEND=noninteractive
-USER_NAME="syselement"
-LOG="/var/log/provision-system.log"
-exec > >(tee -a "$LOG") 2>&1
 
 # --- must be root ---
 if [[ "${EUID}" -ne 0 ]]; then
   echo "[provision-system] must run as root (use Vagrant provisioner with privileged: true)" >&2
   exit 1
 fi
+
+USER_NAME="syselement"
+LOG="/var/log/provision-system.log"
+exec > >(tee -a "$LOG") 2>&1
 
 echo "################################"
 echo "# Provision System"
