@@ -15,6 +15,7 @@ LOG="/var/log/provision-system.log"
 mkdir -p "$MARKER_DIR"
 exec > >(tee -a "$LOG") 2>&1
 
+# Error handling
 trap 'rc=$?; echo "[provision-system] ERROR rc=${rc} at line ${LINENO}: ${BASH_COMMAND}" >&2; exit $rc' ERR
 
 if [[ "${EUID}" -ne 0 ]]; then
@@ -27,6 +28,9 @@ if [[ -f "$MARKER" ]]; then
   exit 0
 fi
 
+echo "################################"
+echo "# Provision System"
+echo "################################"
 echo "[provision-system] start: $(date -Is)"
 
 CODENAME="$(. /etc/os-release && echo "$VERSION_CODENAME")"
@@ -52,6 +56,7 @@ apt-get install -y --no-install-recommends \
   lsb-release \
   net-tools \
   openssh-client \
+  pipx \
   python3 \
   python3-pip \
   python3-venv \
@@ -71,25 +76,42 @@ install -m 0755 -d /etc/apt/keyrings
 
 # --- Docker Engine (official repo) ---
 echo "[provision-system] configure docker repo"
-if [[ ! -f /etc/apt/keyrings/docker.gpg ]]; then
-  curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
-  chmod a+r /etc/apt/keyrings/docker.gpg
+if [[ ! -f /etc/apt/keyrings/docker.asc ]]; then
+  curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+  chmod a+r /etc/apt/keyrings/docker.asc
 fi
-
-cat > /etc/apt/sources.list.d/docker.list <<EOF
-deb [arch=${ARCH} signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu ${CODENAME} stable
+cat > /etc/apt/sources.list.d/docker.sources <<EOF
+Types: deb
+URIs: https://download.docker.com/linux/ubuntu
+Suites: $(. /etc/os-release && echo "${UBUNTU_CODENAME:-$VERSION_CODENAME}")
+Components: stable
+Architectures: amd64
+Signed-By: /etc/apt/keyrings/docker.asc
 EOF
+sudo chmod a+r /etc/apt/sources.list.d/docker.sources
 
 # --- OpenTofu (official repo) ---
 echo "[provision-system] configure opentofu repo"
 if [[ ! -f /etc/apt/keyrings/opentofu.gpg ]]; then
-  curl -fsSL https://get.opentofu.org/opentofu.gpg | gpg --dearmor -o /etc/apt/keyrings/opentofu.gpg
-  chmod a+r /etc/apt/keyrings/opentofu.gpg
+  curl -fsSL https://get.opentofu.org/opentofu.gpg | sudo tee /etc/apt/keyrings/opentofu.gpg >/dev/null
+  curl -fsSL https://packages.opentofu.org/opentofu/tofu/gpgkey | sudo gpg --no-tty --batch --dearmor -o /etc/apt/keyrings/opentofu-repo.gpg >/dev/null
+  sudo chmod a+r /etc/apt/keyrings/opentofu.gpg /etc/apt/keyrings/opentofu-repo.gpg
 fi
-
 cat > /etc/apt/sources.list.d/opentofu.list <<EOF
-deb [signed-by=/etc/apt/keyrings/opentofu.gpg] https://packages.opentofu.org/opentofu/tofu/any/ any main
+deb [signed-by=/etc/apt/keyrings/opentofu.gpg,/etc/apt/keyrings/opentofu-repo.gpg] https://packages.opentofu.org/opentofu/tofu/any/ any main
+deb-src [signed-by=/etc/apt/keyrings/opentofu.gpg,/etc/apt/keyrings/opentofu-repo.gpg] https://packages.opentofu.org/opentofu/tofu/any/ any main
 EOF
+sudo chmod a+r /etc/apt/sources.list.d/opentofu.list
+
+# --- Packer (HashiCorp repo) ---
+echo "[provision-system] configure hashicorp repo"
+if [[ ! -f /usr/share/keyrings/hashicorp-archive-keyring.gpg ]]; then
+  curl -fsSL https://apt.releases.hashicorp.com/gpg | gpg --dearmor | sudo tee /usr/share/keyrings/hashicorp-archive-keyring.gpg >/dev/null
+fi
+cat > /etc/apt/sources.list.d/hashicorp.list <<EOF
+deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main
+EOF
+sudo chmod a+r /etc/apt/sources.list.d/hashicorp.list
 
 # --- Ansible PPA ---
 echo "[provision-system] configure ansible repo"
@@ -106,32 +128,13 @@ echo "[provision-system] install docker + tofu + ansible"
 apt-get install -y --no-install-recommends \
   docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin \
   tofu \
+  packer \
   ansible
 
+# --- Docker post-install setup ---
 systemctl enable --now docker
-
 if id "$USER_NAME" >/dev/null 2>&1; then
   usermod -aG docker "$USER_NAME" || true
-fi
-
-# --- Packer (binary install, pinned) ---
-echo "[provision-system] install packer (pinned)"
-PACKER_VERSION="1.14.3"
-NEED_PACKER="true"
-if command -v packer >/dev/null 2>&1; then
-  if [[ "$(packer --version 2>/dev/null || true)" == "$PACKER_VERSION" ]]; then
-    NEED_PACKER="false"
-  fi
-fi
-
-if [[ "$NEED_PACKER" == "true" ]]; then
-  tmpdir="$(mktemp -d)"
-  pushd "$tmpdir" >/dev/null
-  curl -fsSLO "https://releases.hashicorp.com/packer/${PACKER_VERSION}/packer_${PACKER_VERSION}_linux_${ARCH}.zip"
-  unzip -o "packer_${PACKER_VERSION}_linux_${ARCH}.zip"
-  install -m 0755 packer /usr/local/bin/packer
-  popd >/dev/null
-  rm -rf "$tmpdir"
 fi
 
 # --- VS Code (.deb) ---
@@ -162,8 +165,13 @@ echo "packer:  $(packer --version || true)"
 echo "ansible: $(ansible --version | head -n1 || true)"
 echo "docker:  $(docker --version || true)"
 echo "compose: $(docker compose version 2>/dev/null || true)"
-echo "code:    $(code --version 2>/dev/null | head -n1 || true)"
+CODE_VER="$(sudo -u "$USER_NAME" -H bash -lc 'code --version 2>/dev/null | head -n1 || true')"
+echo "code:    ${CODE_VER}"
 
+# --- mark done ---
 touch "$MARKER"
 echo "[provision-system] done: $(date -Is)"
 echo "[provision-system] marker: $MARKER"
+echo "################################"
+echo "# Provision System Complete"
+echo "################################"
