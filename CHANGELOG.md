@@ -1,3 +1,12 @@
+# [0.7.0](https://github.com/syselement/packertron-vms/compare/v0.6.0...v0.7.0) (2025-12-23)
+
+
+### Features
+
+* streamline provisioning script for Ubuntu 24.04 with improved error handling and repository configurations ([9a90615](https://github.com/syselement/packertron-vms/commit/9a906159be9d8513cdf52e6f2679d0004655eb0e))
+
+
+
 # [0.6.0](https://github.com/syselement/packertron-vms/compare/v0.5.0...v0.6.0) (2025-12-23)
 
 
@@ -31,15 +40,6 @@
 ### Bug Fixes
 
 * dir names changed ([de8a201](https://github.com/syselement/packertron-vms/commit/de8a201e4d3f51a9e0a6969a885bb031afe3c849))
-
-
-
-# [0.4.0](https://github.com/syselement/packertron-vms/compare/v0.3.0...v0.4.0) (2025-08-16)
-
-
-### Features
-
-* Ubuntu Desktop placeholder files [TO DO] ([0b081a1](https://github.com/syselement/packertron-vms/commit/0b081a19840d988a09d0c4a02eb47f009c6a534b))
 
 
 
