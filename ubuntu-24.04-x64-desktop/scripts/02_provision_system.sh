@@ -5,40 +5,28 @@
 set -euo pipefail
 
 export DEBIAN_FRONTEND=noninteractive
-
 USER_NAME="syselement"
-
-MARKER_DIR="/var/lib/provision"
-MARKER="${MARKER_DIR}/provision-system.done"
 LOG="/var/log/provision-system.log"
-
-mkdir -p "$MARKER_DIR"
 exec > >(tee -a "$LOG") 2>&1
 
-# Error handling
-trap 'rc=$?; echo "[provision-system] ERROR rc=${rc} at line ${LINENO}: ${BASH_COMMAND}" >&2; exit $rc' ERR
-
+# --- must be root ---
 if [[ "${EUID}" -ne 0 ]]; then
   echo "[provision-system] must run as root (use Vagrant provisioner with privileged: true)" >&2
   exit 1
-fi
-
-if [[ -f "$MARKER" ]]; then
-  echo "[provision-system] already applied: $MARKER"
-  exit 0
 fi
 
 echo "################################"
 echo "# Provision System"
 echo "################################"
 echo "[provision-system] start: $(date -Is)"
+START_TS="$(date +%s)"
 
 CODENAME="$(. /etc/os-release && echo "$VERSION_CODENAME")"
 ARCH="$(dpkg --print-architecture)"
 
 echo "[provision-system] distro codename=${CODENAME} arch=${ARCH}"
 
-# --- Base OS hygiene / deps ---
+# --- Update system and install baseline packages ---
 echo "[provision-system] apt update / dist-upgrade"
 apt-get update -y
 apt-get dist-upgrade -y
@@ -57,9 +45,8 @@ apt-get install -y --no-install-recommends \
   net-tools \
   openssh-client \
   pipx \
-  python3 \
-  python3-pip \
   python3-venv \
+  sshpass \
   software-properties-common \
   tmux \
   unzip \
@@ -67,14 +54,36 @@ apt-get install -y --no-install-recommends \
   wget \
   zip
 
-# --- Enable NTP (best effort) ---
+# --- Enable NTP ---
 echo "[provision-system] enable NTP (best effort)"
 timedatectl set-ntp true || true
 
 # --- Add apt keyrings dir ---
 install -m 0755 -d /etc/apt/keyrings
 
-# --- Docker Engine (official repo) ---
+# --- Ansible PPA ---
+echo "[provision-system] configure ansible repo"
+if ! grep -Rqs "^deb .*\bansible/ansible\b" /etc/apt/sources.list /etc/apt/sources.list.d 2>/dev/null; then
+  add-apt-repository --yes ppa:ansible/ansible
+fi
+
+# --- VS Code repo ---
+echo "[provision-system] configure vscode repo"
+if [[ ! -f /usr/share/keyrings/microsoft.gpg ]]; then
+  curl -fsSL https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor | sudo tee /usr/share/keyrings/microsoft.gpg >/dev/null
+  sudo chmod a+r /usr/share/keyrings/microsoft.gpg
+fi
+cat > /etc/apt/sources.list.d/vscode.sources <<EOF
+Types: deb
+URIs: https://packages.microsoft.com/repos/code
+Suites: stable
+Components: main
+Architectures: amd64,arm64,armhf
+Signed-By: /usr/share/keyrings/microsoft.gpg
+EOF
+sudo chmod a+r /etc/apt/sources.list.d/vscode.sources
+
+# --- Docker Engine repo ---
 echo "[provision-system] configure docker repo"
 if [[ ! -f /etc/apt/keyrings/docker.asc ]]; then
   curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
@@ -90,7 +99,7 @@ Signed-By: /etc/apt/keyrings/docker.asc
 EOF
 sudo chmod a+r /etc/apt/sources.list.d/docker.sources
 
-# --- OpenTofu (official repo) ---
+# --- OpenTofu repo ---
 echo "[provision-system] configure opentofu repo"
 if [[ ! -f /etc/apt/keyrings/opentofu.gpg ]]; then
   curl -fsSL https://get.opentofu.org/opentofu.gpg | sudo tee /etc/apt/keyrings/opentofu.gpg >/dev/null
@@ -103,7 +112,7 @@ deb-src [signed-by=/etc/apt/keyrings/opentofu.gpg,/etc/apt/keyrings/opentofu-rep
 EOF
 sudo chmod a+r /etc/apt/sources.list.d/opentofu.list
 
-# --- Packer (HashiCorp repo) ---
+# --- Packer - HashiCorp repo ---
 echo "[provision-system] configure hashicorp repo"
 if [[ ! -f /usr/share/keyrings/hashicorp-archive-keyring.gpg ]]; then
   curl -fsSL https://apt.releases.hashicorp.com/gpg | gpg --dearmor | sudo tee /usr/share/keyrings/hashicorp-archive-keyring.gpg >/dev/null
@@ -113,43 +122,21 @@ deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.re
 EOF
 sudo chmod a+r /etc/apt/sources.list.d/hashicorp.list
 
-# --- Ansible PPA ---
-echo "[provision-system] configure ansible repo"
-# idempotent: add-apt-repository is safe to re-run, but we avoid repeated work
-if ! grep -Rqs "^deb .*\bansible/ansible\b" /etc/apt/sources.list /etc/apt/sources.list.d 2>/dev/null; then
-  add-apt-repository --yes ppa:ansible/ansible
-fi
-
-# --- Install toolchain (single apt update for all repos) ---
+# --- Install toolchain ---
 echo "[provision-system] apt update (after adding repos)"
 apt-get update -y
-
-echo "[provision-system] install docker + tofu + ansible"
+echo "[provision-system] install toolchain packages"
 apt-get install -y --no-install-recommends \
+  ansible \
+  code \
   docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin \
-  tofu \
   packer \
-  ansible
+  tofu
 
 # --- Docker post-install setup ---
 systemctl enable --now docker
 if id "$USER_NAME" >/dev/null 2>&1; then
   usermod -aG docker "$USER_NAME" || true
-fi
-
-# --- VS Code (.deb) ---
-echo "[provision-system] install vscode"
-if ! command -v code >/dev/null 2>&1; then
-  if [[ "$ARCH" != "amd64" ]]; then
-    echo "[provision-system] skipping vscode: only linux-deb-x64 is configured (arch=${ARCH})"
-  else
-    tmpdir="$(mktemp -d)"
-    pushd "$tmpdir" >/dev/null
-    curl -fsSLo code.deb "https://code.visualstudio.com/sha/download?build=stable&os=linux-deb-x64"
-    apt-get install -y ./code.deb
-    popd >/dev/null
-    rm -rf "$tmpdir"
-  fi
 fi
 
 # --- hygiene after installs ---
@@ -168,10 +155,12 @@ echo "compose: $(docker compose version 2>/dev/null || true)"
 CODE_VER="$(sudo -u "$USER_NAME" -H bash -lc 'code --version 2>/dev/null | head -n1 || true')"
 echo "code:    ${CODE_VER}"
 
-# --- mark done ---
-touch "$MARKER"
+# --- done ---
 echo "[provision-system] done: $(date -Is)"
-echo "[provision-system] marker: $MARKER"
+END_TS="$(date +%s)"
+ELAPSED="$((END_TS - START_TS))"
+printf '[provision-system] elapsed: %02d:%02d:%02d\n' "$((ELAPSED / 3600))" "$((ELAPSED % 3600 / 60))" "$((ELAPSED % 60))"
+echo "LOG: ${LOG}"
 echo "################################"
 echo "# Provision System Complete"
 echo "################################"
