@@ -1,3 +1,12 @@
+# [0.6.0](https://github.com/syselement/packertron-vms/compare/v0.5.0...v0.6.0) (2025-12-23)
+
+
+### Features
+
+* update provisioning for Ubuntu 24.04 and Windows Server 2025 with enhanced scripts and error handling ([fafcf70](https://github.com/syselement/packertron-vms/commit/fafcf701d723cd98d1ff053bfa37ac1c46b13473))
+
+
+
 # [0.5.0](https://github.com/syselement/packertron-vms/compare/v0.4.2...v0.5.0) (2025-12-22)
 
 
@@ -31,20 +40,6 @@
 ### Features
 
 * Ubuntu Desktop placeholder files [TO DO] ([0b081a1](https://github.com/syselement/packertron-vms/commit/0b081a19840d988a09d0c4a02eb47f009c6a534b))
-
-
-
-# [0.3.0](https://github.com/syselement/packertron-vms/compare/v0.2.0...v0.3.0) (2025-08-16)
-
-
-### Bug Fixes
-
-* CI quick fix ([1682164](https://github.com/syselement/packertron-vms/commit/1682164425d860d69f77b3e3dab9333bc42002bb))
-
-
-### Features
-
-* Kali hcl placeholder files ([c85f4a7](https://github.com/syselement/packertron-vms/commit/c85f4a795075c7742f71c5a348e2c8f9441a1d96))
 
 
 
