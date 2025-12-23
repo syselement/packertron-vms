@@ -34,10 +34,16 @@ Artifacts land in `output/` (e.g., `ubuntu-24.04-x64-desktop-template-vmware.box
 vagrant up --provider=vmware_desktop
 ```
 Vagrant/VMware will manage VMX adjustments during `vagrant up`; no manual VMX edits needed when using Vagrant.
+- The workstation layer (Docker, OpenTofu, Packer CLI, Ansible, VS Code, hygiene) lives in one idempotent script executed on first `vagrant up`.
+- Re-run with `--provision` to re-provision the VM (Vagrant runs provisioners once by default).
+
+```powershell
+vagrant up --provision
+```
 
 ## Customize
 - Final/default Packer variables: `ubuntu-24.04-x64-desktop.auto.pkrvars.hcl` (auto-loaded). Override via `-var "key=value"`.
-- `scripts/` are used during the Packer build for preseed/install automation and for final Ubuntu Desktop provisioning after VMware import.
+- `scripts/` are used during the Packer build for preseed/install automation and for the final provisioning during the Vagrant to VMware import.
 
 ## Troubleshoot fast
 - SSH issues: check VMware network mode (NAT vs bridged) and VMware services.
