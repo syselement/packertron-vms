@@ -52,7 +52,7 @@
 - Customizable **HCL templates and scripts**
 - Hypervisor-agnostic **VM automation**
 
-------
+---
 
 ## 🛠 Requirements
 
@@ -73,7 +73,7 @@ Ensure you have the following installed before proceeding:
 - [Vagrant VMware Plugin](https://developer.hashicorp.com/vagrant/docs/providers/vmware/installation)
 - [Visual Studio Code](https://code.visualstudio.com/)
 
-------
+---
 
 ## 🔧 Installation
 
@@ -128,7 +128,7 @@ git clone https://github.com/syselement/packertron-vms.git
 cd packertron-vms
 ```
 
-------
+---
 
 ## 📁 Directory Structure
 
@@ -146,7 +146,7 @@ packertron-vms/
 └── .gitignore           # Ignore unnecessary files (ISO, temp builds)
 ```
 
-------
+---
 
 ## 🚀 Build & Deploy VMs
 
@@ -191,7 +191,7 @@ vagrant up
 vagrant destroy -f
 ```
 
-------
+---
 
 ## 🛠 Troubleshooting
 
@@ -211,7 +211,7 @@ vagrant destroy -f
   vagrant plugin repair
   ```
 
-------
+---
 
 ## 📜 License
 
@@ -231,6 +231,6 @@ Pull requests and improvements are welcome! Ensure your code follows the repo’
     - [ ] Kali Linux
 - [ ] Integration with **Ansible** for advanced provisioning
 
-------
+---
 
 🚀 **Happy Virtualizing with [packertron-vms](#packertron-vms)!**
