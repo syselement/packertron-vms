@@ -7,8 +7,11 @@
 [![Package - Packer](https://img.shields.io/badge/Packer->=1.11.2-brightgreen?logo=packer&logoColor=acqua)](https://developer.hashicorp.com/packer "Go to Packer homepage") [![Package - Vagrant](https://img.shields.io/badge/Vagrant->=2.4.3-brightgreen?logo=vagrant&logoColor=blue)](https://developer.hashicorp.com/vagrant "Go to Vagrant homepage") [![Package - VMware Workstation Pro](https://img.shields.io/badge/VMwareWorkstationPro->17.x-brightgreen?logo=vmware&logoColor=white)](https://www.vmware.com/products/desktop-hypervisor/workstation-and-fusion "Go to VMware Workstation homepage")
 
 > [!WARNING]
+>
 > 🚧 **Project instructions and commands under review** 🚧  
+>
 > The setup and deployment instructions in this README file are currently being tested and refined.
+>
 > Expect updates and improvements as I validate each step.  
 
 `packertron-vms` is a **collection of templates for automated VM deployment**, designed for home lab environments and testing setups. Using **Packer and Vagrant**, it simplifies the creation, provisioning, and management of virtual machines. The templates currently support **VMware Workstation** (future plans include **Ansible** automation and expanding hypervisor support like **VirtualBox**, **Proxmox**, etc).
@@ -18,27 +21,26 @@
 ## 📖 Table of Contents
 
 - [packertron-vms](#packertron-vms)
-  - [📖 Table of Contents](#-table-of-contents)
-  - [🚀 Features](#-features)
-  - [🛠 Requirements](#-requirements)
-    - [System Requirements](#system-requirements)
-    - [Software Dependencies](#software-dependencies)
-  - [🔧 Installation](#-installation)
-    - [1️⃣ Install Chocolatey (Windows Users Only)](#1️⃣-install-chocolatey-windows-users-only)
-    - [2️⃣ Install Dependencies](#2️⃣-install-dependencies)
-    - [3️⃣ Install Vagrant VMware Plugin](#3️⃣-install-vagrant-vmware-plugin)
-    - [4️⃣ Clone packertron-vms Repository](#4️⃣-clone-packertron-vms-repository)
-  - [📁 Directory Structure](#-directory-structure)
-  - [🚀 Build \& Deploy VMs](#-build--deploy-vms)
-    - [1️⃣ Open Visual Studio Code](#1️⃣-open-visual-studio-code)
-    - [2️⃣ Packer: Initialize \& Build Windows Server 2025](#2️⃣-packer-initialize--build-windows-server-2025)
-    - [3️⃣ Deploy VM with Vagrant](#3️⃣-deploy-vm-with-vagrant)
-    - [4️⃣ Manage VM Lifecycle](#4️⃣-manage-vm-lifecycle)
-  - [🛠 Troubleshooting](#-troubleshooting)
-  - [📜 License](#-license)
-  - [🤝 Contributing](#-contributing)
-  - [🌍 Future Roadmap](#-future-roadmap)
-
+    - [📖 Table of Contents](#-table-of-contents)
+    - [🚀 Features](#-features)
+    - [🛠 Requirements](#-requirements)
+        - [System Requirements](#system-requirements)
+        - [Software Dependencies](#software-dependencies)
+    - [🔧 Installation](#-installation)
+        - [1️⃣ Install Chocolatey (Windows Users Only)](#1️⃣-install-chocolatey-windows-users-only)
+        - [2️⃣ Install Dependencies](#2️⃣-install-dependencies)
+        - [3️⃣ Install Vagrant VMware Plugin](#3️⃣-install-vagrant-vmware-plugin)
+        - [4️⃣ Clone packertron-vms Repository](#4️⃣-clone-packertron-vms-repository)
+    - [📁 Directory Structure](#-directory-structure)
+    - [🚀 Build \& Deploy VMs](#-build--deploy-vms)
+        - [1️⃣ Open Visual Studio Code](#1️⃣-open-visual-studio-code)
+        - [2️⃣ Packer: Initialize \& Build Windows Server 2025](#2️⃣-packer-initialize--build-windows-server-2025)
+        - [3️⃣ Deploy VM with Vagrant](#3️⃣-deploy-vm-with-vagrant)
+        - [4️⃣ Manage VM Lifecycle](#4️⃣-manage-vm-lifecycle)
+    - [🛠 Troubleshooting](#-troubleshooting)
+    - [📜 License](#-license)
+    - [🤝 Contributing](#-contributing)
+    - [🌍 Future Roadmap](#-future-roadmap)
 
 ---
 
@@ -194,7 +196,6 @@ vagrant destroy -f
 ## 🛠 Troubleshooting
 
 - **VMware Workstation Not Detected?** Ensure it is installed and running.
-
 - ISO Checksum Mismatch?
 
    Run:
@@ -202,7 +203,6 @@ vagrant destroy -f
   ```powershell
   Get-FileHash C:\ISO\windows\your_iso.iso
   ```
-
 - Vagrant Plugin Issues?
 
    Reinstall:
@@ -225,14 +225,12 @@ Pull requests and improvements are welcome! Ensure your code follows the repo’
 
 - [ ] Proxmox support
 - [ ] O.S Packer builds:
-  - [ ] Win11
-  - [ ] Ubuntu Server/Desktop
-  - [ ] Kali Linux
+    - [ ] Win11
+    - [ ] Ubuntu Server
+    - [x] Ubuntu Desktop
+    - [ ] Kali Linux
 - [ ] Integration with **Ansible** for advanced provisioning
 
 ------
 
 🚀 **Happy Virtualizing with [packertron-vms](#packertron-vms)!**
-
-
-
