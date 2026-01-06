@@ -101,19 +101,17 @@ source "vmware-iso" "ubuntu2404_desktop" {
   vhv_enabled            = true # Enable nested virtualization
   version                = "21"
   vm_name                = var.vm_name
-  hgfs_enabled          = false
 }
 
 # Build block
 build {
   sources = ["source.vmware-iso.ubuntu2404_desktop"]
-
   # Provisioning script
   provisioner "shell" {
     execute_command="echo '${var.ssh_password}' | sudo -S env {{ .Vars }} {{ .Path }}"
     scripts = [
-      "${path.root}/scripts/update_system.sh",
-      "${path.root}/scripts/cleanup_system.sh"
+      "${path.root}/scripts/00_update_system.sh",
+      "${path.root}/scripts/01_cleanup_system.sh"
     ]
   }
 

@@ -26,6 +26,10 @@ CODENAME="$(. /etc/os-release && echo "$VERSION_CODENAME")"
 ARCH="$(dpkg --print-architecture)"
 echo "[provision-system] distro codename=${CODENAME} arch=${ARCH}"
 
+# --- Expand LVM root to use all free space ---
+echo "[provision-system] expand LVM root to use all free space (if any)"
+lvextend -r -l +100%FREE /dev/ubuntu-vg/ubuntu-lv
+
 # --- Update system and install baseline packages ---
 echo "[provision-system] apt update / dist-upgrade"
 apt-get update -y
@@ -154,6 +158,20 @@ echo "compose: $(docker compose version 2>/dev/null || true)"
 echo "docker:  $(docker --version || true)"
 echo "packer:  $(packer --version || true)"
 echo "tofu:    $(tofu --version | head -n1 || true)"
+
+# --- System info ---
+echo "[provision-system] system info"
+echo "---uname---"
+echo "$(uname -a || true)"
+echo "---lsb---"
+echo "$(lsb_release -a || true)"
+echo "---disk---"
+echo "$(lsblk || true)"
+echo "$(df -h || true)"
+echo "---mem---"
+echo "$(free -h || true)"
+echo "---cpu---"
+echo "$(lscpu || true)"
 
 # --- done ---
 echo "[provision-system] done: $(date -Is)"
