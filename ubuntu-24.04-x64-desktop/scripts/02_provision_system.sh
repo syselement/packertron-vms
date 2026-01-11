@@ -6,12 +6,6 @@ set -euo pipefail
 
 export DEBIAN_FRONTEND=noninteractive
 
-# --- must be root ---
-if [[ "${EUID}" -ne 0 ]]; then
-  echo "[provision-system] must run as root (use Vagrant provisioner with privileged: true)" >&2
-  exit 1
-fi
-
 USER_NAME="syselement"
 LOG="/var/log/provision-system.log"
 exec > >(tee -a "$LOG") 2>&1
@@ -25,6 +19,19 @@ START_TS="$(date +%s)"
 CODENAME="$(. /etc/os-release && echo "$VERSION_CODENAME")"
 ARCH="$(dpkg --print-architecture)"
 echo "[provision-system] distro codename=${CODENAME} arch=${ARCH}"
+
+# --- must be root ---
+if [[ "${EUID}" -ne 0 ]]; then
+  echo "[customize-system] must run as root" >&2
+  exit 1
+fi
+
+if id "$USER_NAME" >/dev/null 2>&1; then
+  echo "[customize-system] running user-scoped commands as: ${USER_NAME}"
+else
+  echo "[customize-system] user not found: ${USER_NAME}" >&2
+  exit 1
+fi
 
 # --- Expand LVM root to use all free space ---
 echo "[provision-system] expand LVM root to use all free space (if any)"
@@ -179,8 +186,11 @@ END_TS="$(date +%s)"
 ELAPSED="$((END_TS - START_TS))"
 printf '[provision-system] elapsed: %02d:%02d:%02d\n' "$((ELAPSED / 3600))" "$((ELAPSED % 3600 / 60))" "$((ELAPSED % 60))"
 echo "[provision-system] LOG: ${LOG}"
+
 echo "################################"
 echo "# Provision System Complete"
-echo "[provision-system] rebooting"
-reboot
+echo "[provision-system] rebooting in 5 seconds ..."
 echo "################################"
+sleep 5
+sync
+shutdown -r now
