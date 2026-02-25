@@ -185,10 +185,10 @@ echo "[provision-system] done: $(date -Is)"
 END_TS="$(date +%s)"
 ELAPSED="$((END_TS - START_TS))"
 printf '[provision-system] elapsed: %02d:%02d:%02d\n' "$((ELAPSED / 3600))" "$((ELAPSED % 3600 / 60))" "$((ELAPSED % 60))"
-echo "[provision-system] LOG: ${LOG}"
+echo "[provision-system] Provisioning LOG: ${LOG}"
 
 echo "################################"
-echo "# Provision System Complete"
+echo "# System Provisioning Complete"
 echo "[provision-system] rebooting in 5 seconds ..."
 echo "################################"
 sleep 5

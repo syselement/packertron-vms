@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+#
+# Cleanup Ubuntu 24.04 Desktop
+#
 set -euo pipefail
 
 export DEBIAN_FRONTEND=noninteractive

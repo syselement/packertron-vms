@@ -73,6 +73,7 @@ locals {
 # Source block
 source "vmware-iso" "ubuntu2404_desktop" {
   # Ubuntu 24.04 Desktop autoinstall via NoCloud-Net and local HTTP server
+  # boot_command provides the necessary keystrokes to start the installation with autoinstall parameters
   boot_wait              = "5s"
   boot_command = [
     "e<wait>",
@@ -110,8 +111,8 @@ build {
   provisioner "shell" {
     execute_command="echo '${var.ssh_password}' | sudo -S env {{ .Vars }} {{ .Path }}"
     scripts = [
-      "${path.root}/scripts/00_update_system.sh",
-      "${path.root}/scripts/01_cleanup_system.sh"
+      "${path.root}/scripts/00-update-system.sh",
+      "${path.root}/scripts/01-cleanup-system.sh"
     ]
   }
 

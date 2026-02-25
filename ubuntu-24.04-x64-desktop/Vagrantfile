@@ -16,7 +16,7 @@ Vagrant.configure("2") do |config|
 
   # Provisioning script
   config.vm.provision "shell",
-    path: "scripts/02_provision_system.sh",
+    path: "scripts/02-provision-system.sh",
     privileged: true,
     run: "once"
 
