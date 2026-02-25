@@ -20,7 +20,7 @@ packer {
 variable "iso_url" {
   type        = string
   description = "A URL to the ISO file"
-  default     = "https://releases.ubuntu.com/noble/ubuntu-24.04.3-desktop-amd64.iso"
+  default     = "https://releases.ubuntu.com/noble/ubuntu-24.04.4-desktop-amd64.iso"
 }
 
 variable "iso_checksum" {

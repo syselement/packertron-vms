@@ -4,6 +4,10 @@
 
 // Packer : https://www.packer.io/
 
+
+// TO TEST
+
+
 packer {
   required_version = ">= 1.7.0"
   required_plugins {
@@ -17,7 +21,7 @@ packer {
 variable "iso" {
   type        = string
   description = "A URL to the ISO file"
-  default     = "https://releases.ubuntu.com/noble/ubuntu-24.04.1-live-server-amd64.iso"
+  default     = "https://releases.ubuntu.com/noble/ubuntu-24.04.4-live-server-amd64.iso"
 }
 
 variable "checksum" {
