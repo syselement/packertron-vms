@@ -44,8 +44,6 @@ apt-get dist-upgrade -y
 
 echo "[provision-system] install baseline packages"
 apt-get install -y --no-install-recommends \
-  apt-transport-https \
-  bash-completion \
   build-essential \
   ca-certificates \
   curl \
@@ -60,10 +58,8 @@ apt-get install -y --no-install-recommends \
   sshpass \
   software-properties-common \
   tmux \
-  unzip \
   vim \
   wget \
-  zip
 
 # --- Enable NTP ---
 echo "[provision-system] enable NTP"

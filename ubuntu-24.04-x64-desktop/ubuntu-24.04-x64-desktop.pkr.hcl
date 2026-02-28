@@ -17,41 +17,21 @@ packer {
 }
 
 # Variables
-variable "iso_url" {
-  type        = string
-  description = "A URL to the ISO file"
-  default     = "https://releases.ubuntu.com/noble/ubuntu-24.04.4-desktop-amd64.iso"
-}
-
 variable "iso_checksum" {
   type        = string
   description = "The checksum for the ISO file"
   default     = "file:https://releases.ubuntu.com/noble/SHA256SUMS"
 }
 
-variable "vm_name" {
+variable "iso_url" {
+  type        = string
+  description = "A URL to the ISO file"
+  default     = "https://releases.ubuntu.com/noble/ubuntu-24.04.4-desktop-amd64.iso"
+}
+
+variable "output_dir" {
   type    = string
-  default = "ubuntu-24.04-x64-desktop-template"
-}
-
-variable "vm_cpu_cores" {
-  type    = number
-  default = 4
-}
-
-variable "vm_memory" {
-  type    = number
-  default = 8192
-}
-
-variable "vm_disk_size" {
-  type    = number
-  default = 61440 # Size in MB
-}
-
-variable "ssh_username" {
-  type    = string
-  default = "syselement"
+  default = "output"
 }
 
 variable "ssh_password" {
@@ -60,9 +40,29 @@ variable "ssh_password" {
   default   = "packer"
 }
 
-variable "output_dir" {
+variable "ssh_username" {
   type    = string
-  default = "output"
+  default = "syselement"
+}
+
+variable "vm_cpu_cores" {
+  type    = number
+  default = 4
+}
+
+variable "vm_disk_size" {
+  type    = number
+  default = 61440 # Size in MB
+}
+
+variable "vm_memory" {
+  type    = number
+  default = 8192
+}
+
+variable "vm_name" {
+  type    = string
+  default = "ubuntu-24.04-x64-desktop-template"
 }
 
 # Local values
