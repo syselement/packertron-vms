@@ -66,7 +66,7 @@ apt-get install -y --no-install-recommends \
   zip
 
 # --- Enable NTP ---
-echo "[provision-system] enable NTP (best effort)"
+echo "[provision-system] enable NTP"
 timedatectl set-ntp true || true
 
 # --- Add apt keyrings dir ---
