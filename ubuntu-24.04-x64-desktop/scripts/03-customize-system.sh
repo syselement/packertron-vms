@@ -115,6 +115,7 @@ install_packages() {
     tmux
     tor
     tree
+    unzip
     ugrep
     vim
     vlc
@@ -126,6 +127,19 @@ install_packages() {
   info "installing ${#pkgs[@]} packages"
   apt-get install -y "${pkgs[@]}"
   ok "package installation completed"
+}
+
+# --- Fonts ---
+install_jetbrainsmono_nerd_font() {
+  sudo -u "$USER_NAME" -H bash -lc '
+    set -euo pipefail
+    mkdir -p "$HOME/.local/share/fonts"
+    cd "$HOME/.local/share/fonts"
+    curl -fL -o JetBrainsMono.zip https://github.com/ryanoasis/nerd-fonts/releases/latest/download/JetBrainsMono.zip
+    unzip -o JetBrainsMono.zip
+    rm -f JetBrainsMono.zip
+    fc-cache -fv
+  '
 }
 
 echo "################################"
@@ -182,6 +196,11 @@ apt-get update -y
 
 # --- Install requested tools ---
 install_packages
+
+# --- Install Nerd Font ---
+info "installing JetBrainsMono Nerd Font"
+install_jetbrainsmono_nerd_font
+ok "JetBrainsMono Nerd Font installed"
 
 # --- Post-install tweaks ---
 info "updating locate database (best effort)"
