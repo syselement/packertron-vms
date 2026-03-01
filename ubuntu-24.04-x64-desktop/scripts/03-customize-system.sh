@@ -430,8 +430,8 @@ run_user_gsettings_try org.gnome.desktop.interface color-scheme "'prefer-dark'"
 run_user_gsettings_try org.gnome.desktop.interface gtk-theme "'Yaru-dark'"
 run_user_gsettings_try org.gnome.desktop.interface show-battery-percentage "true"
 run_user_gsettings_try org.gnome.shell.extensions.dash-to-dock dock-position "'BOTTOM'"
-run_user_gsettings_try org.gnome.shell.extensions.dash-to-dock extend-height "false"
-run_user_gsettings_try org.gnome.shell.extensions.dash-to-dock dash-max-icon-size "40"
+run_user_gsettings_try org.gnome.shell.extensions.dash-to-dock extend-height "true"
+run_user_gsettings_try org.gnome.shell.extensions.dash-to-dock dash-max-icon-size "32"
 run_user_gsettings_try org.gnome.shell.extensions.dash-to-dock click-action "'minimize'"
 
 # --- Power / lockscreen: disable blank + lock ---
@@ -483,4 +483,8 @@ info "================= RUN END ================="
 
 echo "################################"
 echo "# Customize System Complete"
+echo "[provision-system] rebooting in 5 seconds ..."
 echo "################################"
+sleep 5
+sync
+shutdown -r now
