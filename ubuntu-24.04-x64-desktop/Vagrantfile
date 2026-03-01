@@ -65,7 +65,7 @@ Vagrant.configure("2") do |config|
       run: "once"
 
     prov.vm.provision "shell",
-      path: "scripts/03-install-desktop.sh",
+      path: "scripts/03-customize-system.sh",
       privileged: true,
       run: "never"
   end
