@@ -54,6 +54,22 @@ run_user_gsettings_try() {
     "gsettings set ${schema} ${key} ${value}" >/dev/null 2>&1 || true
 }
 
+enable_system_monitor_extension() {
+  sudo -u "$USER_NAME" -H dbus-run-session -- bash -lc '
+    set -euo pipefail
+    if ! command -v gnome-extensions >/dev/null 2>&1; then
+      exit 0
+    fi
+
+    ext_uuid="$(gnome-extensions list | grep -E "system-monitor|SystemMonitor" | head -n1 || true)"
+    if [[ -z "$ext_uuid" ]]; then
+      ext_uuid="system-monitor@gnome-shell-extensions.gcampax.github.com"
+    fi
+
+    gnome-extensions enable "$ext_uuid" >/dev/null 2>&1 || true
+  ' || true
+}
+
 # --- Repository setup ---
 ensure_fastfetch_ppa() {
   local ppa="ppa:zhangsongcui3371/fastfetch"
@@ -315,6 +331,17 @@ install_obsidian_snap() {
   ok "Obsidian installed"
 }
 
+# --- Pipx tools ---
+install_tldr_pipx() {
+  if sudo -u "$USER_NAME" -H bash -lc 'pipx list 2>/dev/null | grep -q "package tldr"'; then
+    info "tldr already installed via pipx, skipping"
+    return
+  fi
+
+  sudo -u "$USER_NAME" -H bash -lc 'pipx install tldr && pipx ensurepath'
+  ok "tldr installed via pipx"
+}
+
 # --- Fonts ---
 install_jetbrainsmono_nerd_font() {
   if sudo -u "$USER_NAME" -H bash -lc 'fc-list | grep -qi "JetBrainsMono Nerd Font"'; then
@@ -417,6 +444,7 @@ install_dbeaver
 install_postman_snap
 install_flameshot_and_config
 install_obsidian_snap
+install_tldr_pipx
 ok "specific tools installed/configured"
 
 # --- Post-install tweaks ---
@@ -442,8 +470,11 @@ run_user_gsettings_try org.gnome.desktop.screensaver lock-delay "uint32 0"
 run_user_gsettings_try org.gnome.desktop.notifications show-in-lock-screen "false"
 run_user_gsettings_try org.gnome.desktop.screensaver ubuntu-lock-on-suspend "false"
 run_user_gsettings_try org.gnome.system.location enabled "false"
-ok "GNOME preferences applied"
 
+# --- GNOME extensions tweaks ---
+enable_system_monitor_extension
+
+# --- Dock favorites ---
 info "setting GNOME favorites (best effort)"
 sudo -u "$USER_NAME" -H dbus-run-session -- bash -lc \
   "gsettings set org.gnome.shell favorite-apps \"[
@@ -453,7 +484,7 @@ sudo -u "$USER_NAME" -H dbus-run-session -- bash -lc \
     'sublime_text.desktop',
     'obsidian_obsidian.desktop'
   ]\" || true"
-ok "GNOME favorites set"
+ok "GNOME preferences applied"
 
 # --- Cleanup and update repositories ---
 info "cleanup"
