@@ -510,7 +510,7 @@ info "================= RUN END ================="
 
 echo "################################"
 echo "# Customize System Complete"
-echo "[provision-system] rebooting in 5 seconds ..."
+echo "[customize-system] rebooting in 5 seconds ..."
 echo "################################"
 sleep 5
 sync

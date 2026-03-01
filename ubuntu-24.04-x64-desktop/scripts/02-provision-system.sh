@@ -284,11 +284,13 @@ echo "---cpu---"
 echo "$(lscpu || true)"
 
 # --- done ---
-log "done: $(date -Is)"
 END_TS="$(date +%s)"
 ELAPSED="$((END_TS - START_TS))"
-printf '[provision-system] elapsed: %02d:%02d:%02d\n' "$((ELAPSED / 3600))" "$((ELAPSED % 3600 / 60))" "$((ELAPSED % 60))"
-log "Provisioning LOG: ${LOG_FILE}"
+log "done: $(date -Is)"
+log "elapsed: $(printf '%02d:%02d:%02d' "$((ELAPSED / 3600))" "$((ELAPSED % 3600 / 60))" "$((ELAPSED % 60))")"
+log "log file: ${LOG_FILE}"
+info "run_id: ${RUN_ID}"
+info "================= RUN END ================="
 
 echo "################################"
 echo "# System Provisioning Complete"
