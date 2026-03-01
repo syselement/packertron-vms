@@ -12,6 +12,16 @@ LOG_PREFIX="[${SCRIPT_NAME}]"
 RUN_ID="$(date +%Y%m%d-%H%M%S)"
 LOG_FILE="/var/log/${SCRIPT_NAME}-${RUN_ID}.log"
 
+require_root() {
+  if [[ "${EUID}" -ne 0 ]]; then
+    echo "[${SCRIPT_NAME}] ERROR must run as root (use: sudo bash $0)" >&2
+    exit 1
+  fi
+}
+
+# --- must be root (before touching /var/log) ---
+require_root
+
 # --- Logging setup ---
 # --- ANSI Colors for console output ---
 if [[ -t 1 ]]; then
@@ -54,13 +64,10 @@ enable_system_monitor_extension() {
       exit 0
     fi
 
-    ext_uuid="$(gnome-extensions list | grep -E "system-monitor|SystemMonitor" | head -n1 || true)"
-    if [[ -z "$ext_uuid" ]]; then
-      ext_uuid="system-monitor@gnome-shell-extensions.gcampax.github.com"
-    fi
+    ext_uuid="system-monitor@gnome-shell-extensions.gcampax.github.com"
 
     gnome-extensions enable "$ext_uuid" >/dev/null 2>&1 || true
-  ' || true
+  ' >/dev/null 2>&1 || true
 }
 
 # --- Repository setup ---
@@ -366,7 +373,7 @@ ARCH="$(dpkg --print-architecture)"
 info "distro codename=${CODENAME} arch=${ARCH}"
 
 # --- must be root ---
-[[ "${EUID}" -eq 0 ]] || die "must run as root"
+require_root
 
 if id "$USER_NAME" >/dev/null 2>&1; then
   ok "running user-scoped commands as: ${USER_NAME}"
@@ -391,7 +398,7 @@ fi
 # --- Update system ---
 info "apt update/dist-upgrade"
 apt-get update -y -qq
-apt-get dist-upgrade -y
+apt-get dist-upgrade -y -qq
 ok "apt update/dist-upgrade completed"
 
 # --- Update snaps ---
@@ -475,7 +482,7 @@ sudo -u "$USER_NAME" -H dbus-run-session -- bash -lc \
     'terminator.desktop',
     'sublime_text.desktop',
     'obsidian_obsidian.desktop'
-  ]\" || true"
+  ]\"" >/dev/null 2>&1 || true
 ok "GNOME preferences applied"
 
 # --- Cleanup and update repositories ---

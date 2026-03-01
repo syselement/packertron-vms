@@ -187,7 +187,7 @@ lvextend -r -l +100%FREE /dev/ubuntu-vg/ubuntu-lv || warn "LVM expand skipped or
 # --- Update system and install baseline packages ---
 log "apt update / dist-upgrade"
 apt-get update -y -qq || warn "apt update failed"
-apt-get dist-upgrade -y || warn "apt dist-upgrade failed"
+apt-get dist-upgrade -y -qq || warn "apt dist-upgrade failed"
 
 log "install baseline packages (missing only)"
 install_missing_packages \
