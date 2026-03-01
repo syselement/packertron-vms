@@ -1,3 +1,12 @@
+# [0.13.0](https://github.com/syselement/packertron-vms/compare/v0.12.0...v0.13.0) (2026-03-01)
+
+
+### Features
+
+* update dash-to-dock settings to hide trash and modify GNOME favorites ([0b959db](https://github.com/syselement/packertron-vms/commit/0b959dbaf40fecb25e56d7414ff05f7d38c23936))
+
+
+
 # [0.12.0](https://github.com/syselement/packertron-vms/compare/v0.11.0...v0.12.0) (2026-03-01)
 
 
@@ -31,15 +40,6 @@
 ### Features
 
 * add installation of JetBrainsMono Nerd Font and unzip package ([f88728e](https://github.com/syselement/packertron-vms/commit/f88728ecd95e2948ac1196bdd588067d041d2d20))
-
-
-
-# [0.8.0](https://github.com/syselement/packertron-vms/compare/v0.7.0...v0.8.0) (2026-03-01)
-
-
-### Features
-
-* updated 03-customize-system.sh script for Ubuntu Desktop ([7b760e8](https://github.com/syselement/packertron-vms/commit/7b760e8d5f4aff2b0d95bdec08ab60e4c61dafe0))
 
 
 
