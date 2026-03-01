@@ -433,6 +433,7 @@ run_user_gsettings_try org.gnome.shell.extensions.dash-to-dock dock-position "'B
 run_user_gsettings_try org.gnome.shell.extensions.dash-to-dock extend-height "true"
 run_user_gsettings_try org.gnome.shell.extensions.dash-to-dock dash-max-icon-size "32"
 run_user_gsettings_try org.gnome.shell.extensions.dash-to-dock click-action "'minimize'"
+run_user_gsettings_try org.gnome.shell.extensions.dash-to-dock show-trash "false"
 
 # --- Power / lockscreen: disable blank + lock ---
 run_user_gsettings_try org.gnome.desktop.session idle-delay "uint32 0"
@@ -446,8 +447,8 @@ ok "GNOME preferences applied"
 info "setting GNOME favorites (best effort)"
 sudo -u "$USER_NAME" -H dbus-run-session -- bash -lc \
   "gsettings set org.gnome.shell favorite-apps \"[
-    'firefox_firefox.desktop',
     'org.gnome.Nautilus.desktop',
+    'brave-browser.desktop',
     'terminator.desktop',
     'sublime_text.desktop',
     'obsidian_obsidian.desktop'
