@@ -1,3 +1,12 @@
+# [0.10.0](https://github.com/syselement/packertron-vms/compare/v0.9.0...v0.10.0) (2026-03-01)
+
+
+### Features
+
+* enhance JetBrainsMono Nerd Font installation and configure Terminator ([015f33e](https://github.com/syselement/packertron-vms/commit/015f33e30218956a66c4f40f9628369ffc0f944f))
+
+
+
 # [0.9.0](https://github.com/syselement/packertron-vms/compare/v0.8.0...v0.9.0) (2026-03-01)
 
 
@@ -31,15 +40,6 @@
 ### Features
 
 * update provisioning for Ubuntu 24.04 and Windows Server 2025 with enhanced scripts and error handling ([fafcf70](https://github.com/syselement/packertron-vms/commit/fafcf701d723cd98d1ff053bfa37ac1c46b13473))
-
-
-
-# [0.5.0](https://github.com/syselement/packertron-vms/compare/v0.4.2...v0.5.0) (2025-12-22)
-
-
-### Features
-
-* enhance Windows Server 2025 provisioning with updated scripts and README ([18dd0c6](https://github.com/syselement/packertron-vms/commit/18dd0c685b4c616e75ec7ff4b711aa8363cdab48))
 
 
 
