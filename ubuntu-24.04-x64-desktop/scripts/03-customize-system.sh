@@ -222,8 +222,15 @@ info "cleanup"
 apt-get -y autoremove --purge
 apt-get -y clean
 rm -rf /var/lib/apt/lists/*
-apt-get -y update
+apt-get -y update >/dev/null 2>&1 || true
 ok "cleanup completed"
+
+# --- Manual SSH key setup hint ---
+echo "# --- Manual SSH private key setup (run as ${USER_NAME}) ---"
+echo "# cat > \$HOME/.ssh/id_ed25519"
+echo "# (paste private key content, then Ctrl-D)"
+echo "# chmod 600 \$HOME/.ssh/*"
+echo "# eval \"\$(ssh-agent -s)\" && ssh-add \$HOME/.ssh/id_ed25519"
 
 END_TS="$(date +%s)"
 ELAPSED="$((END_TS - START_TS))"
