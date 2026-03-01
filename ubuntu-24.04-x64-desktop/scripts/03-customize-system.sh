@@ -481,7 +481,8 @@ sudo -u "$USER_NAME" -H dbus-run-session -- bash -lc \
     'brave-browser.desktop',
     'terminator.desktop',
     'sublime_text.desktop',
-    'obsidian_obsidian.desktop'
+    'obsidian_obsidian.desktop',
+    'code.desktop'
   ]\"" >/dev/null 2>&1 || true
 ok "GNOME preferences applied"
 
