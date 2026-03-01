@@ -12,7 +12,7 @@ LOG_PREFIX="[${SCRIPT_NAME}]"
 LOG_FILE="/var/log/${SCRIPT_NAME}.log"
 RUN_ID="$(date +%Y%m%d-%H%M%S)"
 
-# --- ANSI Colors for output ---
+# --- ANSI Colors for console output ---
 if [[ -t 1 ]]; then
   t_bold=$'\e[1m'; t_dim=$'\e[2m'
   t_green=$'\e[32m'; t_yellow=$'\e[33m'; t_red=$'\e[31m'
@@ -26,17 +26,16 @@ if ! touch "$LOG_FILE" &>/dev/null; then
   LOG_FILE="$HOME/${SCRIPT_NAME}.log"
 fi
 
+# Console keeps ANSI colors, log file stores ANSI-stripped output.
+exec > >(tee >(sed -u -r 's/\x1B\[[0-9;]*[[:alpha:]]//g' >> "$LOG_FILE")) 2>&1
+
 _ts() { date +'%F %T'; }
-_strip_ansi() { sed -r 's/\x1B\[[0-9;]*[[:alpha:]]//g'; }
 
 log() {
   local msg="$*"
   local ts
   ts="$(_ts)"
-  # Console (colored if enabled)
-  printf '%s %s %b\n' "[$ts]" "$LOG_PREFIX" "$msg" >&2
-  # Log file (stripped of ANSI codes)
-  printf '%s %s %s\n' "[$ts]" "$LOG_PREFIX" "$(printf '%b' "$msg" | _strip_ansi)" >> "$LOG_FILE"
+  printf '%s %s %b\n' "[$ts]" "$LOG_PREFIX" "$msg"
 }
 
 info()  { log "${t_dim}INFO${t_reset}  $*"; }
@@ -313,7 +312,6 @@ EOF
   '
 
   ok "Flameshot installed and configured"
-  info "manual shortcut hint: script --command \"flameshot gui\" /dev/null"
 }
 
 install_obsidian_snap() {
@@ -496,13 +494,16 @@ ok "cleanup completed"
 
 # --- Manual SSH key setup hint ---
 warn "=============================================================="
-warn "MANUAL ACTION REQUIRED: SSH PRIVATE KEY SETUP"
-info "# run as ${USER_NAME}:"
+warn "MANUAL SECTION"
+warn "=============================================================="
+info "--- SSH private key setup (run as ${USER_NAME}):"
 info "mkdir -p \$HOME/.ssh && chmod 700 \$HOME/.ssh"
 info "cat > \$HOME/.ssh/id_ed25519"
 info "# paste key, then Ctrl-D"
 info "chmod 600 \$HOME/.ssh/id_ed25519"
 info "eval \"\$(ssh-agent -s)\" && ssh-add \$HOME/.ssh/id_ed25519"
+info "--- Flameshot keyboard shortcut command:"
+info "script --command \"flameshot gui\" /dev/null"
 warn "=============================================================="
 
 END_TS="$(date +%s)"
