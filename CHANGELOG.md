@@ -1,3 +1,12 @@
+# [0.9.0](https://github.com/syselement/packertron-vms/compare/v0.8.0...v0.9.0) (2026-03-01)
+
+
+### Features
+
+* add installation of JetBrainsMono Nerd Font and unzip package ([f88728e](https://github.com/syselement/packertron-vms/commit/f88728ecd95e2948ac1196bdd588067d041d2d20))
+
+
+
 # [0.8.0](https://github.com/syselement/packertron-vms/compare/v0.7.0...v0.8.0) (2026-03-01)
 
 
@@ -31,15 +40,6 @@
 ### Features
 
 * enhance Windows Server 2025 provisioning with updated scripts and README ([18dd0c6](https://github.com/syselement/packertron-vms/commit/18dd0c685b4c616e75ec7ff4b711aa8363cdab48))
-
-
-
-## [0.4.2](https://github.com/syselement/packertron-vms/compare/v0.4.1...v0.4.2) (2025-12-22)
-
-
-### Bug Fixes
-
-* Refactor provisioning scripts and cleanup: update .gitignore, remove obsolete scripts, and enhance system update and cleanup processes ([b044d77](https://github.com/syselement/packertron-vms/commit/b044d7796a785ed161dabb7485aa83245a24ae03))
 
 
 
