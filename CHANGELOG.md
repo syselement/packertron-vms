@@ -1,3 +1,12 @@
+# [0.12.0](https://github.com/syselement/packertron-vms/compare/v0.11.0...v0.12.0) (2026-03-01)
+
+
+### Features
+
+* update dash-to-dock settings and add reboot prompt after customization ([239009f](https://github.com/syselement/packertron-vms/commit/239009f2befc1f20916006cffb7d69c501ff4a63))
+
+
+
 # [0.11.0](https://github.com/syselement/packertron-vms/compare/v0.10.0...v0.11.0) (2026-03-01)
 
 
@@ -31,15 +40,6 @@
 ### Features
 
 * updated 03-customize-system.sh script for Ubuntu Desktop ([7b760e8](https://github.com/syselement/packertron-vms/commit/7b760e8d5f4aff2b0d95bdec08ab60e4c61dafe0))
-
-
-
-# [0.7.0](https://github.com/syselement/packertron-vms/compare/v0.6.0...v0.7.0) (2025-12-23)
-
-
-### Features
-
-* streamline provisioning script for Ubuntu 24.04 with improved error handling and repository configurations ([9a90615](https://github.com/syselement/packertron-vms/commit/9a906159be9d8513cdf52e6f2679d0004655eb0e))
 
 
 
