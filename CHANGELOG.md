@@ -1,3 +1,12 @@
+# [0.14.0](https://github.com/syselement/packertron-vms/compare/v0.13.0...v0.14.0) (2026-03-01)
+
+
+### Features
+
+* enhance provisioning scripts with logging and new package installations ([bc2a5fe](https://github.com/syselement/packertron-vms/commit/bc2a5fe1240dc6a05ead452ed538627896b46e9b))
+
+
+
 # [0.13.0](https://github.com/syselement/packertron-vms/compare/v0.12.0...v0.13.0) (2026-03-01)
 
 
@@ -31,15 +40,6 @@
 ### Features
 
 * enhance JetBrainsMono Nerd Font installation and configure Terminator ([015f33e](https://github.com/syselement/packertron-vms/commit/015f33e30218956a66c4f40f9628369ffc0f944f))
-
-
-
-# [0.9.0](https://github.com/syselement/packertron-vms/compare/v0.8.0...v0.9.0) (2026-03-01)
-
-
-### Features
-
-* add installation of JetBrainsMono Nerd Font and unzip package ([f88728e](https://github.com/syselement/packertron-vms/commit/f88728ecd95e2948ac1196bdd588067d041d2d20))
 
 
 
