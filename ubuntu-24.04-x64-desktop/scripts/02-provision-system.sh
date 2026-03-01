@@ -9,9 +9,11 @@ export DEBIAN_FRONTEND=noninteractive
 USER_NAME="syselement"
 SCRIPT_NAME="provision-system"
 LOG_PREFIX="[${SCRIPT_NAME}]"
-LOG_FILE="/var/log/${SCRIPT_NAME}.log"
-exec > >(tee -a "$LOG_FILE") 2>&1
+RUN_ID="$(date +%Y%m%d-%H%M%S)"
+LOG_FILE="/var/log/${SCRIPT_NAME}-${RUN_ID}.log"
+exec > >(tee "$LOG_FILE") 2>&1
 
+# --- Logging setup ---
 _ts() { date +'%F %T'; }
 log()  { printf '[%s] %s %s\n' "$(_ts)" "$LOG_PREFIX" "$*"; }
 warn() { printf '[%s] %s WARN: %s\n' "$(_ts)" "$LOG_PREFIX" "$*"; }

@@ -9,9 +9,10 @@ export DEBIAN_FRONTEND=noninteractive
 USER_NAME="syselement"
 SCRIPT_NAME="customize-system"
 LOG_PREFIX="[${SCRIPT_NAME}]"
-LOG_FILE="/var/log/${SCRIPT_NAME}.log"
 RUN_ID="$(date +%Y%m%d-%H%M%S)"
+LOG_FILE="/var/log/${SCRIPT_NAME}-${RUN_ID}.log"
 
+# --- Logging setup ---
 # --- ANSI Colors for console output ---
 if [[ -t 1 ]]; then
   t_bold=$'\e[1m'; t_dim=$'\e[2m'
@@ -21,23 +22,16 @@ else
   t_bold=""; t_dim=""; t_green=""; t_yellow=""; t_red=""; t_reset=""
 fi
 
-# --- Logging ---
-if ! touch "$LOG_FILE" &>/dev/null; then
-  LOG_FILE="$HOME/${SCRIPT_NAME}.log"
-fi
-
 # Console keeps ANSI colors, log file stores ANSI-stripped output.
-exec > >(tee >(sed -u -r 's/\x1B\[[0-9;]*[[:alpha:]]//g' >> "$LOG_FILE")) 2>&1
+exec > >(tee >(sed -u -r 's/\x1B\[[0-9;]*[[:alpha:]]//g' > "$LOG_FILE")) 2>&1
 
 _ts() { date +'%F %T'; }
-
 log() {
   local msg="$*"
   local ts
   ts="$(_ts)"
   printf '%s %s %b\n' "[$ts]" "$LOG_PREFIX" "$msg"
 }
-
 info()  { log "${t_dim}INFO${t_reset}  $*"; }
 ok()    { log "${t_green}${t_bold}OK${t_reset}    $*"; }
 warn()  { log "${t_yellow}${t_bold}WARN${t_reset}  $*"; }
