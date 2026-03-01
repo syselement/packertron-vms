@@ -133,7 +133,7 @@ install_packages() {
   )
 
   info "installing ${#pkgs[@]} packages"
-  apt-get install -y "${pkgs[@]}"
+  apt-get install -y -qq "${pkgs[@]}"
   ok "package installation completed"
 }
 
@@ -149,7 +149,7 @@ install_terminator_and_config() {
     return
   fi
 
-  apt-get install -y terminator
+  apt-get install -y -qq terminator
 
   sudo -u "$USER_NAME" -H bash -lc '
     set -euo pipefail
@@ -198,8 +198,8 @@ Suites: apt/stable/
 Signed-By: /usr/share/keyrings/sublimehq-pub.asc
 EOF
 
-  apt-get update -y
-  apt-get install -y sublime-text
+  apt-get update -y -qq
+  apt-get install -y -qq sublime-text
   ok "Sublime Text installed"
 }
 
@@ -218,8 +218,8 @@ install_brave_browser() {
 deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/brave-browser-archive-keyring.gpg] https://brave-browser-apt-release.s3.brave.com/ stable main
 EOF
 
-  apt-get update -y
-  apt-get install -y libu2f-udev brave-browser
+  apt-get update -y -qq
+  apt-get install -y -qq libu2f-udev brave-browser
   ok "Brave installed"
 }
 
@@ -252,8 +252,8 @@ install_dbeaver() {
 deb [signed-by=/usr/share/keyrings/dbeaver.gpg.key] https://dbeaver.io/debs/dbeaver-ce /
 EOF
 
-  apt-get update -y
-  apt-get install -y dbeaver-ce
+  apt-get update -y -qq
+  apt-get install -y -qq dbeaver-ce
   ok "DBeaver CE installed"
 }
 
@@ -283,7 +283,7 @@ install_flameshot_and_config() {
     return
   fi
 
-  apt-get install -y flameshot
+  apt-get install -y -qq flameshot
 
   sudo -u "$USER_NAME" -H bash -lc '
     set -euo pipefail
@@ -346,7 +346,7 @@ install_jetbrainsmono_nerd_font() {
     mkdir -p "$HOME/.local/share/fonts"
     cd "$HOME/.local/share/fonts"
     curl -fL -o JetBrainsMono.zip https://github.com/ryanoasis/nerd-fonts/releases/latest/download/JetBrainsMono.zip
-    unzip -o JetBrainsMono.zip
+    unzip -q -o JetBrainsMono.zip
     rm -f JetBrainsMono.zip
     fc-cache -fv
   '
@@ -390,7 +390,7 @@ fi
 
 # --- Update system ---
 info "apt update/dist-upgrade"
-apt-get update -y
+apt-get update -y -qq
 apt-get dist-upgrade -y
 ok "apt update/dist-upgrade completed"
 
@@ -408,7 +408,7 @@ fi
 
 # --- APT prerequisites ---
 info "ensuring repository prerequisites"
-apt-get install -y software-properties-common ca-certificates curl gnupg lsb-release
+apt-get install -y -qq software-properties-common ca-certificates curl gnupg lsb-release
 
 # --- Fastfetch PPA ---
 info "ensuring fastfetch repository"
@@ -416,7 +416,7 @@ ensure_fastfetch_ppa
 
 # --- Refresh APT cache ---
 info "apt update after repository changes"
-apt-get update -y
+apt-get update -y -qq
 
 # --- Install requested tools ---
 install_packages

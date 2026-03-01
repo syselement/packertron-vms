@@ -48,7 +48,7 @@ install_missing_packages() {
   fi
 
   log "install missing packages: ${missing[*]}"
-  if ! apt-get install -y --no-install-recommends "${missing[@]}"; then
+  if ! apt-get install -y -qq --no-install-recommends "${missing[@]}"; then
     warn "failed installing some packages: ${missing[*]}"
     return 1
   fi
@@ -186,7 +186,7 @@ lvextend -r -l +100%FREE /dev/ubuntu-vg/ubuntu-lv || warn "LVM expand skipped or
 
 # --- Update system and install baseline packages ---
 log "apt update / dist-upgrade"
-apt-get update -y || warn "apt update failed"
+apt-get update -y -qq || warn "apt update failed"
 apt-get dist-upgrade -y || warn "apt dist-upgrade failed"
 
 log "install baseline packages (missing only)"
@@ -233,7 +233,7 @@ setup_hashicorp_repo
 
 # --- Install toolchain (missing only) ---
 log "apt update (after adding repos)"
-if ! apt-get update -y; then
+if ! apt-get update -y -qq; then
   warn "apt update after repo setup failed; continuing with best effort"
 fi
 
@@ -289,8 +289,8 @@ ELAPSED="$((END_TS - START_TS))"
 log "done: $(date -Is)"
 log "elapsed: $(printf '%02d:%02d:%02d' "$((ELAPSED / 3600))" "$((ELAPSED % 3600 / 60))" "$((ELAPSED % 60))")"
 log "log file: ${LOG_FILE}"
-info "run_id: ${RUN_ID}"
-info "================= RUN END ================="
+log "run_id: ${RUN_ID}"
+log "================= RUN END ================="
 
 echo "################################"
 echo "# System Provisioning Complete"
