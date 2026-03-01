@@ -131,6 +131,11 @@ install_packages() {
 
 # --- Fonts ---
 install_jetbrainsmono_nerd_font() {
+  if sudo -u "$USER_NAME" -H bash -lc 'fc-list | grep -qi "JetBrainsMono Nerd Font"'; then
+    info "JetBrainsMono Nerd Font already installed, skipping"
+    return
+  fi
+
   sudo -u "$USER_NAME" -H bash -lc '
     set -euo pipefail
     mkdir -p "$HOME/.local/share/fonts"
@@ -139,6 +144,47 @@ install_jetbrainsmono_nerd_font() {
     unzip -o JetBrainsMono.zip
     rm -f JetBrainsMono.zip
     fc-cache -fv
+  '
+}
+
+# --- Terminator configuration ---
+configure_terminator() {
+  if sudo -u "$USER_NAME" -H bash -lc '
+    [[ -f "$HOME/.config/terminator/config" ]] && \
+    grep -q "font = JetBrainsMono Nerd Font Mono 16" "$HOME/.config/terminator/config" && \
+    grep -q "scrollback_infinite = True" "$HOME/.config/terminator/config"
+  '; then
+    info "Terminator already configured, skipping"
+    return
+  fi
+
+  sudo -u "$USER_NAME" -H bash -lc '
+    set -euo pipefail
+    rm -f "$HOME/.config/terminator/config"
+    mkdir -p "$HOME/.config/terminator"
+    touch "$HOME/.config/terminator/config"
+    cat > "$HOME/.config/terminator/config" << '"'"'EOF'"'"'
+[global_config]
+  window_state = maximise
+[keybindings]
+[profiles]
+  [[default]]
+    font = JetBrainsMono Nerd Font Mono 16
+    foreground_color = "#f6f5f4"
+    show_titlebar = False
+    scrollback_infinite = True
+    disable_mousewheel_zoom = True
+    use_system_font = False
+[layouts]
+  [[default]]
+    [[[window0]]]
+      type = Window
+      parent = ""
+    [[[child1]]]
+      type = Terminal
+      parent = window0
+[plugins]
+EOF
   '
 }
 
@@ -202,6 +248,11 @@ info "installing JetBrainsMono Nerd Font"
 install_jetbrainsmono_nerd_font
 ok "JetBrainsMono Nerd Font installed"
 
+# --- Configure Terminator ---
+info "configuring Terminator"
+configure_terminator
+ok "Terminator configured"
+
 # --- Post-install tweaks ---
 info "updating locate database (best effort)"
 updatedb || true
@@ -245,11 +296,15 @@ apt-get -y update >/dev/null 2>&1 || true
 ok "cleanup completed"
 
 # --- Manual SSH key setup hint ---
-echo "# --- Manual SSH private key setup (run as ${USER_NAME}) ---"
-echo "# cat > \$HOME/.ssh/id_ed25519"
-echo "# (paste private key content, then Ctrl-D)"
-echo "# chmod 600 \$HOME/.ssh/*"
-echo "# eval \"\$(ssh-agent -s)\" && ssh-add \$HOME/.ssh/id_ed25519"
+warn "=============================================================="
+warn "MANUAL ACTION REQUIRED: SSH PRIVATE KEY SETUP"
+info "# run as ${USER_NAME}:"
+info "mkdir -p \$HOME/.ssh && chmod 700 \$HOME/.ssh"
+info "cat > \$HOME/.ssh/id_ed25519"
+info "# paste key, then Ctrl-D"
+info "chmod 600 \$HOME/.ssh/id_ed25519"
+info "eval \"\$(ssh-agent -s)\" && ssh-add \$HOME/.ssh/id_ed25519"
+warn "=============================================================="
 
 END_TS="$(date +%s)"
 ELAPSED="$((END_TS - START_TS))"
