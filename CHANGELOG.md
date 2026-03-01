@@ -1,3 +1,12 @@
+# [0.8.0](https://github.com/syselement/packertron-vms/compare/v0.7.0...v0.8.0) (2026-03-01)
+
+
+### Features
+
+* updated 03-customize-system.sh script for Ubuntu Desktop ([7b760e8](https://github.com/syselement/packertron-vms/commit/7b760e8d5f4aff2b0d95bdec08ab60e4c61dafe0))
+
+
+
 # [0.7.0](https://github.com/syselement/packertron-vms/compare/v0.6.0...v0.7.0) (2025-12-23)
 
 
@@ -31,15 +40,6 @@
 ### Bug Fixes
 
 * Refactor provisioning scripts and cleanup: update .gitignore, remove obsolete scripts, and enhance system update and cleanup processes ([b044d77](https://github.com/syselement/packertron-vms/commit/b044d7796a785ed161dabb7485aa83245a24ae03))
-
-
-
-## [0.4.1](https://github.com/syselement/packertron-vms/compare/v0.4.0...v0.4.1) (2025-08-16)
-
-
-### Bug Fixes
-
-* dir names changed ([de8a201](https://github.com/syselement/packertron-vms/commit/de8a201e4d3f51a9e0a6969a885bb031afe3c849))
 
 
 
