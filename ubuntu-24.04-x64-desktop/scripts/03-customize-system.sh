@@ -10,6 +10,7 @@ USER_NAME="syselement"
 SCRIPT_NAME="customize-system"
 LOG_PREFIX="[${SCRIPT_NAME}]"
 LOG_FILE="/var/log/${SCRIPT_NAME}.log"
+RUN_ID="$(date +%Y%m%d-%H%M%S)"
 
 # --- ANSI Colors for output ---
 if [[ -t 1 ]]; then
@@ -82,7 +83,6 @@ install_packages() {
     eza
     fastfetch
     filezilla
-    flameshot
     flatpak
     fonts-noto-color-emoji
     fzf
@@ -111,7 +111,6 @@ install_packages() {
     speedtest-cli
     sshpass
     sysstat
-    terminator
     tmux
     tor
     tree
@@ -129,27 +128,10 @@ install_packages() {
   ok "package installation completed"
 }
 
-# --- Fonts ---
-install_jetbrainsmono_nerd_font() {
-  if sudo -u "$USER_NAME" -H bash -lc 'fc-list | grep -qi "JetBrainsMono Nerd Font"'; then
-    info "JetBrainsMono Nerd Font already installed, skipping"
-    return
-  fi
-
-  sudo -u "$USER_NAME" -H bash -lc '
-    set -euo pipefail
-    mkdir -p "$HOME/.local/share/fonts"
-    cd "$HOME/.local/share/fonts"
-    curl -fL -o JetBrainsMono.zip https://github.com/ryanoasis/nerd-fonts/releases/latest/download/JetBrainsMono.zip
-    unzip -o JetBrainsMono.zip
-    rm -f JetBrainsMono.zip
-    fc-cache -fv
-  '
-}
-
-# --- Terminator configuration ---
-configure_terminator() {
+# --- Specific tools ---
+install_terminator_and_config() {
   if sudo -u "$USER_NAME" -H bash -lc '
+    dpkg -s terminator >/dev/null 2>&1 && \
     [[ -f "$HOME/.config/terminator/config" ]] && \
     grep -q "font = JetBrainsMono Nerd Font Mono 16" "$HOME/.config/terminator/config" && \
     grep -q "scrollback_infinite = True" "$HOME/.config/terminator/config"
@@ -157,6 +139,8 @@ configure_terminator() {
     info "Terminator already configured, skipping"
     return
   fi
+
+  apt-get install -y terminator
 
   sudo -u "$USER_NAME" -H bash -lc '
     set -euo pipefail
@@ -188,11 +172,174 @@ EOF
   '
 }
 
+install_sublime_text() {
+  if dpkg -s sublime-text >/dev/null 2>&1; then
+    info "Sublime Text already installed, skipping"
+    return
+  fi
+
+  if [[ ! -f /usr/share/keyrings/sublimehq-pub.asc ]]; then
+    wget -qO - https://download.sublimetext.com/sublimehq-pub.gpg | tee /usr/share/keyrings/sublimehq-pub.asc >/dev/null
+  fi
+
+  cat > /etc/apt/sources.list.d/sublime-text.sources <<EOF
+Types: deb
+URIs: https://download.sublimetext.com/
+Suites: apt/stable/
+Signed-By: /usr/share/keyrings/sublimehq-pub.asc
+EOF
+
+  apt-get update -y
+  apt-get install -y sublime-text
+  ok "Sublime Text installed"
+}
+
+install_brave_browser() {
+  if dpkg -s brave-browser >/dev/null 2>&1; then
+    info "Brave already installed, skipping"
+    return
+  fi
+
+  if [[ ! -f /usr/share/keyrings/brave-browser-archive-keyring.gpg ]]; then
+    curl -fsSLo /usr/share/keyrings/brave-browser-archive-keyring.gpg \
+      https://brave-browser-apt-release.s3.brave.com/brave-browser-archive-keyring.gpg
+  fi
+
+  cat > /etc/apt/sources.list.d/brave-browser-release.list <<EOF
+deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/brave-browser-archive-keyring.gpg] https://brave-browser-apt-release.s3.brave.com/ stable main
+EOF
+
+  apt-get update -y
+  apt-get install -y libu2f-udev brave-browser
+  ok "Brave installed"
+}
+
+install_emote_snap() {
+  if command -v snap >/dev/null 2>&1 && snap list emote >/dev/null 2>&1; then
+    info "Emote snap already installed, skipping"
+    return
+  fi
+
+  if ! command -v snap >/dev/null 2>&1; then
+    warn "snap command not found, cannot install Emote"
+    return
+  fi
+
+  snap install emote
+  ok "Emote installed"
+}
+
+install_dbeaver() {
+  if dpkg -s dbeaver-ce >/dev/null 2>&1; then
+    info "DBeaver CE already installed, skipping"
+    return
+  fi
+
+  if [[ ! -f /usr/share/keyrings/dbeaver.gpg.key ]]; then
+    wget -O /usr/share/keyrings/dbeaver.gpg.key https://dbeaver.io/debs/dbeaver.gpg.key
+  fi
+
+  cat > /etc/apt/sources.list.d/dbeaver.list <<EOF
+deb [signed-by=/usr/share/keyrings/dbeaver.gpg.key] https://dbeaver.io/debs/dbeaver-ce /
+EOF
+
+  apt-get update -y
+  apt-get install -y dbeaver-ce
+  ok "DBeaver CE installed"
+}
+
+install_postman_snap() {
+  if command -v snap >/dev/null 2>&1 && snap list postman >/dev/null 2>&1; then
+    info "Postman snap already installed, skipping"
+    return
+  fi
+
+  if ! command -v snap >/dev/null 2>&1; then
+    warn "snap command not found, cannot install Postman"
+    return
+  fi
+
+  snap install postman
+  ok "Postman installed"
+}
+
+install_flameshot_and_config() {
+  if sudo -u "$USER_NAME" -H bash -lc '
+    dpkg -s flameshot >/dev/null 2>&1 && \
+    [[ -f "$HOME/.config/flameshot/flameshot.ini" ]] && \
+    grep -q "^startupLaunch=true$" "$HOME/.config/flameshot/flameshot.ini" && \
+    grep -q "^savePathFixed=true$" "$HOME/.config/flameshot/flameshot.ini"
+  '; then
+    info "Flameshot already configured, skipping"
+    return
+  fi
+
+  apt-get install -y flameshot
+
+  sudo -u "$USER_NAME" -H bash -lc '
+    set -euo pipefail
+    mkdir -p "$HOME/.config/flameshot"
+    cat > "$HOME/.config/flameshot/flameshot.ini" << '"'"'EOF'"'"'
+[General]
+contrastOpacity=188
+copyPathAfterSave=false
+saveAfterCopy=true
+saveAsFileExtension=png
+saveLastRegion=true
+savePath=/home/'"$USER_NAME"'/Pictures/flameshot
+savePathFixed=true
+showHelp=false
+showMagnifier=false
+showStartupLaunchMessage=false
+squareMagnifier=true
+startupLaunch=true
+EOF
+  '
+
+  ok "Flameshot installed and configured"
+  info "manual shortcut hint: script --command \"flameshot gui\" /dev/null"
+}
+
+install_obsidian_snap() {
+  if command -v snap >/dev/null 2>&1 && snap list obsidian >/dev/null 2>&1; then
+    info "Obsidian snap already installed, skipping"
+    return
+  fi
+
+  if ! command -v snap >/dev/null 2>&1; then
+    warn "snap command not found, cannot install Obsidian"
+    return
+  fi
+
+  snap install obsidian --classic
+  ok "Obsidian installed"
+}
+
+# --- Fonts ---
+install_jetbrainsmono_nerd_font() {
+  if sudo -u "$USER_NAME" -H bash -lc 'fc-list | grep -qi "JetBrainsMono Nerd Font"'; then
+    info "JetBrainsMono Nerd Font already installed, skipping"
+    return
+  fi
+
+  sudo -u "$USER_NAME" -H bash -lc '
+    set -euo pipefail
+    mkdir -p "$HOME/.local/share/fonts"
+    cd "$HOME/.local/share/fonts"
+    curl -fL -o JetBrainsMono.zip https://github.com/ryanoasis/nerd-fonts/releases/latest/download/JetBrainsMono.zip
+    unzip -o JetBrainsMono.zip
+    rm -f JetBrainsMono.zip
+    fc-cache -fv
+  '
+}
+
 echo "################################"
 echo "# Customize System"
 echo "################################"
 
-info "start: $(date -Is)"
+info "================ RUN START ================"
+info "run_id: ${RUN_ID}"
+info "started_at: $(date -Is)"
 START_TS="$(date +%s)"
 
 CODENAME="$(. /etc/os-release && echo "$VERSION_CODENAME")"
@@ -228,6 +375,18 @@ apt-get update -y
 apt-get dist-upgrade -y
 ok "apt update/dist-upgrade completed"
 
+# --- Update snaps ---
+if command -v snap >/dev/null 2>&1; then
+  info "snap refresh"
+  if snap refresh; then
+    ok "snap refresh completed"
+  else
+    warn "snap refresh failed, continuing"
+  fi
+else
+  warn "snap command not found, skipping snap refresh"
+fi
+
 # --- APT prerequisites ---
 info "ensuring repository prerequisites"
 apt-get install -y software-properties-common ca-certificates curl gnupg lsb-release
@@ -248,10 +407,17 @@ info "installing JetBrainsMono Nerd Font"
 install_jetbrainsmono_nerd_font
 ok "JetBrainsMono Nerd Font installed"
 
-# --- Configure Terminator ---
-info "configuring Terminator"
-configure_terminator
-ok "Terminator configured"
+# --- Install specific tools ---
+info "installing specific tools"
+install_terminator_and_config
+install_sublime_text
+install_brave_browser
+install_emote_snap
+install_dbeaver
+install_postman_snap
+install_flameshot_and_config
+install_obsidian_snap
+ok "specific tools installed/configured"
 
 # --- Post-install tweaks ---
 info "updating locate database (best effort)"
@@ -283,7 +449,8 @@ sudo -u "$USER_NAME" -H dbus-run-session -- bash -lc \
     'firefox_firefox.desktop',
     'org.gnome.Nautilus.desktop',
     'terminator.desktop',
-    'sublime_text.desktop'
+    'sublime_text.desktop',
+    'obsidian_obsidian.desktop'
   ]\" || true"
 ok "GNOME favorites set"
 
@@ -311,6 +478,8 @@ ELAPSED="$((END_TS - START_TS))"
 info "done: $(date -Is)"
 info "elapsed: $(printf '%02d:%02d:%02d' "$((ELAPSED / 3600))" "$((ELAPSED % 3600 / 60))" "$((ELAPSED % 60))")"
 info "log file: ${LOG_FILE}"
+info "run_id: ${RUN_ID}"
+info "================= RUN END ================="
 
 echo "################################"
 echo "# Customize System Complete"
