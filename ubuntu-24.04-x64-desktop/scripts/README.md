@@ -7,7 +7,7 @@ The set currently covers:
 
 - base OS update and VMware guest tooling
 - cleanup and template hygiene
-- baseline dev/IaC tooling installation
+- baseline sysadmin/devops/IaC tooling installation
 - desktop customization, user preferences, and extra apps
 
 ---
@@ -62,7 +62,7 @@ Installs the main tooling stack for the Ubuntu ops workstation. It:
 - prints validation output and basic system information
 - reboots at the end
 
-This is the main “developer + IaC tools” bootstrap script.
+This is the main “sysadmin + devops + IaC tools” bootstrap script.
 
 ---
 
@@ -89,7 +89,7 @@ Applies desktop customization and installs additional user-facing tools. It:
 - prints a manual post-run section for SSH key import and Flameshot shortcut setup
 - reboots at the end
 
-This is the “make the desktop mine” layer.
+This is the customized desktop layer.
 
 ---
 
@@ -102,3 +102,7 @@ Recommended execution order:
 01-cleanup-system.sh
 02-provision-system.sh
 03-customize-system.sh
+```
+
+---
+
