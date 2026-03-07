@@ -2,6 +2,7 @@
 #
 # Install baseline + developer tools on Ubuntu 24.04 Desktop
 #
+
 set -euo pipefail
 
 export DEBIAN_FRONTEND=noninteractive
