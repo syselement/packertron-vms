@@ -2,9 +2,10 @@
 #
 # Do not alter first line of this file.
 # https://cloudinit.readthedocs.io/en/latest/
+# https://github.com/canonical/cloud-init/tree/main/doc/examples
+#
 # For autoinstall specific documentation see:
 # https://canonical-subiquity.readthedocs-hosted.com/en/latest/reference/autoinstall-reference.html
-# https://github.com/canonical/cloud-init/tree/main/doc/examples
 #
 # This file is used by cloud-init to perform an unattended installation of Ubuntu 24.04 Desktop.
 #
