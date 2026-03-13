@@ -6,6 +6,10 @@
 # https://canonical-subiquity.readthedocs-hosted.com/en/latest/reference/autoinstall-reference.html
 # https://github.com/canonical/cloud-init/tree/main/doc/examples
 #
+# This file is used by cloud-init to perform an unattended installation of Ubuntu 24.04 Desktop.
+#
+# Customize username, password, timezone, keyboard layout, ssh authorized keys and other settings as needed.
+#
 
 autoinstall:
   # version is an Autoinstall required field.

@@ -2,6 +2,13 @@
 #
 # Customize Ubuntu 24.04 Desktop
 #
+# Notes:
+# - Run as root.
+# - Console output is colorized when interactive.
+# - Log output is written to /var/log/customize-system-<run_id>.log without ANSI escapes.
+# - GNOME string values passed to run_user_gsettings_try must already be quoted, e.g. "'prefer-dark'".
+#
+
 set -euo pipefail
 
 export DEBIAN_FRONTEND=noninteractive
@@ -19,7 +26,7 @@ require_root() {
   fi
 }
 
-# --- must be root (before touching /var/log) ---
+# --- must be root ---
 require_root
 
 # --- Logging setup ---
@@ -371,9 +378,6 @@ START_TS="$(date +%s)"
 CODENAME="$(. /etc/os-release && echo "$VERSION_CODENAME")"
 ARCH="$(dpkg --print-architecture)"
 info "distro codename=${CODENAME} arch=${ARCH}"
-
-# --- must be root ---
-require_root
 
 if id "$USER_NAME" >/dev/null 2>&1; then
   ok "running user-scoped commands as: ${USER_NAME}"
