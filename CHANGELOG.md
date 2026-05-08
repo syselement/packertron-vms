@@ -1,3 +1,12 @@
+# [0.15.0](https://github.com/syselement/packertron-vms/compare/v0.14.0...v0.15.0) (2026-05-08)
+
+
+### Features
+
+* add Ubuntu 26.04 Desktop build scripts and cloud-init configuration; fixed doc ([9d84a84](https://github.com/syselement/packertron-vms/commit/9d84a84d9590151ba07d9e5d30a2c70e569438fc))
+
+
+
 # [0.14.0](https://github.com/syselement/packertron-vms/compare/v0.13.0...v0.14.0) (2026-03-01)
 
 
@@ -31,15 +40,6 @@
 ### Features
 
 * update system customization script to install additional tools and enhance logging ([34177b8](https://github.com/syselement/packertron-vms/commit/34177b8765a37bebdc709fb687906c1649984848))
-
-
-
-# [0.10.0](https://github.com/syselement/packertron-vms/compare/v0.9.0...v0.10.0) (2026-03-01)
-
-
-### Features
-
-* enhance JetBrainsMono Nerd Font installation and configure Terminator ([015f33e](https://github.com/syselement/packertron-vms/commit/015f33e30218956a66c4f40f9628369ffc0f944f))
 
 
 
