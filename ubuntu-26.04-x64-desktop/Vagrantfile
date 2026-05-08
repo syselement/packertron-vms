@@ -1,12 +1,12 @@
-# Vagrantfile for Ubuntu 24.04 x64 Desktop VMware VM
+# Vagrantfile for Ubuntu 26.04 x64 Desktop VMware VM
 
-description = "Ubuntu-Desktop-24"
+description = "Ubuntu-Desktop-26"
 
 Vagrant.configure("2") do |config|
 
   # Common box configuration
-  config.vm.box = "ubuntu-24.04-x64-desktop-template-vmware"
-  config.vm.box_url = "file://#{File.expand_path("output/ubuntu-24.04-x64-desktop-template-vmware.box", __dir__)}"
+  config.vm.box = "ubuntu-26.04-x64-desktop-template-vmware"
+  config.vm.box_url = "file://#{File.expand_path("output/ubuntu-26.04-x64-desktop-template-vmware.box", __dir__)}"
   config.vm.synced_folder ".", "/vagrant", disabled: true
 
   # -------------------------
@@ -32,7 +32,7 @@ Vagrant.configure("2") do |config|
   # Base VM (NO provisioning)
   # -------------------------
   config.vm.define "base" do |base|
-    base.vm.hostname = "ub24-base"
+    base.vm.hostname = "ub26-base"
     base.ssh.username = "syselement"
     base.ssh.password = "packer"
     base.ssh.keep_alive = true
@@ -48,7 +48,7 @@ Vagrant.configure("2") do |config|
   # Provisioned VM
   # ---------------------------------
   config.vm.define "provisioned" do |prov|
-    prov.vm.hostname = "ub24-desktop"
+    prov.vm.hostname = "ub26-desktop"
     prov.ssh.username = "syselement"
     prov.ssh.password = "packer"
     prov.ssh.keep_alive = true

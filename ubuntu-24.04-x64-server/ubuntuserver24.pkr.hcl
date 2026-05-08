@@ -114,7 +114,7 @@ build {
   provisioner "shell" {
     execute_command="echo '${var.password}' | sudo -S env {{ .Vars }} {{ .Path }}"
     scripts = [
-      "scripts/provisioning.sh"
+      "../scripts/ubuntu/provisioning.sh"
     ]
   }
 

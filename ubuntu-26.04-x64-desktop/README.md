@@ -1,6 +1,6 @@
-# Ubuntu 24.04 Desktop (VMware + Packer)
+# Ubuntu 26.04 Desktop (VMware + Packer)
 
-Repeatable Ubuntu 24.04 desktop build for VMware Workstation with optional Vagrant box export.
+Repeatable **Ubuntu 26.04 Desktop** build for VMware Workstation with optional Vagrant box export.
 
 ## Requirements
 
@@ -12,14 +12,14 @@ Repeatable Ubuntu 24.04 desktop build for VMware Workstation with optional Vagra
 ## Quick build
 
 ```powershell
-cd ubuntu-24.04-x64-desktop
+cd ubuntu-26.04-x64-desktop
 packer init .
-packer validate ubuntu-24.04-x64-desktop.pkr.hcl
+packer validate ubuntu-26.04-x64-desktop.pkr.hcl
 packer build .
 ```
 
 - Artifacts land in `output/`
-    - e.g. `ubuntu-24.04-x64-desktop-template-vmware.box`
+    - e.g. `ubuntu-26.04-x64-desktop-template-vmware.box` - size ~5GB
 
 - Build time: ~15 minutes (hardware dependent)
 
@@ -28,14 +28,14 @@ packer build .
 1. Extract the .box:
 
 ```powershell
-mkdir tmp && tar -xf output/ubuntu-24.04-x64-desktop-template-vmware.box -C tmp
+mkdir tmp && tar -xf output/ubuntu-26.04-x64-desktop-template-vmware.box -C tmp
 ```
 
-2. Open `tmp/ubuntu-24.04-x64-desktop-template.vmx` in Workstation (File -> Open) and power it on.
+2. Open `tmp/ubuntu-26.04-x64-desktop-template.vmx` in Workstation (File -> Open) and power it on.
     - The `.vmxf`, `.nvram`, `.vmdk`, and `.vmsd` sit alongside it.
 
 3. Optional VMX tweaks (before first boot):
-    - `displayname = "Ubuntu-Desktop-24"`
+    - `displayname = "Ubuntu-Desktop-26"`
     - `hgfs.linkrootshare = "FALSE"`
     - `hgfs.maprootshare = "FALSE"`
     - `isolation.tools.hgfs.disable = "TRUE"`
@@ -76,7 +76,7 @@ vagrant up provisioned
 
 Vagrant/VMware will manage VMX adjustments during `vagrant up`; no manual VMX edits needed when using Vagrant.
 
-- The workstation layer (Docker, OpenTofu, Packer CLI, Ansible, VS Code, hygiene) lives in one idempotent script executed only on the first `vagrant up` - `../scripts/ubuntu/02-provision-system.sh`
+- The workstation layer (Docker, OpenTofu, Packer CLI, Ansible, VS Code, hygiene) lives in one idempotent script executed only on the first `vagrant up` - `scripts/02-provision-system.sh`
 - Re-run with `--provision` to re-provision the VM (Vagrant runs provisioners once by default).
 
 ```powershell
@@ -108,11 +108,12 @@ vagrant destroy -f
 
 ## Customize
 
-- `ubuntu-24.04-x64-desktop.pkr` - contains the Packer variables with some defaults.
-- `ubuntu-24.04-x64-desktop.auto.pkrvars.hcl` - auto-loaded Packer Build variables
+- `ubuntu-26.04-x64-desktop.pkr` - contains the Packer variables with some defaults.
+- `ubuntu-26.04-x64-desktop.auto.pkrvars.hcl` - auto-loaded Packer Build variables
+- Override variables at build time with `-var "key=value"`.
 - `../scripts/` are used
-   - during Packer build for preseed/install automation
-   - during Vagrant provisioning
+    - during Packer build for preseed/install automation
+    - during Vagrant provisioning
 
 ## Troubleshoot fast
 
@@ -123,8 +124,8 @@ vagrant destroy -f
 ## Files of note
 
 - `Vagrantfile`
-- `ubuntu-24.04-x64-desktop.pkr.hcl`
-- `ubuntu-24.04-x64-desktop.auto.pkrvars.hcl`
+- `ubuntu-26.04-x64-desktop.pkr.hcl`
+- `ubuntu-26.04-x64-desktop.auto.pkrvars.hcl`
 - `output/`
 - `../scripts/`
 

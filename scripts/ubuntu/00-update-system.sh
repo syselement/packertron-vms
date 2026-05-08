@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Update Ubuntu 24.04 Desktop
+# Update Ubuntu Desktop
 #
 
 set -euo pipefail

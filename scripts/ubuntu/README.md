@@ -1,6 +1,6 @@
-# Scripts
+# Debian/Ubuntu Bash Scripts
 
-Bootstrap and customization scripts for the Ubuntu 24.04 Desktop workstation.
+Bootstrap and customization scripts for the Ubuntu Desktop workstation.
 
 These scripts are designed to be run in order, typically from Vagrant shell provisioners, to turn a freshly built Ubuntu Desktop VM into a usable workstation for homelab, IaC, and daily operations.
 The set currently covers:

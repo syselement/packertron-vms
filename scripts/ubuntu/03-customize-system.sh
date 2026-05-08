@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Customize Ubuntu 24.04 Desktop
+# Customize Ubuntu Desktop
 #
 # Notes:
 # - Run as root.

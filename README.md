@@ -137,13 +137,15 @@ packertron-vms/
 ├── win-srv-2025/
 │   ├── config/          # Configuration files (autounattend.xml, unattend.xml)
 │   ├── output/          # VM build output
-│   ├── scripts/         # Automation scripts (Powershell, Batch)
 │   ├── vagrant/         # Vagrant Automation scripts (Powershell, Batch)
 │   ├── README.md        # Readme file
 │   ├── Vagrantfile      # Vagrant configuration
 │   ├── winserver2025.pkr.hcl      # Packer HCL template
 │   ├── winserver2025.pkrvars.hcl  # Packer variables
+├── scripts/             # Automation scripts (Bash, Powershell, Batch)
+├── ...
 └── .gitignore           # Ignore unnecessary files (ISO, temp builds)
+
 ```
 
 ---

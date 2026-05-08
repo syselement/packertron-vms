@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Install baseline + developer tools on Ubuntu 24.04 Desktop
+# Install baseline + developer tools on Ubuntu Desktop
 #
 
 set -euo pipefail

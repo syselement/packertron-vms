@@ -87,7 +87,7 @@ source "vmware-iso" "winsrv2025" {
   cpus             = var.vm_cpu_cores
   disk_size        = var.vm_disk_size
   disk_type_id     = "0"
-  floppy_files     = ["config/autounattend.xml","scripts/packer_shutdown.bat"]
+  floppy_files     = ["config/autounattend.xml","${path.root}/../scripts/windows/packer_shutdown.bat"]
   guest_os_type    = "windows2022srvnext-64"
   headless         = false
   iso_checksum     = var.iso_checksum
@@ -121,7 +121,7 @@ build {
   provisioner "powershell" {
     only         = ["vmware-iso.winsrv2025"]
     pause_before = "1m0s"
-    scripts      = ["scripts/01_vmware_tools.ps1"]
+    scripts      = ["${path.root}/../scripts/windows/01_vmware_tools.ps1"]
   }
 
   # Copy unattend.xml to the VM for the final sysprep shutdown step in the packer_shutdown.bat script
@@ -136,12 +136,12 @@ build {
   }
 
   provisioner "file" {
-    source = "scripts/04_startup.cmd"
+    source = "${path.root}/../scripts/windows/04_startup.cmd"
     destination = "c:/tmp/startup.cmd"
   }
 
   provisioner "file" {
-    source = "scripts/04_startup.ps1"
+    source = "${path.root}/../scripts/windows/04_startup.ps1"
     destination = "c:/tmp/startup.ps1"
   }
 
@@ -151,7 +151,7 @@ build {
 
   # First round of Windows Updates
   provisioner "powershell" {
-    scripts = ["scripts/02_win_updates.ps1"]
+    scripts = ["${path.root}/../scripts/windows/02_win_updates.ps1"]
   }
 
   provisioner "windows-restart" {
@@ -160,7 +160,7 @@ build {
 
   # Second round of Windows Updates
   provisioner "powershell" {
-    scripts = ["scripts/02_win_updates.ps1"]
+    scripts = ["${path.root}/../scripts/windows/02_win_updates.ps1"]
   }
 
   provisioner "windows-restart" {
@@ -170,7 +170,7 @@ build {
   # Final cleanup before packaging the box
   provisioner "powershell" {
     pause_before = "1m0s"
-    scripts      = ["scripts/03_cleanup.ps1"]
+    scripts      = ["${path.root}/../scripts/windows/03_cleanup.ps1"]
   }
 
   post-processor "vagrant" {

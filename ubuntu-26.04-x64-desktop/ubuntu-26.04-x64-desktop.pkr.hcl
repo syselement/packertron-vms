@@ -1,4 +1,4 @@
-# Description: Packer template to build an Ubuntu 24.04 Desktop VMware VM and package as Vagrant box
+# Description: Packer template to build an Ubuntu 26.04 Desktop VMware VM and package as Vagrant box
 # 
 # https://developer.hashicorp.com/packer/integrations/hashicorp/vmware/latest/components/builder/iso
 
@@ -20,19 +20,19 @@ packer {
 variable "iso_checksum" {
   type        = string
   description = "The checksum for the ISO file"
-  default     = "file:https://releases.ubuntu.com/noble/SHA256SUMS"
+  default     = "file:https://releases.ubuntu.com/resolute/SHA256SUMS"
 }
 
 variable "iso_url" {
   type        = string
   description = "A URL to the ISO file"
-  default     = "https://releases.ubuntu.com/noble/ubuntu-24.04.4-desktop-amd64.iso"
+  default     = "https://releases.ubuntu.com/resolute/ubuntu-26.04-desktop-amd64.iso"
 }
 
 variable "iso_fallback_url" {
   type        = string
   description = "Fallback URL used when iso_url points to a missing local file"
-  default     = "https://releases.ubuntu.com/noble/ubuntu-24.04.4-desktop-amd64.iso"
+  default     = "https://releases.ubuntu.com/resolute/ubuntu-26.04-desktop-amd64.iso"
 }
 
 variable "output_dir" {
@@ -68,7 +68,7 @@ variable "vm_memory" {
 
 variable "vm_name" {
   type    = string
-  default = "ubuntu-24.04-x64-desktop-template"
+  default = "ubuntu-26.04-x64-desktop-template"
 }
 
 # Local values
@@ -78,7 +78,7 @@ locals {
 }
 
 # Source block
-source "vmware-iso" "ubuntu2404_desktop" {
+source "vmware-iso" "ubuntu2604_desktop" {
   # Ubuntu Desktop autoinstall via NoCloud-Net and local HTTP server
   # boot_command provides the necessary keystrokes to start the installation with autoinstall parameters
   boot_wait         = "5s"
@@ -113,7 +113,7 @@ source "vmware-iso" "ubuntu2404_desktop" {
 
 # Build block
 build {
-  sources = ["source.vmware-iso.ubuntu2404_desktop"]
+  sources = ["source.vmware-iso.ubuntu2604_desktop"]
   # Provisioning script
   provisioner "shell" {
     execute_command = "echo '${var.ssh_password}' | sudo -S env {{ .Vars }} {{ .Path }}"

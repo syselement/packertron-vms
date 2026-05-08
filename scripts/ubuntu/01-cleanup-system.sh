@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Cleanup Ubuntu 24.04 Desktop
+# Cleanup Ubuntu Desktop
 #
 
 set -euo pipefail
