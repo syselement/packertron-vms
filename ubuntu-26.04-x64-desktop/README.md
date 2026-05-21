@@ -1,3 +1,5 @@
+# NOT WORKING - https://bugs.launchpad.net/subiquity/+bug/2150197
+
 # Ubuntu 26.04 Desktop (VMware + Packer)
 
 Repeatable **Ubuntu 26.04 Desktop** build for VMware Workstation with optional Vagrant box export.
