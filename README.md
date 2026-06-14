@@ -110,14 +110,50 @@ The latest **VMware Workstation Pro** version installer can be found at the [off
 
 ### 3️⃣ Install Vagrant VMware Plugins
 
-- **Requirement**: [Install Vagrant VMware Utility](https://developer.hashicorp.com/vagrant/install/vmware) using the binary (for Win).
-- Install `vagrant-vmware-desktop` plugin
+**Requirements**
+
+- [Install Vagrant VMware Utility](https://developer.hashicorp.com/vagrant/install/vmware) using the binary (for Win).
+
+> If the installer cannot find VMware Workstation, in case of VMware Workstation Pro 26H1 (64bit) - [issue](https://github.com/hashicorp/vagrant-vmware-desktop/issues/177) - proceed by creating the registry keys the installer and its service is looking for.
+>
+> Run this in **PowerShell as Administrator**:
+>
+> ```powershell
+> $src = "HKLM:\SOFTWARE\VMware, Inc.\VMware Workstation"
+> $dstRoot = "HKLM:\SOFTWARE\WOW6432Node\VMware, Inc."
+> $dst = "$dstRoot\VMware Workstation"
+> 
+> New-Item -Path $dstRoot -Force | Out-Null
+> New-Item -Path $dst -Force | Out-Null
+> 
+> Set-ItemProperty -Path $dstRoot -Name "Core" -Value "VMware Workstation"
+> 
+> $props = Get-ItemProperty -Path $src
+> 
+> foreach ($name in "InstallPath", "InstallPath64", "ProductCode", "ProductVersion", "Version") {
+>     if ($props.$name) {
+>         Set-ItemProperty -Path $dst -Name $name -Value $props.$name
+>     }
+> }
+> 
+> # fallback if InstallPath64 does not exist in 26H1
+> if (-not (Get-ItemProperty -Path $dst -Name InstallPath64 -ErrorAction SilentlyContinue)) {
+>     Set-ItemProperty -Path $dst -Name "InstallPath64" -Value $props.InstallPath
+> }
+> ```
+>
+> Then rerun the Vagrant VMware Utility MSI as admin.
+>
+> After install, check if the service is running:
+>
+> ```powershell
+> Get-Service *vagrant*vmware*
+> Get-Service vagrant-vmware-utility
+> ```
+
+- Install the `vagrant-vmware-desktop` plugin
 
 ```powershell
-# choco install vagrant-vmware-utility -y
-# ^^ may not work anymore since vmwareworkstation dependency URL is broken
-# ^^ use binary
-
 vagrant plugin install vagrant-vmware-desktop
 ```
 

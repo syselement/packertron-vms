@@ -13,6 +13,17 @@ Repeatable **Ubuntu 26.04 Desktop** build for VMware Workstation with optional V
 
 ## Quick build
 
+### Prepare for Cloud-init/Unattended installation:
+
+- Create empty `http/meta-data` and customize `http/user-data`
+
+- The build serves the local `http/` directory through Packer’s temporary HTTP server (using `http_directory`). `${path.root}` points to the directory where the Packer template is run from
+
+- During boot, the installer is given `autoinstall ds=nocloud-net\\;s=http://{{ .HTTPIP }}:{{ .HTTPPort }}/`
+  - Packer serves the local `http/` directory, then Ubuntu autoinstall downloads `user-data` and `meta-data` from Packer’s temporary HTTP server as its NoCloud seed configuration
+
+### Build the template box
+
 ```powershell
 cd ubuntu-26.04-x64-desktop
 packer init .
@@ -21,7 +32,7 @@ packer build .
 ```
 
 - Artifacts land in `output/`
-    - e.g. `ubuntu-26.04-x64-desktop-template-vmware.box` - size ~5GB
+  - e.g. `ubuntu-26.04-x64-desktop-template-vmware.box` - size ~5GB
 
 - Build time: ~15 minutes (hardware dependent)
 
@@ -33,8 +44,8 @@ packer build .
 mkdir tmp && tar -xf output/ubuntu-26.04-x64-desktop-template-vmware.box -C tmp
 ```
 
-2. Open `tmp/ubuntu-26.04-x64-desktop-template.vmx` in Workstation (File -> Open) and power it on.
-    - The `.vmxf`, `.nvram`, `.vmdk`, and `.vmsd` sit alongside it.
+2. Open `tmp/ubuntu-26.04-x64-desktop-template.vmx` in Workstation (File -> Open) and power it on
+    - The `.vmxf`, `.nvram`, `.vmdk`, and `.vmsd` sit alongside it
 
 3. Optional VMX tweaks (before first boot):
     - `displayname = "Ubuntu-Desktop-26"`
@@ -44,14 +55,14 @@ mkdir tmp && tar -xf output/ubuntu-26.04-x64-desktop-template-vmware.box -C tmp
     - `sound.present = "TRUE"`
     - `sound.startconnected = "TRUE"`
 
-1. Alternative: create a new VM and point the disk to `tmp/disk.vmdk`.
+4. Alternative: create a new VM and point the disk to `tmp/disk.vmdk`
 
 ## Use with Vagrant (VMware provider)
 
 This project defines **two machines** in the Vagrantfile
 
-- Both machines share identical VMware hardware configuration (RAM, CPU, NAT networking, nested virtualization).
-- Adjust VMX memory/CPU settings in the Vagrantfile if needed.
+- Both machines share identical VMware hardware configuration (RAM, CPU, NAT networking, nested virtualization)
+- Adjust VMX memory/CPU settings in the Vagrantfile if needed
 
 | Machine       | Purpose                     | Provisioned             |
 | ------------- | --------------------------- | ----------------------- |
@@ -78,8 +89,8 @@ vagrant up provisioned
 
 Vagrant/VMware will manage VMX adjustments during `vagrant up`; no manual VMX edits needed when using Vagrant.
 
-- The workstation layer (Docker, OpenTofu, Packer CLI, Ansible, VS Code, hygiene) lives in one idempotent script executed only on the first `vagrant up` - `scripts/02-provision-system.sh`
-- Re-run with `--provision` to re-provision the VM (Vagrant runs provisioners once by default).
+- The workstation layer (Docker, OpenTofu, Packer CLI, Ansible, VS Code, hygiene) lives in one idempotent script executed only on the first `vagrant up` - `../scripts/ubuntu/02-provision-system.sh`
+- Re-run with `--provision` to re-provision the VM (Vagrant runs provisioners once by default)
 
 ```powershell
 # Re-Provision VM
@@ -110,18 +121,18 @@ vagrant destroy -f
 
 ## Customize
 
-- `ubuntu-26.04-x64-desktop.pkr` - contains the Packer variables with some defaults.
+- `ubuntu-26.04-x64-desktop.pkr` - contains the Packer variables with some defaults
 - `ubuntu-26.04-x64-desktop.auto.pkrvars.hcl` - auto-loaded Packer Build variables
-- Override variables at build time with `-var "key=value"`.
+- Override variables at build time with `-var "key=value"`
 - `../scripts/` are used
-    - during Packer build for preseed/install automation
-    - during Vagrant provisioning
+  - during Packer build for preseed/install automation
+  - during Vagrant provisioning
 
 ## Troubleshoot fast
 
-- SSH issues: check VMware network mode (NAT vs bridged) and VMware services.
-- Import failures: confirm Workstation version and BIOS virtualization enabled.
-- Run `packer build -debug` for an interactive troubleshooting VM.
+- SSH issues: check VMware network mode (NAT vs bridged) and VMware services
+- Import failures: confirm Workstation version and BIOS virtualization enabled
+- Run `packer build -debug` for an interactive troubleshooting VM
 
 ## Files of note
 

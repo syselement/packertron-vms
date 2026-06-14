@@ -299,12 +299,14 @@ install_flameshot_and_config() {
 
   apt-get install -y -qq flameshot
 
+  mkdir -p "/home/${USER_NAME}/Pictures/flameshot" && chown "${USER_NAME}":"${USER_NAME}" "/home/${USER_NAME}/Pictures/flameshot"
   sudo -u "$USER_NAME" -H bash -lc '
     set -euo pipefail
     mkdir -p "$HOME/.config/flameshot"
     cat > "$HOME/.config/flameshot/flameshot.ini" << '"'"'EOF'"'"'
 [General]
 contrastOpacity=188
+copyOnDoubleClick=true
 copyPathAfterSave=false
 saveAfterCopy=true
 saveAsFileExtension=png
@@ -312,7 +314,7 @@ saveLastRegion=true
 savePath=/home/'"$USER_NAME"'/Pictures/flameshot
 savePathFixed=true
 showHelp=false
-showMagnifier=false
+showMagnifier=true
 showStartupLaunchMessage=false
 squareMagnifier=true
 startupLaunch=true
