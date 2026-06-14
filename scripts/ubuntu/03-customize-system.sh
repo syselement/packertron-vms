@@ -224,16 +224,16 @@ install_brave_browser() {
   fi
 
   if [[ ! -f /usr/share/keyrings/brave-browser-archive-keyring.gpg ]]; then
-    curl -fsSLo /usr/share/keyrings/brave-browser-archive-keyring.gpg \
-      https://brave-browser-apt-release.s3.brave.com/brave-browser-archive-keyring.gpg
+    curl -fsSLo /usr/share/keyrings/brave-browser-archive-keyring.gpg https://brave-browser-apt-release.s3.brave.com/brave-browser-archive-keyring.gpg
   fi
 
-  cat > /etc/apt/sources.list.d/brave-browser-release.list <<EOF
-deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/brave-browser-archive-keyring.gpg] https://brave-browser-apt-release.s3.brave.com/ stable main
-EOF
+  if [[ ! -f /etc/apt/sources.list.d/brave-browser-release.sources ]]; then
+    curl -fsSLo /etc/apt/sources.list.d/brave-browser-release.sources https://brave-browser-apt-release.s3.brave.com/brave-browser.sources
+  fi 
 
+  rm -f /etc/apt/sources.list.d/brave-browser-*.list
   apt-get update -y -qq
-  apt-get install -y -qq libu2f-udev brave-browser
+  apt-get install -y -qq brave-browser
   ok "Brave installed"
 }
 
@@ -259,7 +259,7 @@ install_dbeaver() {
   fi
 
   if [[ ! -f /usr/share/keyrings/dbeaver.gpg.key ]]; then
-    wget -O /usr/share/keyrings/dbeaver.gpg.key https://dbeaver.io/debs/dbeaver.gpg.key
+    wget -qO- https://dbeaver.io/debs/dbeaver.gpg.key | gpg --dearmor -o /usr/share/keyrings/dbeaver.gpg.key
   fi
 
   cat > /etc/apt/sources.list.d/dbeaver.list <<EOF

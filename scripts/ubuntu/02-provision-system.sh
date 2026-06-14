@@ -203,8 +203,9 @@ install_missing_packages \
   openssh-client \
   pipx \
   python3-venv \
-  sshpass \
+  snapd \
   software-properties-common \
+  sshpass \
   tmux \
   vim \
   wget || true
