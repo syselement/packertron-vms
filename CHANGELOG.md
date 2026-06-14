@@ -1,3 +1,12 @@
+## [0.15.2](https://github.com/syselement/packertron-vms/compare/v0.15.1...v0.15.2) (2026-06-14)
+
+
+### Bug Fixes
+
+* update package installation and source list handling in provisioning scripts ([01e3122](https://github.com/syselement/packertron-vms/commit/01e3122b438b081deda20b7bfee6b3f6eef4da53))
+
+
+
 ## [0.15.1](https://github.com/syselement/packertron-vms/compare/v0.15.0...v0.15.1) (2026-05-21)
 
 
@@ -31,15 +40,6 @@
 ### Features
 
 * update dash-to-dock settings to hide trash and modify GNOME favorites ([0b959db](https://github.com/syselement/packertron-vms/commit/0b959dbaf40fecb25e56d7414ff05f7d38c23936))
-
-
-
-# [0.12.0](https://github.com/syselement/packertron-vms/compare/v0.11.0...v0.12.0) (2026-03-01)
-
-
-### Features
-
-* update dash-to-dock settings and add reboot prompt after customization ([239009f](https://github.com/syselement/packertron-vms/commit/239009f2befc1f20916006cffb7d69c501ff4a63))
 
 
 
