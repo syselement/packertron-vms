@@ -4,18 +4,28 @@
 
 Repeatable **Ubuntu 26.04 Desktop** build for VMware Workstation with optional Vagrant box export.
 
+---
+
 ## Requirements
 
 - Windows host with VMware Workstation
 - Packer >= 1.8 (HCL2)
 - Disk space + BIOS virtualization
-- Optional: Vagrant + vagrant-vmware-desktop/vagrant-vmware-workstation
+- Optional: Vagrant + vagrant-vmware-desktop plugin
+
+---
 
 ## Quick build
+
+```bash
+git clone https://github.com/syselement/packertron-vms.git
+```
 
 ### Prepare for Cloud-init/Unattended installation:
 
 - Create empty `http/meta-data` and customize `http/user-data`
+
+This is how it works:
 
 - The build serves the local `http/` directory through Packer’s temporary HTTP server (using `http_directory`). `${path.root}` points to the directory where the Packer template is run from
 
@@ -25,7 +35,7 @@ Repeatable **Ubuntu 26.04 Desktop** build for VMware Workstation with optional V
 ### Build the template box
 
 ```powershell
-cd ubuntu-26.04-x64-desktop
+cd .\packertron-vms\ubuntu-26.04-x64-desktop
 packer init .
 packer validate ubuntu-26.04-x64-desktop.pkr.hcl
 packer build .
@@ -35,6 +45,8 @@ packer build .
   - e.g. `ubuntu-26.04-x64-desktop-template-vmware.box` - size ~5GB
 
 - Build time: ~15 minutes (hardware dependent)
+
+---
 
 ## Use in VMware Workstation
 
@@ -57,6 +69,8 @@ mkdir tmp && tar -xf output/ubuntu-26.04-x64-desktop-template-vmware.box -C tmp
 
 4. Alternative: create a new VM and point the disk to `tmp/disk.vmdk`
 
+---
+
 ## Use with Vagrant (VMware provider)
 
 This project defines **two machines** in the Vagrantfile
@@ -69,19 +83,19 @@ This project defines **two machines** in the Vagrantfile
 | `base`        | Clean reference VM from box | ❌ No                    |
 | `provisioned` | Workstation-ready desktop   | ✅ Yes (first boot only) |
 
-**Start both machines**
+Start **both** machines
 
 ```powershell
 vagrant up --provider=vmware_desktop
 ```
 
-**Start only base**
+Start only **base**
 
 ```powershell
 vagrant up base
 ```
 
-**Start only provisioned**
+Start only **provisioned**
 
 ```powershell
 vagrant up provisioned
@@ -119,6 +133,8 @@ vagrant destroy base -f
 vagrant destroy -f
 ```
 
+---
+
 ## Customize
 
 - `ubuntu-26.04-x64-desktop.pkr` - contains the Packer variables with some defaults
@@ -128,11 +144,15 @@ vagrant destroy -f
   - during Packer build for preseed/install automation
   - during Vagrant provisioning
 
-## Troubleshoot fast
+---
+
+## Troubleshoot
 
 - SSH issues: check VMware network mode (NAT vs bridged) and VMware services
 - Import failures: confirm Workstation version and BIOS virtualization enabled
 - Run `packer build -debug` for an interactive troubleshooting VM
+
+---
 
 ## Files of note
 
