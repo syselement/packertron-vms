@@ -1,3 +1,12 @@
+## [0.15.3](https://github.com/syselement/packertron-vms/compare/v0.15.2...v0.15.3) (2026-07-01)
+
+
+### Bug Fixes
+
+* update package list in install_packages function to include coreutils, dnsutils, lm-sensors, openjdk-21-jre-headless, s-tui, and stress ([4f1a943](https://github.com/syselement/packertron-vms/commit/4f1a943844a5c71735aa5417d9b49390cf34e9ad))
+
+
+
 ## [0.15.2](https://github.com/syselement/packertron-vms/compare/v0.15.1...v0.15.2) (2026-06-14)
 
 
@@ -31,15 +40,6 @@
 ### Features
 
 * enhance provisioning scripts with logging and new package installations ([bc2a5fe](https://github.com/syselement/packertron-vms/commit/bc2a5fe1240dc6a05ead452ed538627896b46e9b))
-
-
-
-# [0.13.0](https://github.com/syselement/packertron-vms/compare/v0.12.0...v0.13.0) (2026-03-01)
-
-
-### Features
-
-* update dash-to-dock settings to hide trash and modify GNOME favorites ([0b959db](https://github.com/syselement/packertron-vms/commit/0b959dbaf40fecb25e56d7414ff05f7d38c23936))
 
 
 
