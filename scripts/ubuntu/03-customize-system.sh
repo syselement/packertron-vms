@@ -101,14 +101,15 @@ install_packages() {
     btop
     build-essential
     ca-certificates
+    coreutils
     curl
+    dnsutils
     duf
     eza
     fastfetch
     filezilla
     flatpak
     fonts-noto-color-emoji
-    fzf
     gdu
     git
     gnome-shell-extensions
@@ -122,23 +123,28 @@ install_packages() {
     ipcalc
     iperf3
     jq
+    lm-sensors
     lsb-release
     nano
     net-tools
     nload
     nmap
     npm
+    openjdk-21-jre-headless
     pipx
     plocate
+    s-tui
     software-properties-common
     speedtest-cli
     sshpass
+    stress
     sysstat
+    tldr
     tmux
     tor
     tree
-    unzip
     ugrep
+    unzip
     vim
     vlc
     wget
