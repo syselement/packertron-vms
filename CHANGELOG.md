@@ -1,3 +1,12 @@
+# [0.16.0](https://github.com/syselement/packertron-vms/compare/v0.15.3...v0.16.0) (2026-07-01)
+
+
+### Features
+
+* enhance system customization script for Ubuntu with package management and user configuration ([0dd8cc2](https://github.com/syselement/packertron-vms/commit/0dd8cc27fcc1857debeb6f2306abcd00940b1565))
+
+
+
 ## [0.15.3](https://github.com/syselement/packertron-vms/compare/v0.15.2...v0.15.3) (2026-07-01)
 
 
@@ -31,15 +40,6 @@
 ### Features
 
 * add Ubuntu 26.04 Desktop build scripts and cloud-init configuration; fixed doc ([9d84a84](https://github.com/syselement/packertron-vms/commit/9d84a84d9590151ba07d9e5d30a2c70e569438fc))
-
-
-
-# [0.14.0](https://github.com/syselement/packertron-vms/compare/v0.13.0...v0.14.0) (2026-03-01)
-
-
-### Features
-
-* enhance provisioning scripts with logging and new package installations ([bc2a5fe](https://github.com/syselement/packertron-vms/commit/bc2a5fe1240dc6a05ead452ed538627896b46e9b))
 
 
 
