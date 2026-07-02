@@ -767,12 +767,12 @@ add_newline = false
 [custom.root_marker]
 command = "printf ''"
 when = 'test "$(id -u)" -eq 0'
-format = " "
+format = "[$output]($style) "
 style = "bold red"
 
 [username]
 show_always = true
-format = " "
+format = "[$user]($style) "
 style_user = "bold yellow"
 style_root = "bold red"
 
@@ -785,11 +785,11 @@ else
 fi
 '''
 when = true
-format = " "
+format = "[$output]($style) "
 style = "bold cyan"
 
 [directory]
-format = " "
+format = "[$path]($style) "
 style = "bold cyan"
 home_symbol = "~"
 truncation_length = 3
@@ -800,33 +800,33 @@ read_only_style = "bold red"
 
 [git_branch]
 symbol = " "
-format = " "
+format = "[$symbol$branch]($style) "
 style = "bold green"
 
 [git_status]
-format = "( )"
+format = "([$all_status$ahead_behind]($style) )"
 style = "bold yellow"
 
 [hostname]
 ssh_only = true
-format = " "
+format = "[$ssh_symbol$hostname]($style) "
 style = "dimmed cyan"
 ssh_symbol = "󰣀 "
 
 [jobs]
 symbol = " "
-format = " "
+format = "[$symbol$number]($style) "
 style = "bold red"
 number_threshold = 1
 
 [cmd_duration]
 min_time = 2000
-format = " "
+format = "[$duration]($style) "
 style = "dimmed yellow"
 
 [status]
 disabled = false
-format = " "
+format = "[$symbol$signal_name$maybe_int]($style) "
 symbol = "✘ "
 sigint_symbol = "✘ "
 signal_symbol = "✘ "
