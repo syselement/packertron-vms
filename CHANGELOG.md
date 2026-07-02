@@ -1,3 +1,12 @@
+# [0.18.0](https://github.com/syselement/packertron-vms/compare/v0.17.0...v0.18.0) (2026-07-02)
+
+
+### Features
+
+* update format strings in Starship configuration for enhanced terminal output ([58a63d7](https://github.com/syselement/packertron-vms/commit/58a63d7624b9f24fc6cd0f4af763e9f483d132e2))
+
+
+
 # [0.17.0](https://github.com/syselement/packertron-vms/compare/v0.16.0...v0.17.0) (2026-07-02)
 
 
@@ -31,15 +40,6 @@
 ### Bug Fixes
 
 * update package installation and source list handling in provisioning scripts ([01e3122](https://github.com/syselement/packertron-vms/commit/01e3122b438b081deda20b7bfee6b3f6eef4da53))
-
-
-
-## [0.15.1](https://github.com/syselement/packertron-vms/compare/v0.15.0...v0.15.1) (2026-05-21)
-
-
-### Bug Fixes
-
-* rename kali hcl placeholder ([f8cd177](https://github.com/syselement/packertron-vms/commit/f8cd1776437b238ac9e284daf9fc20812594826d))
 
 
 
