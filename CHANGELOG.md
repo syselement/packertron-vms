@@ -1,3 +1,12 @@
+# [0.17.0](https://github.com/syselement/packertron-vms/compare/v0.16.0...v0.17.0) (2026-07-02)
+
+
+### Features
+
+* update FZF options and enhance Starship configuration for improved terminal experience ([2a9da85](https://github.com/syselement/packertron-vms/commit/2a9da8596bcd6a0248fea3f898fffbf5164c805a))
+
+
+
 # [0.16.0](https://github.com/syselement/packertron-vms/compare/v0.15.3...v0.16.0) (2026-07-01)
 
 
@@ -31,15 +40,6 @@
 ### Bug Fixes
 
 * rename kali hcl placeholder ([f8cd177](https://github.com/syselement/packertron-vms/commit/f8cd1776437b238ac9e284daf9fc20812594826d))
-
-
-
-# [0.15.0](https://github.com/syselement/packertron-vms/compare/v0.14.0...v0.15.0) (2026-05-08)
-
-
-### Features
-
-* add Ubuntu 26.04 Desktop build scripts and cloud-init configuration; fixed doc ([9d84a84](https://github.com/syselement/packertron-vms/commit/9d84a84d9590151ba07d9e5d30a2c70e569438fc))
 
 
 
