@@ -603,7 +603,7 @@ alias alert='notify-send --urgency=low -i "$([ $? = 0 ] && echo terminal || echo
 '''
 
 fzf_block = r'''# >>> fzf (managed) >>>
-export FZF_DEFAULT_OPTS='--height=40% --layout=reverse --border'
+export FZF_DEFAULT_OPTS='-m --height 50% --border'
 export FZF_CTRL_R_OPTS="$FZF_DEFAULT_OPTS"
 export FZF_CTRL_T_OPTS="$FZF_DEFAULT_OPTS"
 export FZF_ALT_C_OPTS="$FZF_DEFAULT_OPTS"
@@ -689,10 +689,11 @@ source = re.sub(
 source = set_line(source, r'^[ \t]*HISTCONTROL=.*$', 'HISTCONTROL=ignoreboth:erasedups')
 source = set_line(source, r'^[ \t]*HISTSIZE=.*$', 'HISTSIZE=50000')
 source = set_line(source, r'^[ \t]*HISTFILESIZE=.*$', 'HISTFILESIZE=100000')
+source = set_line(source, r'^[ \t]*HISTTIMEFORMAT=.*$', "HISTTIMEFORMAT='%F %T '")
 source = set_line(source, r'^[ \t]*PROMPT_COMMAND=.*$', "PROMPT_COMMAND='history -a; history -n'")
 source = set_line(source, r'^[ \t]*#?[ \t]*shopt -s checkwinsize.*$', 'shopt -s checkwinsize')
 source = set_line(source, r'^[ \t]*#?[ \t]*shopt -s globstar.*$', 'shopt -s globstar 2>/dev/null')
-source = set_line(source, r'^[ \t]*#?[ \t]*set -o vi.*$', 'set -o vi')
+source = re.sub(r'^[ \t]*#?[ \t]*set -o vi[ \t]*\n?', '', source, flags=re.M)
 
 for name in ("fzf", "starship", "future dotfiles hook"):
     source = re.sub(
@@ -745,7 +746,10 @@ import tempfile
 
 home = Path(sys.argv[1])
 path = home / ".config" / "starship.toml"
-content = '''format = """
+content = """format = \"\"\"
+${custom.root_marker}\\
+$username\\
+${custom.directory_icon}\\
 $directory\\
 $git_branch\\
 $git_status\\
@@ -753,60 +757,99 @@ $fill\\
 $hostname\\
 $jobs\\
 $cmd_duration\\
+$status\\
 $time\\
 $line_break\\
-$character"""
+$character\"\"\"
 
-add_newline = true
+add_newline = false
+
+[custom.root_marker]
+command = "printf ''"
+when = 'test "$(id -u)" -eq 0'
+format = " "
+style = "bold red"
+
+[username]
+show_always = true
+format = " "
+style_user = "bold yellow"
+style_root = "bold red"
+
+[custom.directory_icon]
+command = '''
+if [ "$PWD" = "$HOME" ]; then
+    printf ''
+else
+    printf ''
+fi
+'''
+when = true
+format = " "
+style = "bold cyan"
 
 [directory]
-format = "[$path]($style) "
-style = "bold blue"
+format = " "
+style = "bold cyan"
+home_symbol = "~"
 truncation_length = 3
 truncation_symbol = "…/"
 truncate_to_repo = false
 read_only = " "
+read_only_style = "bold red"
 
 [git_branch]
 symbol = " "
-format = "[$symbol$branch]($style) "
-style = "dimmed green"
+format = " "
+style = "bold green"
 
 [git_status]
-format = "([$all_status$ahead_behind]($style) )"
-style = "yellow"
+format = "( )"
+style = "bold yellow"
 
 [hostname]
 ssh_only = true
-format = "[$ssh_symbol$hostname]($style) "
+format = " "
 style = "dimmed cyan"
 ssh_symbol = "󰣀 "
 
 [jobs]
 symbol = " "
-format = "[$symbol$number]($style) "
+format = " "
 style = "bold red"
 number_threshold = 1
 
 [cmd_duration]
 min_time = 2000
-format = "[$duration]($style) "
+format = " "
 style = "dimmed yellow"
+
+[status]
+disabled = false
+format = " "
+symbol = "✘ "
+sigint_symbol = "✘ "
+signal_symbol = "✘ "
+not_executable_symbol = "✘ "
+not_found_symbol = "✘ "
+recognize_signal_code = true
+map_symbol = false
+style = "bold red"
 
 [time]
 disabled = false
-format = "[$time]($style)"
-time_format = "%H:%M"
-style = "dimmed white"
+format = "[ $time]($style)"
+time_format = "%H:%M:%S"
+style = "bold cyan"
 
 [character]
+format = "$symbol "
 success_symbol = "[❯](bold green)"
 error_symbol = "[❯](bold red)"
-vimcmd_symbol = "[❮](bold green)"
 
 [fill]
 symbol = " "
-'''
+"""
 
 content = content.rstrip() + "\n"
 old = path.read_text(encoding="utf-8") if path.exists() else None
