@@ -697,7 +697,14 @@ source = re.sub(
 source = set_line(source, r'^[ \t]*HISTCONTROL=.*$', 'HISTCONTROL=ignoreboth:erasedups')
 source = set_line(source, r'^[ \t]*HISTSIZE=.*$', 'HISTSIZE=50000')
 source = set_line(source, r'^[ \t]*HISTFILESIZE=.*$', 'HISTFILESIZE=100000')
-source = set_line(source, r'^[ \t]*HISTTIMEFORMAT=.*$', "HISTTIMEFORMAT='%F %T '")
+source = re.sub(r'^[ \t]*HISTTIMEFORMAT=.*\n?', '', source, flags=re.M)
+source = re.sub(
+    r'(^HISTFILESIZE=.*$)',
+    lambda match: match.group(1) + "\nHISTTIMEFORMAT='%F %T '",
+    source,
+    count=1,
+    flags=re.M,
+)
 source = set_line(source, r'^[ \t]*PROMPT_COMMAND=.*$', "PROMPT_COMMAND='history -a; history -n'")
 source = set_line(source, r'^[ \t]*#?[ \t]*shopt -s checkwinsize.*$', 'shopt -s checkwinsize')
 source = set_line(source, r'^[ \t]*#?[ \t]*shopt -s globstar.*$', 'shopt -s globstar 2>/dev/null')
