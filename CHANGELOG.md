@@ -1,3 +1,12 @@
+## [0.19.1](https://github.com/syselement/packertron-vms/compare/v0.19.0...v0.19.1) (2026-07-03)
+
+
+### Bug Fixes
+
+* update HISTTIMEFORMAT handling in bash configuration ([138c750](https://github.com/syselement/packertron-vms/commit/138c7501d7fd20f98eb59b57c7903213f09629a5))
+
+
+
 # [0.19.0](https://github.com/syselement/packertron-vms/compare/v0.18.0...v0.19.0) (2026-07-03)
 
 
@@ -31,15 +40,6 @@
 ### Features
 
 * enhance system customization script for Ubuntu with package management and user configuration ([0dd8cc2](https://github.com/syselement/packertron-vms/commit/0dd8cc27fcc1857debeb6f2306abcd00940b1565))
-
-
-
-## [0.15.3](https://github.com/syselement/packertron-vms/compare/v0.15.2...v0.15.3) (2026-07-01)
-
-
-### Bug Fixes
-
-* update package list in install_packages function to include coreutils, dnsutils, lm-sensors, openjdk-21-jre-headless, s-tui, and stress ([4f1a943](https://github.com/syselement/packertron-vms/commit/4f1a943844a5c71735aa5417d9b49390cf34e9ad))
 
 
 
