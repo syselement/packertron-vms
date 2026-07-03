@@ -611,6 +611,14 @@ export FZF_ALT_C_OPTS="$FZF_DEFAULT_OPTS"
 [ -f "$HOME/.fzf.bash" ] && source "$HOME/.fzf.bash"
 # <<< fzf (managed) <<<'''
 
+fastfetch_block = r'''# >>> fastfetch (managed) >>>
+# Fastfetch - login shells only
+if shopt -q login_shell && command -v fastfetch >/dev/null 2>&1; then
+    clear
+    fastfetch
+fi
+# <<< fastfetch (managed) <<<'''
+
 starship_block = r'''# >>> starship (managed) >>>
 if command -v starship >/dev/null 2>&1; then
   eval "$(starship init bash)"
@@ -695,7 +703,7 @@ source = set_line(source, r'^[ \t]*#?[ \t]*shopt -s checkwinsize.*$', 'shopt -s 
 source = set_line(source, r'^[ \t]*#?[ \t]*shopt -s globstar.*$', 'shopt -s globstar 2>/dev/null')
 source = re.sub(r'^[ \t]*#?[ \t]*set -o vi[ \t]*\n?', '', source, flags=re.M)
 
-for name in ("fzf", "starship", "future dotfiles hook"):
+for name in ("fzf", "fastfetch", "starship", "future dotfiles hook"):
     source = re.sub(
         rf'\n?# >>> {re.escape(name)} \((?:managed|disabled)\) >>>.*?# <<< {re.escape(name)} \((?:managed|disabled)\) <<<\n?',
         '\n',
@@ -719,7 +727,7 @@ if [ -f "$HOME/.bash_aliases" ]; then
 fi
 '''
 
-source = source.rstrip() + "\n\n" + fzf_block + "\n\n" + starship_block + "\n\n" + dotfiles_hook + "\n"
+source = source.rstrip() + "\n\n" + fzf_block + "\n\n" + fastfetch_block + "\n\n" + starship_block + "\n\n" + dotfiles_hook + "\n"
 
 install_if_changed(aliases_path, aliases)
 install_if_changed(bashrc, source)
