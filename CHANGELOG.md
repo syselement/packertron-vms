@@ -1,3 +1,12 @@
+# [0.19.0](https://github.com/syselement/packertron-vms/compare/v0.18.0...v0.19.0) (2026-07-03)
+
+
+### Features
+
+* add fastfetch support to bash configuration ([879590b](https://github.com/syselement/packertron-vms/commit/879590be5e1dc9d0faa0f93d8205aaaff5692143))
+
+
+
 # [0.18.0](https://github.com/syselement/packertron-vms/compare/v0.17.0...v0.18.0) (2026-07-02)
 
 
@@ -31,15 +40,6 @@
 ### Bug Fixes
 
 * update package list in install_packages function to include coreutils, dnsutils, lm-sensors, openjdk-21-jre-headless, s-tui, and stress ([4f1a943](https://github.com/syselement/packertron-vms/commit/4f1a943844a5c71735aa5417d9b49390cf34e9ad))
-
-
-
-## [0.15.2](https://github.com/syselement/packertron-vms/compare/v0.15.1...v0.15.2) (2026-06-14)
-
-
-### Bug Fixes
-
-* update package installation and source list handling in provisioning scripts ([01e3122](https://github.com/syselement/packertron-vms/commit/01e3122b438b081deda20b7bfee6b3f6eef4da53))
 
 
 
