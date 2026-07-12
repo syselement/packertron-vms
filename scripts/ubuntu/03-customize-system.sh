@@ -332,6 +332,30 @@ set_gsetting org.gnome.desktop.notifications show-in-lock-screen "false"
 set_gsetting org.gnome.desktop.screensaver ubuntu-lock-on-suspend "false"
 set_gsetting org.gnome.system.location enabled "false"
 
+# Display color / Night Light
+set_gsetting org.gnome.settings-daemon.plugins.color night-light-enabled "true"
+set_gsetting org.gnome.settings-daemon.plugins.color night-light-schedule-automatic "false"
+set_gsetting org.gnome.settings-daemon.plugins.color night-light-schedule-from "18.0"
+set_gsetting org.gnome.settings-daemon.plugins.color night-light-schedule-to "8.0"
+set_gsetting org.gnome.settings-daemon.plugins.color night-light-temperature "uint32 4700"
+
+# Sound
+set_gsetting org.gnome.desktop.sound allow-volume-above-100-percent "true"
+
+# Power
+set_gsetting org.gnome.desktop.interface show-battery-percentage "true"
+set_gsetting org.gnome.settings-daemon.plugins.power power-button-action "'suspend'"
+
+# Ubuntu Desktop
+set_gsetting org.gnome.shell.extensions.ding show-home "false"
+
+# Notifications
+set_gsetting org.gnome.desktop.notifications show-in-lock-screen "false"
+
+# Mouse and Touchpad
+# false = traditional scrolling; true = natural/reversed scrolling.
+set_gsetting org.gnome.desktop.peripherals.touchpad natural-scroll "false"
+
 # Dock favorites
 set_gsetting org.gnome.shell favorite-apps \
   "['org.gnome.Nautilus.desktop', 'brave-browser.desktop', 'terminator.desktop', 'sublime_text.desktop', 'obsidian_obsidian.desktop', 'code.desktop']"
@@ -358,6 +382,70 @@ GNOME_SETTINGS
   fi
 
   ok "GNOME preferences applied and verified"
+}
+
+enable_battery_health_preservation() {
+  local device supported enabled
+  local found_battery=false
+  local enabled_count=0
+
+  if ! command -v upower >/dev/null 2>&1; then
+    warn "upower not found; cannot enable battery health preservation"
+    return
+  fi
+
+  if ! command -v busctl >/dev/null 2>&1; then
+    warn "busctl not found; cannot enable battery health preservation"
+    return
+  fi
+
+  while IFS= read -r device; do
+    [[ "$device" == */battery_* ]] || continue
+    found_battery=true
+
+    supported="$(
+      busctl --system get-property \
+        org.freedesktop.UPower \
+        "$device" \
+        org.freedesktop.UPower.Device \
+        ChargeThresholdSupported 2>/dev/null || true
+    )"
+
+    if [[ "$supported" != "b true" ]]; then
+      info "battery charge thresholds unsupported for ${device##*/}; skipping"
+      continue
+    fi
+
+    if ! busctl --system call \
+      org.freedesktop.UPower \
+      "$device" \
+      org.freedesktop.UPower.Device \
+      EnableChargeThreshold b true >/dev/null; then
+      warn "failed to enable battery health preservation for ${device##*/}"
+      continue
+    fi
+
+    enabled="$(
+      busctl --system get-property \
+        org.freedesktop.UPower \
+        "$device" \
+        org.freedesktop.UPower.Device \
+        ChargeThresholdEnabled 2>/dev/null || true
+    )"
+
+    if [[ "$enabled" == "b true" ]]; then
+      ok "battery health preservation enabled for ${device##*/}"
+      enabled_count=$((enabled_count + 1))
+    else
+      warn "battery health preservation could not be verified for ${device##*/}"
+    fi
+  done < <(upower -e 2>/dev/null || true)
+
+  if [[ "$found_battery" == false ]]; then
+    info "no system battery detected; skipping battery health preservation"
+  elif (( enabled_count == 0 )); then
+    info "no battery supports UPower charge thresholds"
+  fi
 }
 
 # --- Repository setup ---
@@ -1310,7 +1398,8 @@ if [[ "$UBUNTU_VARIANT" == "desktop" ]]; then
   # Apply now, inside this provisioning run. When GNOME is already running,
   # target its real per-user bus; during headless SSH/Vagrant provisioning,
   # use the temporary-bus fallback from run_as_gnome_user().
-  apply_gnome_preferences || true
+  apply_gnome_preferences
+  enable_battery_health_preservation
 else
   info "server variant detected; skipping GNOME preferences"
 fi
