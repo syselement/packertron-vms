@@ -1144,6 +1144,46 @@ PY
   ok "Starship configuration installed for ${account}"
 }
 
+configure_git_identity_for_user() {
+  local account="$1"
+  local git_name="syselement"
+  local git_email="81392234+syselement@users.noreply.github.com"
+  local current_name current_email
+
+  if ! id "$account" >/dev/null 2>&1; then
+    warn "user not found: ${account}; skipping Git identity configuration"
+    return
+  fi
+
+  current_name="$(
+    sudo -u "$account" -H git config --global --get user.name 2>/dev/null || true
+  )"
+  current_email="$(
+    sudo -u "$account" -H git config --global --get user.email 2>/dev/null || true
+  )"
+
+  if [[ "$current_name" == "$git_name" && "$current_email" == "$git_email" ]]; then
+    info "Git identity already configured for ${account}, skipping"
+    return
+  fi
+
+  sudo -u "$account" -H git config --global user.name "$git_name"
+  sudo -u "$account" -H git config --global user.email "$git_email"
+
+  current_name="$(
+    sudo -u "$account" -H git config --global --get user.name
+  )"
+  current_email="$(
+    sudo -u "$account" -H git config --global --get user.email
+  )"
+
+  if [[ "$current_name" != "$git_name" || "$current_email" != "$git_email" ]]; then
+    die "failed to configure Git identity for ${account}"
+  fi
+
+  ok "Git identity configured for ${account}: ${git_name} <${git_email}>"
+}
+
 echo "################################"
 echo "# Customize System"
 echo "################################"
@@ -1250,6 +1290,7 @@ for account in "$USER_NAME" root; do
   configure_starship_for_user "$account"
 done
 install_tldr_pipx
+configure_git_identity_for_user "$USER_NAME"
 ok "common user tools and shell configuration completed"
 
 # --- Install/configure Desktop-specific tools ---
