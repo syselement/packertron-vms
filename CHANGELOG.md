@@ -1,3 +1,12 @@
+# [0.29.0](https://github.com/syselement/packertron-vms/compare/v0.28.1...v0.29.0) (2026-07-12)
+
+
+### Features
+
+* add Bitwarden and Discord snap installation functions and create new autoinstall configuration file ([7377b73](https://github.com/syselement/packertron-vms/commit/7377b73591e5c6967acdc1434a26c9fe002b0934))
+
+
+
 ## [0.28.1](https://github.com/syselement/packertron-vms/compare/v0.28.0...v0.28.1) (2026-07-12)
 
 
@@ -31,15 +40,6 @@
 ### Features
 
 * improve installation process for System Monitor Panel extension ([e169d65](https://github.com/syselement/packertron-vms/commit/e169d6539be9de78740d55dcf1f503f4f42a12f5))
-
-
-
-# [0.25.0](https://github.com/syselement/packertron-vms/compare/v0.24.0...v0.25.0) (2026-07-12)
-
-
-### Features
-
-* add support for System Monitor Panel extension installation and management ([2a15ecb](https://github.com/syselement/packertron-vms/commit/2a15ecb13e34847f2c3ce8b1f2883ef0303be9c9))
 
 
 
