@@ -1,3 +1,12 @@
+# [0.30.0](https://github.com/syselement/packertron-vms/compare/v0.29.0...v0.30.0) (2026-07-12)
+
+
+### Features
+
+* replace Obsidian snap installation with direct Debian package installation and adjust GNOME settings ([6616e6e](https://github.com/syselement/packertron-vms/commit/6616e6ec0f2113c44d7ec6318f676e5c45da9cab))
+
+
+
 # [0.29.0](https://github.com/syselement/packertron-vms/compare/v0.28.1...v0.29.0) (2026-07-12)
 
 
@@ -31,15 +40,6 @@
 ### Features
 
 * update Flameshot command to include clipboard and save path ([eec45b7](https://github.com/syselement/packertron-vms/commit/eec45b76feb992738985fae65d040878fae250fa))
-
-
-
-# [0.26.0](https://github.com/syselement/packertron-vms/compare/v0.25.0...v0.26.0) (2026-07-12)
-
-
-### Features
-
-* improve installation process for System Monitor Panel extension ([e169d65](https://github.com/syselement/packertron-vms/commit/e169d6539be9de78740d55dcf1f503f4f42a12f5))
 
 
 
