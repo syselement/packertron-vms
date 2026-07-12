@@ -415,13 +415,12 @@ install_system_monitor_panel_extension() (
   local account="$1"
   local uuid="system-monitor-panel@naimur"
   local download_url="https://extensions.gnome.org/review/download/72705.shell-extension.zip"
-  local home metadata_file tmp_file installed_uuid
+  local home metadata_file
 
   case "$VERSION_ID" in
-    26.*)
-      ;;
+    26.*) ;;
     24.*)
-      info "System Monitor Panel requires GNOME 48 or newer; using packaged extension on Ubuntu ${VERSION_ID}"
+      info "System Monitor Panel requires GNOME 48 or newer; skipping on Ubuntu ${VERSION_ID}"
       return
       ;;
     *)
@@ -442,29 +441,30 @@ install_system_monitor_panel_extension() (
 
   metadata_file="$home/.local/share/gnome-shell/extensions/$uuid/metadata.json"
 
-  if [[ -f "$metadata_file" ]] &&
-     [[ "$(jq -r '.uuid // empty' "$metadata_file")" == "$uuid" ]]; then
+  if [[ -f "$metadata_file" ]]; then
     info "System Monitor Panel extension already installed, skipping"
     return
   fi
 
-  tmp_file="$(
-    sudo -u "$account" -H mktemp --suffix=.shell-extension.zip
-  )"
-  trap 'rm -f -- "$tmp_file"' EXIT
-
   info "downloading System Monitor Panel extension"
-  curl -fsSL "$download_url" -o "$tmp_file"
 
-  sudo -u "$account" -H \
-    gnome-extensions install --force "$tmp_file"
+  sudo -u "$account" -H bash -s -- "$download_url" <<'USER_INSTALL'
+set -euo pipefail
+
+download_url="$1"
+tmp_file="$(mktemp --suffix=.shell-extension.zip)"
+
+cleanup() {
+  rm -f -- "$tmp_file"
+}
+trap cleanup EXIT
+
+curl -fsSL "$download_url" -o "$tmp_file"
+gnome-extensions install --force "$tmp_file"
+USER_INSTALL
 
   [[ -f "$metadata_file" ]] ||
     die "System Monitor Panel extension installation failed"
-
-  installed_uuid="$(jq -r '.uuid // empty' "$metadata_file")"
-  [[ "$installed_uuid" == "$uuid" ]] ||
-    die "unexpected extension UUID after installation: ${installed_uuid}"
 
   ok "System Monitor Panel extension installed for ${account}"
 )
