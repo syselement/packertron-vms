@@ -80,6 +80,7 @@ DESKTOP_PACKAGES=(
   fonts-noto-color-emoji
   gnome-shell-extension-manager
   gnome-shell-extensions
+  gnome-system-monitor
   gnome-tweaks
   sublime-text
   terminator
@@ -359,15 +360,40 @@ set_gsetting org.gnome.desktop.peripherals.touchpad natural-scroll "false"
 set_gsetting org.gnome.shell favorite-apps \
   "['org.gnome.Nautilus.desktop', 'brave-browser.desktop', 'terminator.desktop', 'sublime_text.desktop', 'obsidian_obsidian.desktop', 'code.desktop']"
 
-# Enable the packaged System Monitor extension using GSettings only.
-ext_uuid='system-monitor@gnome-shell-extensions.gcampax.github.com'
-if [[ -d "/usr/share/gnome-shell/extensions/${ext_uuid}" || \
-      -d "$HOME/.local/share/gnome-shell/extensions/${ext_uuid}" ]]; then
+# Enable System Monitor Panel on Ubuntu 26.04.
+# Fall back to the packaged System Monitor extension on Ubuntu 24.04.
+new_ext_uuid='system-monitor-panel@naimur'
+old_ext_uuid='system-monitor@gnome-shell-extensions.gcampax.github.com'
+
+new_ext_installed=false
+old_ext_installed=false
+
+if [[ -d "/usr/share/gnome-shell/extensions/${new_ext_uuid}" ||
+      -d "$HOME/.local/share/gnome-shell/extensions/${new_ext_uuid}" ]]; then
+  new_ext_installed=true
+fi
+
+if [[ -d "/usr/share/gnome-shell/extensions/${old_ext_uuid}" ||
+      -d "$HOME/.local/share/gnome-shell/extensions/${old_ext_uuid}" ]]; then
+  old_ext_installed=true
+fi
+
+if [[ "$new_ext_installed" == true ]]; then
   set_gsetting org.gnome.shell disable-user-extensions "false"
-  update_string_array org.gnome.shell enabled-extensions add "$ext_uuid"
-  update_string_array org.gnome.shell disabled-extensions remove "$ext_uuid"
+  # Disable the old packaged extension.
+  update_string_array  org.gnome.shell enabled-extensions remove "$old_ext_uuid"
+  update_string_array org.gnome.shell disabled-extensions add "$old_ext_uuid"
+  # Enable the new extension.
+  update_string_array org.gnome.shell enabled-extensions add "$new_ext_uuid"
+  update_string_array org.gnome.shell disabled-extensions remove "$new_ext_uuid"
+
+elif [[ "$old_ext_installed" == true ]]; then
+  # Ubuntu 24.04 fallback.
+  set_gsetting org.gnome.shell disable-user-extensions "false"
+  update_string_array org.gnome.shell enabled-extensions add "$old_ext_uuid"
+  update_string_array org.gnome.shell disabled-extensions remove "$old_ext_uuid"
 else
-  printf '[gnome-settings] SKIP extension not installed: %s\n' "$ext_uuid"
+  printf '[gnome-settings] SKIP no supported System Monitor extension installed\n'
 fi
 
 # Force a final read through the same backend before the process/session exits.
@@ -382,6 +408,66 @@ GNOME_SETTINGS
 
   ok "GNOME preferences applied and verified"
 }
+
+install_system_monitor_panel_extension() (
+  set -euo pipefail
+
+  local account="$1"
+  local uuid="system-monitor-panel@naimur"
+  local download_url="https://extensions.gnome.org/review/download/72705.shell-extension.zip"
+  local home metadata_file tmp_file installed_uuid
+
+  case "$VERSION_ID" in
+    26.*)
+      ;;
+    24.*)
+      info "System Monitor Panel requires GNOME 48 or newer; using packaged extension on Ubuntu ${VERSION_ID}"
+      return
+      ;;
+    *)
+      warn "System Monitor Panel installation not configured for Ubuntu ${VERSION_ID}"
+      return
+      ;;
+  esac
+
+  command -v curl >/dev/null 2>&1 ||
+    die "curl is required to install System Monitor Panel"
+
+  command -v gnome-extensions >/dev/null 2>&1 ||
+    die "gnome-extensions is required to install System Monitor Panel"
+
+  home="$(user_home "$account")"
+  [[ -n "$home" ]] ||
+    die "could not determine home directory for ${account}"
+
+  metadata_file="$home/.local/share/gnome-shell/extensions/$uuid/metadata.json"
+
+  if [[ -f "$metadata_file" ]] &&
+     [[ "$(jq -r '.uuid // empty' "$metadata_file")" == "$uuid" ]]; then
+    info "System Monitor Panel extension already installed, skipping"
+    return
+  fi
+
+  tmp_file="$(
+    sudo -u "$account" -H mktemp --suffix=.shell-extension.zip
+  )"
+  trap 'rm -f -- "$tmp_file"' EXIT
+
+  info "downloading System Monitor Panel extension"
+  curl -fsSL "$download_url" -o "$tmp_file"
+
+  sudo -u "$account" -H \
+    gnome-extensions install --force "$tmp_file"
+
+  [[ -f "$metadata_file" ]] ||
+    die "System Monitor Panel extension installation failed"
+
+  installed_uuid="$(jq -r '.uuid // empty' "$metadata_file")"
+  [[ "$installed_uuid" == "$uuid" ]] ||
+    die "unexpected extension UUID after installation: ${installed_uuid}"
+
+  ok "System Monitor Panel extension installed for ${account}"
+)
 
 enable_battery_health_preservation() {
   local device supported enabled
@@ -1514,6 +1600,7 @@ if [[ "$UBUNTU_VARIANT" == "desktop" ]]; then
   # Apply now, inside this provisioning run. When GNOME is already running,
   # target its real per-user bus; during headless SSH/Vagrant provisioning,
   # use the temporary-bus fallback from run_as_gnome_user().
+  install_system_monitor_panel_extension "$USER_NAME"
   apply_gnome_preferences
   enable_battery_health_preservation
 else
