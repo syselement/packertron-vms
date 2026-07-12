@@ -1,3 +1,12 @@
+# [0.27.0](https://github.com/syselement/packertron-vms/compare/v0.26.0...v0.27.0) (2026-07-12)
+
+
+### Features
+
+* update Flameshot command to include clipboard and save path ([eec45b7](https://github.com/syselement/packertron-vms/commit/eec45b76feb992738985fae65d040878fae250fa))
+
+
+
 # [0.26.0](https://github.com/syselement/packertron-vms/compare/v0.25.0...v0.26.0) (2026-07-12)
 
 
@@ -31,15 +40,6 @@
 ### Features
 
 * add function to install SnapX snap if not already present ([5ad0edb](https://github.com/syselement/packertron-vms/commit/5ad0edbf81595f3d0e9a9968c6c8193e8589ea23))
-
-
-
-# [0.22.0](https://github.com/syselement/packertron-vms/compare/v0.21.0...v0.22.0) (2026-07-12)
-
-
-### Features
-
-* enhance GNOME settings and add battery health preservation functionality ([ed6be33](https://github.com/syselement/packertron-vms/commit/ed6be3350916ced4498d72c705fcf56c340aacbe))
 
 
 
