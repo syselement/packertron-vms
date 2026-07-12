@@ -321,7 +321,7 @@ set_gsetting org.gnome.desktop.interface show-battery-percentage "true"
 # Ubuntu Dock
 set_gsetting org.gnome.shell.extensions.dash-to-dock dock-position "'BOTTOM'"
 set_gsetting org.gnome.shell.extensions.dash-to-dock extend-height "true"
-set_gsetting org.gnome.shell.extensions.dash-to-dock dash-max-icon-size "32"
+set_gsetting org.gnome.shell.extensions.dash-to-dock dash-max-icon-size "24"
 set_gsetting org.gnome.shell.extensions.dash-to-dock click-action "'minimize'"
 set_gsetting org.gnome.shell.extensions.dash-to-dock show-trash "false"
 
@@ -842,21 +842,6 @@ install_emote_snap() {
   ok "Emote installed"
 }
 
-install_obsidian_snap() {
-  if command -v snap >/dev/null 2>&1 && snap list obsidian >/dev/null 2>&1; then
-    info "Obsidian snap already installed, skipping"
-    return
-  fi
-
-  if ! command -v snap >/dev/null 2>&1; then
-    warn "snap command not found, cannot install Obsidian"
-    return
-  fi
-
-  snap install obsidian --classic
-  ok "Obsidian installed"
-}
-
 install_postman_snap() {
   if command -v snap >/dev/null 2>&1 && snap list postman >/dev/null 2>&1; then
     info "Postman snap already installed, skipping"
@@ -1001,6 +986,112 @@ install_flameshot() (
     die "Flameshot installation could not be verified"
 
   ok "Flameshot ${installed_version} installed from the official GitHub release"
+)
+
+install_obsidian() (
+  set -euo pipefail
+
+  local api_url="https://api.github.com/repos/obsidianmd/obsidian-releases/releases/latest"
+  local release_json tag latest_version
+  local architecture asset_url asset_name asset_digest
+  local installed_version tmp_dir deb_file package_name
+
+  for cmd in curl jq dpkg dpkg-query dpkg-deb apt-get; do
+    command -v "$cmd" >/dev/null 2>&1 ||
+      die "${cmd} is required to install Obsidian"
+  done
+
+  architecture="$(dpkg --print-architecture)"
+  case "$architecture" in
+    amd64|arm64) ;;
+    *)
+      warn "unsupported Obsidian architecture: ${architecture}"
+      return
+      ;;
+  esac
+
+  # Remove the Snap version to avoid duplicate launchers.
+  if command -v snap >/dev/null 2>&1 &&
+    snap list obsidian >/dev/null 2>&1; then
+    info "removing Obsidian snap"
+    snap remove obsidian
+  fi
+
+  info "checking latest Obsidian GitHub release"
+
+  release_json="$(curl -fsSL --retry 3 "$api_url")"
+  tag="$(jq -r '.tag_name // empty' <<<"$release_json")"
+  [[ -n "$tag" ]] ||
+    die "could not determine the latest Obsidian release"
+
+  latest_version="${tag#v}"
+
+  installed_version="$(
+    dpkg-query -W -f='${Version}' obsidian 2>/dev/null || true
+  )"
+
+  if [[ -n "$installed_version" ]] &&
+    dpkg --compare-versions "$installed_version" ge "$latest_version"; then
+    info "Obsidian ${installed_version} already installed, skipping"
+    return
+  fi
+
+asset_url="$(
+  jq -r --arg arch "$architecture" '
+    first(
+      .assets[]
+      | select(.name | endswith("_" + $arch + ".deb"))
+      | .browser_download_url
+    ) // empty
+  ' <<<"$release_json"
+)"
+
+  [[ -n "$asset_url" ]] ||
+    die "no Obsidian Debian package found for ${architecture}"
+
+  asset_name="${asset_url##*/}"
+
+  asset_digest="$(
+    jq -r --arg name "$asset_name" '
+      [.assets[] | select(.name == $name)][0].digest // empty
+    ' <<<"$release_json"
+  )"
+
+  tmp_dir="$(mktemp -d)"
+  trap 'rm -rf -- "$tmp_dir"' EXIT
+
+  deb_file="$tmp_dir/$asset_name"
+
+  info "downloading Obsidian ${tag} for ${architecture}"
+  curl -fL --retry 3 "$asset_url" -o "$deb_file"
+
+  # Verify the GitHub-provided SHA-256 digest when available.
+  if [[ "$asset_digest" == sha256:* ]]; then
+    printf '%s  %s\n' \
+      "${asset_digest#sha256:}" \
+      "$deb_file" |
+      sha256sum --check -
+  else
+    warn "GitHub API did not provide an asset digest; continuing after package validation"
+  fi
+
+  dpkg-deb --info "$deb_file" >/dev/null
+
+  package_name="$(dpkg-deb -f "$deb_file" Package)"
+  [[ "$package_name" == "obsidian" ]] ||
+    die "unexpected Debian package name: ${package_name}"
+
+  info "installing Obsidian ${tag}"
+  apt-get install -y "$deb_file"
+
+  installed_version="$(
+    dpkg-query -W -f='${Version}' obsidian 2>/dev/null || true
+  )"
+
+  [[ -n "$installed_version" ]] ||
+    die "Obsidian installation could not be verified"
+
+  ok "Obsidian ${installed_version} installed from the official GitHub release"
 )
 
 configure_flameshot() {
@@ -1618,11 +1709,11 @@ if [[ "$UBUNTU_VARIANT" == "desktop" ]]; then
   install_flameshot
   configure_flameshot
   configure_terminator
+  install_obsidian
   configure_terminator_as_default "$USER_NAME"
   install_bitwarden_snap
   install_discord_snap
   install_emote_snap
-  install_obsidian_snap
   install_postman_snap
   install_telegram_snap
   ok "Desktop-specific tools installed/configured"
