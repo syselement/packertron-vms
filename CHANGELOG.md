@@ -1,3 +1,12 @@
+# [0.23.0](https://github.com/syselement/packertron-vms/compare/v0.22.0...v0.23.0) (2026-07-12)
+
+
+### Features
+
+* add function to install SnapX snap if not already present ([5ad0edb](https://github.com/syselement/packertron-vms/commit/5ad0edbf81595f3d0e9a9968c6c8193e8589ea23))
+
+
+
 # [0.22.0](https://github.com/syselement/packertron-vms/compare/v0.21.0...v0.22.0) (2026-07-12)
 
 
@@ -37,15 +46,6 @@
 ### Bug Fixes
 
 * update HISTTIMEFORMAT handling in bash configuration ([138c750](https://github.com/syselement/packertron-vms/commit/138c7501d7fd20f98eb59b57c7903213f09629a5))
-
-
-
-# [0.19.0](https://github.com/syselement/packertron-vms/compare/v0.18.0...v0.19.0) (2026-07-03)
-
-
-### Features
-
-* add fastfetch support to bash configuration ([879590b](https://github.com/syselement/packertron-vms/commit/879590be5e1dc9d0faa0f93d8205aaaff5692143))
 
 
 
