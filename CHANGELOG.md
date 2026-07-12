@@ -1,3 +1,12 @@
+## [0.30.1](https://github.com/syselement/packertron-vms/compare/v0.30.0...v0.30.1) (2026-07-12)
+
+
+### Bug Fixes
+
+* correct Obsidian desktop entry name in GNOME favorites ([0e926a7](https://github.com/syselement/packertron-vms/commit/0e926a758ff7dd36fc89f21f89b0ec0516df8ae2))
+
+
+
 # [0.30.0](https://github.com/syselement/packertron-vms/compare/v0.29.0...v0.30.0) (2026-07-12)
 
 
@@ -31,15 +40,6 @@
 ### Features
 
 * add first-boot orchestration and autoinstall configuration for Ubuntu 26.04 ([4be123e](https://github.com/syselement/packertron-vms/commit/4be123e7453095f625a1a46d8ca1b442979246a1))
-
-
-
-# [0.27.0](https://github.com/syselement/packertron-vms/compare/v0.26.0...v0.27.0) (2026-07-12)
-
-
-### Features
-
-* update Flameshot command to include clipboard and save path ([eec45b7](https://github.com/syselement/packertron-vms/commit/eec45b76feb992738985fae65d040878fae250fa))
 
 
 
