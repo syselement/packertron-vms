@@ -11,6 +11,7 @@ USER_NAME="syselement"
 SCRIPT_NAME="provision-system"
 LOG_PREFIX="[${SCRIPT_NAME}]"
 RUN_ID="$(date +%Y%m%d-%H%M%S)"
+REBOOT_AT_END="${REBOOT_AT_END:-true}"
 LOG_FILE="/var/log/${SCRIPT_NAME}-${RUN_ID}.log"
 exec > >(tee "$LOG_FILE") 2>&1
 
@@ -296,8 +297,13 @@ log "================= RUN END ================="
 
 echo "################################"
 echo "# System Provisioning Complete"
-echo "[provision-system] rebooting in 5 seconds ..."
 echo "################################"
-sleep 5
-sync
-shutdown -r now
+
+if [[ "${REBOOT_AT_END:-false}" == "true" ]]; then
+  echo "[provision-system] rebooting in 5 seconds..."
+  sleep 5
+  sync
+  shutdown -r now
+else
+  echo "[provision-system] reboot deferred to orchestrator"
+fi

@@ -17,6 +17,7 @@ USER_NAME="syselement"
 SCRIPT_NAME="customize-system"
 LOG_PREFIX="[${SCRIPT_NAME}]"
 RUN_ID="$(date +%Y%m%d-%H%M%S)"
+REBOOT_AT_END="${REBOOT_AT_END:-true}"
 LOG_FILE="/var/log/${SCRIPT_NAME}-${RUN_ID}.log"
 UBUNTU_VARIANT="server"
 APT_SOURCES_CHANGED=false
@@ -1640,9 +1641,14 @@ info "run_id: ${RUN_ID}"
 info "================= RUN END ================="
 
 echo "################################"
-echo "# Customize System Complete"
-echo "[customize-system] rebooting in 5 seconds ..."
+echo "# System Provisioning Complete"
 echo "################################"
-sleep 5
-sync
-shutdown -r now
+
+if [[ "${REBOOT_AT_END:-false}" == "true" ]]; then
+  echo "[provision-system] rebooting in 5 seconds..."
+  sleep 5
+  sync
+  shutdown -r now
+else
+  echo "[provision-system] reboot deferred to orchestrator"
+fi
