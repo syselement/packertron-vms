@@ -69,7 +69,9 @@ echo "Bare-metal bootstrap completed successfully"
 echo "Log: $LOG_FILE"
 
 # Return control to cloud-init, then reboot after cloud-init-final completes.
+sync
+
 systemd-run \
   --unit=packertron-bootstrap-reboot \
   --on-active=2m \
-  /usr/bin/systemctl reboot
+  /usr/bin/systemctl reboot -i

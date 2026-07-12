@@ -264,13 +264,14 @@ rm -rf /var/lib/apt/lists/*
 
 # --- Validate ---
 log "validate"
-echo "ansible: $(ansible --version | head -n1 || true)"
+echo "ansible: $(ansible --version 2>/dev/null | head -n1 || true)"
 CODE_VER="$(sudo -u "$USER_NAME" -H bash -lc 'code --version 2>/dev/null | head -n1 || true')"
 echo "code:    ${CODE_VER}"
 echo "compose: $(docker compose version 2>/dev/null || true)"
-echo "docker:  $(docker --version || true)"
-echo "packer:  $(packer --version || true)"
-echo "tofu:    $(tofu --version | head -n1 || true)"
+echo "docker:  $(docker --version 2>/dev/null || true)"
+PACKER_VER="$(sudo -u "$USER_NAME" -H bash -lc 'packer version 2>/dev/null | head -n1 || true')"
+echo "packer:  ${PACKER_VER}"
+echo "tofu:    $(tofu --version 2>/dev/null | head -n1 || true)"
 
 # --- System info ---
 log "system info"
