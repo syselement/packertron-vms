@@ -1627,7 +1627,7 @@ info "chmod 600 \$HOME/.ssh/id_ed25519"
 info "eval \"\$(ssh-agent -s)\" && ssh-add \$HOME/.ssh/id_ed25519"
 if [[ "$UBUNTU_VARIANT" == "desktop" ]]; then
   info "--- Flameshot keyboard shortcut command:"
-  info "script --command \"flameshot gui\" /dev/null"
+  info "script --quiet --command \"/usr/bin/flameshot gui --clipboard --path /home/${USER_NAME}/Pictures/flameshot\" /dev/null"
 fi
 warn "=============================================================="
 
