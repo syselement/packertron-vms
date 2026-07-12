@@ -359,7 +359,7 @@ set_gsetting org.gnome.desktop.peripherals.touchpad natural-scroll "false"
 
 # Dock favorites
 set_gsetting org.gnome.shell favorite-apps \
-  "['org.gnome.Nautilus.desktop', 'brave-browser.desktop', 'terminator.desktop', 'sublime_text.desktop', 'obsidian_obsidian.desktop', 'code.desktop']"
+  "['org.gnome.Nautilus.desktop', 'brave-browser.desktop', 'terminator.desktop', 'sublime_text.desktop', 'obsidian.desktop', 'code.desktop']"
 
 # Enable System Monitor Panel on Ubuntu 26.04.
 # Fall back to the packaged System Monitor extension on Ubuntu 24.04.
