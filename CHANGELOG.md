@@ -1,3 +1,13 @@
+# [0.21.0](https://github.com/syselement/packertron-vms/compare/v0.20.0...v0.21.0) (2026-07-12)
+
+
+### Features
+
+* add function to configure Git identity for user ([bc9124d](https://github.com/syselement/packertron-vms/commit/bc9124d4520277a4fb155fed5fc7e2eb1e9aa8e4))
+* update Git configuration function to include pull-rebase policy ([3400b51](https://github.com/syselement/packertron-vms/commit/3400b51d2d2a436a91913eb681d67928bce9116b))
+
+
+
 # [0.20.0](https://github.com/syselement/packertron-vms/compare/v0.19.1...v0.20.0) (2026-07-12)
 
 
@@ -36,15 +46,6 @@
 ### Features
 
 * update format strings in Starship configuration for enhanced terminal output ([58a63d7](https://github.com/syselement/packertron-vms/commit/58a63d7624b9f24fc6cd0f4af763e9f483d132e2))
-
-
-
-# [0.17.0](https://github.com/syselement/packertron-vms/compare/v0.16.0...v0.17.0) (2026-07-02)
-
-
-### Features
-
-* update FZF options and enhance Starship configuration for improved terminal experience ([2a9da85](https://github.com/syselement/packertron-vms/commit/2a9da8596bcd6a0248fea3f898fffbf5164c805a))
 
 
 
