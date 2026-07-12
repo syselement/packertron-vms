@@ -1,3 +1,12 @@
+# [0.24.0](https://github.com/syselement/packertron-vms/compare/v0.23.0...v0.24.0) (2026-07-12)
+
+
+### Features
+
+* remove SnapX installation and add Flameshot installation script ([b9a7f7c](https://github.com/syselement/packertron-vms/commit/b9a7f7c528596a6fc570a7e44c80c4d757a8d780))
+
+
+
 # [0.23.0](https://github.com/syselement/packertron-vms/compare/v0.22.0...v0.23.0) (2026-07-12)
 
 
@@ -37,15 +46,6 @@
 ### Features
 
 * enhance GNOME preferences application and remove deprecated backup script ([21b58e2](https://github.com/syselement/packertron-vms/commit/21b58e2073f9c67e3e1e61da86c57a81019b883c))
-
-
-
-## [0.19.1](https://github.com/syselement/packertron-vms/compare/v0.19.0...v0.19.1) (2026-07-03)
-
-
-### Bug Fixes
-
-* update HISTTIMEFORMAT handling in bash configuration ([138c750](https://github.com/syselement/packertron-vms/commit/138c7501d7fd20f98eb59b57c7903213f09629a5))
 
 
 
