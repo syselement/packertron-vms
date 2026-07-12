@@ -6,7 +6,7 @@
 # - Run as root.
 # - Console output is colorized when interactive.
 # - Log output is written to /var/log/customize-system-<run_id>.log without ANSI escapes.
-# - GNOME string values passed to run_user_gsettings_try must already be quoted, e.g. "'prefer-dark'".
+# - GNOME preferences are written immediately for USER_NAME through GSettings.
 #
 
 set -euo pipefail
@@ -175,24 +175,189 @@ write_file_if_changed() {
   return 0
 }
 
-run_user_gsettings_try() {
+# Get the user's D-Bus session bus socket.
+gnome_user_bus_available() {
+  local uid
+  uid="$(id -u "$USER_NAME")"
+  [[ -S "/run/user/${uid}/bus" ]]
+}
+
+# Run a command as the desktop user on their real per-user D-Bus when one
+# exists. This is essential when the script is launched with sudo from a live
+# GNOME session: using an isolated dbus-run-session there can race with the
+# already-running dconf service. For SSH/Vagrant provisioning before graphical
+# login, fall back to a temporary session bus so GSettings can still persist.
+run_as_gnome_user() {
+  local uid runtime_dir
+  uid="$(id -u "$USER_NAME")"
+  runtime_dir="/run/user/${uid}"
+
+  if [[ -S "${runtime_dir}/bus" ]]; then
+    sudo -u "$USER_NAME" -H env \
+      XDG_RUNTIME_DIR="$runtime_dir" \
+      DBUS_SESSION_BUS_ADDRESS="unix:path=${runtime_dir}/bus" \
+      "$@"
+  else
+    sudo -u "$USER_NAME" -H dbus-run-session -- "$@"
+  fi
+}
+
+apply_gnome_preferences() {
+  local bus_mode
+
+  if gnome_user_bus_available; then
+    bus_mode="existing per-user D-Bus"
+  else
+    bus_mode="temporary D-Bus fallback"
+  fi
+  info "applying GNOME preferences via ${bus_mode}"
+
+  if ! run_as_gnome_user bash <<'GNOME_SETTINGS'
+set -uo pipefail
+
+failures=0
+
+schema_exists() {
+  # Process substitution avoids a pipefail/SIGPIPE false negative caused by
+  # `gsettings list-schemas | grep -q`.
+  grep -Fx -- "$1" < <(gsettings list-schemas) >/dev/null
+}
+
+key_exists() {
+  local schema="$1"
+  local key="$2"
+
+  schema_exists "$schema" || return 1
+  grep -Fx -- "$key" < <(gsettings list-keys "$schema") >/dev/null
+}
+
+set_gsetting() {
   local schema="$1"
   local key="$2"
   local value="$3"
-  sudo -u "$USER_NAME" -H dbus-run-session -- bash -lc \
-    "gsettings set ${schema} ${key} ${value}" >/dev/null 2>&1 || true
+  local actual
+
+  if ! key_exists "$schema" "$key"; then
+    printf '[gnome-settings] SKIP missing schema/key: %s %s\n' "$schema" "$key"
+    return 0
+  fi
+
+  if [[ "$(gsettings writable "$schema" "$key" 2>/dev/null)" != "true" ]]; then
+    printf '[gnome-settings] SKIP non-writable key: %s %s\n' "$schema" "$key"
+    return 0
+  fi
+
+  if ! gsettings set "$schema" "$key" "$value"; then
+    printf '[gnome-settings] ERROR failed: %s %s = %s\n' "$schema" "$key" "$value" >&2
+    failures=$((failures + 1))
+    return 0
+  fi
+
+  actual="$(gsettings get "$schema" "$key")"
+  if [[ "$actual" != "$value" ]]; then
+    printf '[gnome-settings] ERROR verify failed: %s %s; requested=%s actual=%s\n' \
+      "$schema" "$key" "$value" "$actual" >&2
+    failures=$((failures + 1))
+    return 0
+  fi
+
+  printf '[gnome-settings] SET %s %s = %s\n' "$schema" "$key" "$actual"
 }
 
-enable_system_monitor_extension() {
-  sudo -u "$USER_NAME" -H dbus-run-session -- bash -lc '
-    set -euo pipefail
-    if ! command -v gnome-extensions >/dev/null 2>&1; then
-      exit 0
-    fi
+update_string_array() {
+  local schema="$1"
+  local key="$2"
+  local action="$3"
+  local item="$4"
+  local current updated actual
 
-    ext_uuid="system-monitor@gnome-shell-extensions.gcampax.github.com"
-    gnome-extensions enable "$ext_uuid" >/dev/null 2>&1 || true
-  ' >/dev/null 2>&1 || true
+  if ! key_exists "$schema" "$key"; then
+    printf '[gnome-settings] SKIP missing schema/key: %s %s\n' "$schema" "$key"
+    return 0
+  fi
+
+  current="$(gsettings get "$schema" "$key")"
+  if ! updated="$(python3 - "$current" "$action" "$item" <<'PYTHON_ARRAY'
+import ast
+import sys
+
+raw, action, item = sys.argv[1:]
+if raw.startswith("@as "):
+    raw = raw[4:]
+values = list(ast.literal_eval(raw))
+
+if action == "add":
+    if item not in values:
+        values.append(item)
+elif action == "remove":
+    values = [value for value in values if value != item]
+else:
+    raise SystemExit(f"unsupported action: {action}")
+
+print("[" + ", ".join(repr(value) for value in values) + "]")
+PYTHON_ARRAY
+  )"; then
+    printf '[gnome-settings] ERROR cannot parse/update %s %s\n' "$schema" "$key" >&2
+    failures=$((failures + 1))
+    return 0
+  fi
+
+  if ! gsettings set "$schema" "$key" "$updated"; then
+    printf '[gnome-settings] ERROR failed updating: %s %s\n' "$schema" "$key" >&2
+    failures=$((failures + 1))
+    return 0
+  fi
+
+  actual="$(gsettings get "$schema" "$key")"
+  printf '[gnome-settings] SET %s %s = %s\n' "$schema" "$key" "$actual"
+}
+
+# Appearance
+set_gsetting org.gnome.desktop.interface color-scheme "'prefer-dark'"
+set_gsetting org.gnome.desktop.interface gtk-theme "'Yaru-yellow-dark'"
+set_gsetting org.gnome.desktop.interface show-battery-percentage "true"
+
+# Ubuntu Dock
+set_gsetting org.gnome.shell.extensions.dash-to-dock dock-position "'BOTTOM'"
+set_gsetting org.gnome.shell.extensions.dash-to-dock extend-height "true"
+set_gsetting org.gnome.shell.extensions.dash-to-dock dash-max-icon-size "32"
+set_gsetting org.gnome.shell.extensions.dash-to-dock click-action "'minimize'"
+set_gsetting org.gnome.shell.extensions.dash-to-dock show-trash "false"
+
+# Power and lock screen
+set_gsetting org.gnome.desktop.session idle-delay "uint32 0"
+set_gsetting org.gnome.desktop.screensaver lock-enabled "false"
+set_gsetting org.gnome.desktop.screensaver lock-delay "uint32 0"
+set_gsetting org.gnome.desktop.notifications show-in-lock-screen "false"
+set_gsetting org.gnome.desktop.screensaver ubuntu-lock-on-suspend "false"
+set_gsetting org.gnome.system.location enabled "false"
+
+# Dock favorites
+set_gsetting org.gnome.shell favorite-apps \
+  "['org.gnome.Nautilus.desktop', 'brave-browser.desktop', 'terminator.desktop', 'sublime_text.desktop', 'obsidian_obsidian.desktop', 'code.desktop']"
+
+# Enable the packaged System Monitor extension using GSettings only.
+ext_uuid='system-monitor@gnome-shell-extensions.gcampax.github.com'
+if [[ -d "/usr/share/gnome-shell/extensions/${ext_uuid}" || \
+      -d "$HOME/.local/share/gnome-shell/extensions/${ext_uuid}" ]]; then
+  set_gsetting org.gnome.shell disable-user-extensions "false"
+  update_string_array org.gnome.shell enabled-extensions add "$ext_uuid"
+  update_string_array org.gnome.shell disabled-extensions remove "$ext_uuid"
+else
+  printf '[gnome-settings] SKIP extension not installed: %s\n' "$ext_uuid"
+fi
+
+# Force a final read through the same backend before the process/session exits.
+gsettings get org.gnome.shell favorite-apps >/dev/null
+
+(( failures == 0 ))
+GNOME_SETTINGS
+  then
+    warn "one or more GNOME preferences failed; inspect the log above"
+    return 1
+  fi
+
+  ok "GNOME preferences applied and verified"
 }
 
 # --- Repository setup ---
@@ -379,6 +544,79 @@ EOF
   ok "Terminator configured"
 }
 
+configure_terminator_as_default() {
+  local account="$1"
+  local home
+  local terminator_bin
+  local desktop_file="/usr/share/applications/terminator.desktop"
+  local desktop_id="terminator.desktop"
+
+  home="$(user_home "$account")"
+  [[ -n "$home" ]] || die "could not determine home directory for ${account}"
+
+  terminator_bin="$(command -v terminator 2>/dev/null || true)"
+  if [[ -z "$terminator_bin" ]]; then
+    warn "Terminator is not installed; cannot configure default terminal"
+    return
+  fi
+
+  case "$VERSION_ID" in
+    24.*)
+      # Ubuntu 24.04: legacy system-wide alternatives mechanism.
+      if ! grep -Fx -- "$terminator_bin" \
+        < <(update-alternatives --list x-terminal-emulator 2>/dev/null); then
+        warn "Terminator is not registered as an x-terminal-emulator alternative"
+        return
+      fi
+
+      update-alternatives --set x-terminal-emulator "$terminator_bin"
+      ok "Terminator configured as system default terminal on Ubuntu ${VERSION_ID}"
+      ;;
+
+    26.*)
+      # Ubuntu 26.04: per-user xdg-terminal-exec configuration.
+      if [[ ! -f "$desktop_file" ]]; then
+        warn "Terminator desktop file not found: ${desktop_file}"
+        return
+      fi
+
+      install -d -m 0755 -o "$account" -g "$account" "$home/.config"
+
+      sudo -u "$account" -H bash -s -- "$desktop_id" <<'EOF'
+set -euo pipefail
+
+desktop_id="$1"
+config_file="$HOME/.config/ubuntu-xdg-terminals.list"
+tmp_file="$(mktemp "$HOME/.config/.ubuntu-xdg-terminals.list.XXXXXX")"
+
+cleanup() {
+  rm -f "$tmp_file"
+}
+trap cleanup EXIT
+
+# Put Terminator first while preserving other configured terminals.
+{
+  printf '%s\n' "$desktop_id"
+
+  if [[ -f "$config_file" ]]; then
+    grep -Fxv -- "$desktop_id" "$config_file" || true
+  fi
+} > "$tmp_file"
+
+chmod 0644 "$tmp_file"
+mv -f "$tmp_file" "$config_file"
+trap - EXIT
+EOF
+
+      ok "Terminator configured as default terminal for ${account} on Ubuntu ${VERSION_ID}"
+      ;;
+
+    *)
+      warn "default terminal configuration not implemented for Ubuntu ${VERSION_ID}"
+      ;;
+  esac
+}
+
 install_emote_snap() {
   if command -v snap >/dev/null 2>&1 && snap list emote >/dev/null 2>&1; then
     info "Emote snap already installed, skipping"
@@ -394,6 +632,21 @@ install_emote_snap() {
   ok "Emote installed"
 }
 
+install_obsidian_snap() {
+  if command -v snap >/dev/null 2>&1 && snap list obsidian >/dev/null 2>&1; then
+    info "Obsidian snap already installed, skipping"
+    return
+  fi
+
+  if ! command -v snap >/dev/null 2>&1; then
+    warn "snap command not found, cannot install Obsidian"
+    return
+  fi
+
+  snap install obsidian --classic
+  ok "Obsidian installed"
+}
+
 install_postman_snap() {
   if command -v snap >/dev/null 2>&1 && snap list postman >/dev/null 2>&1; then
     info "Postman snap already installed, skipping"
@@ -407,6 +660,21 @@ install_postman_snap() {
 
   snap install postman
   ok "Postman installed"
+}
+
+install_telegram_snap() {
+  if command -v snap >/dev/null 2>&1 && snap list telegram-desktop >/dev/null 2>&1; then
+    info "Telegram Desktop snap already installed, skipping"
+    return
+  fi
+
+  if ! command -v snap >/dev/null 2>&1; then
+    warn "snap command not found, cannot install Telegram Desktop"
+    return
+  fi
+
+  snap install telegram-desktop
+  ok "Telegram Desktop installed"
 }
 
 configure_flameshot() {
@@ -442,21 +710,6 @@ EOF
   '
 
   ok "Flameshot configured"
-}
-
-install_obsidian_snap() {
-  if command -v snap >/dev/null 2>&1 && snap list obsidian >/dev/null 2>&1; then
-    info "Obsidian snap already installed, skipping"
-    return
-  fi
-
-  if ! command -v snap >/dev/null 2>&1; then
-    warn "snap command not found, cannot install Obsidian"
-    return
-  fi
-
-  snap install obsidian --classic
-  ok "Obsidian installed"
 }
 
 # --- Common user tools ---
@@ -1002,11 +1255,13 @@ ok "common user tools and shell configuration completed"
 # --- Install/configure Desktop-specific tools ---
 if [[ "$UBUNTU_VARIANT" == "desktop" ]]; then
   info "installing/configuring Desktop-specific tools"
-  configure_terminator
-  install_emote_snap
-  install_postman_snap
   configure_flameshot
+  configure_terminator
+  configure_terminator_as_default "$USER_NAME"
+  install_emote_snap
   install_obsidian_snap
+  install_postman_snap
+  install_telegram_snap
   ok "Desktop-specific tools installed/configured"
 else
   info "server variant detected; skipping Desktop-specific tools"
@@ -1018,40 +1273,10 @@ updatedb || true
 
 # --- GNOME and Dock customization (Desktop only) ---
 if [[ "$UBUNTU_VARIANT" == "desktop" ]]; then
-  info "applying GNOME preferences (best effort)"
-
-  run_user_gsettings_try org.gnome.desktop.interface color-scheme "'prefer-dark'"
-  run_user_gsettings_try org.gnome.desktop.interface gtk-theme "'Yaru-dark'"
-  run_user_gsettings_try org.gnome.desktop.interface show-battery-percentage "true"
-  run_user_gsettings_try org.gnome.shell.extensions.dash-to-dock dock-position "'BOTTOM'"
-  run_user_gsettings_try org.gnome.shell.extensions.dash-to-dock extend-height "true"
-  run_user_gsettings_try org.gnome.shell.extensions.dash-to-dock dash-max-icon-size "32"
-  run_user_gsettings_try org.gnome.shell.extensions.dash-to-dock click-action "'minimize'"
-  run_user_gsettings_try org.gnome.shell.extensions.dash-to-dock show-trash "false"
-
-  # --- Power / lockscreen: disable blank + lock ---
-  run_user_gsettings_try org.gnome.desktop.session idle-delay "uint32 0"
-  run_user_gsettings_try org.gnome.desktop.screensaver lock-enabled "false"
-  run_user_gsettings_try org.gnome.desktop.screensaver lock-delay "uint32 0"
-  run_user_gsettings_try org.gnome.desktop.notifications show-in-lock-screen "false"
-  run_user_gsettings_try org.gnome.desktop.screensaver ubuntu-lock-on-suspend "false"
-  run_user_gsettings_try org.gnome.system.location enabled "false"
-
-  # --- GNOME extensions tweaks ---
-  enable_system_monitor_extension
-
-  # --- Dock favorites ---
-  info "setting GNOME favorites (best effort)"
-  sudo -u "$USER_NAME" -H dbus-run-session -- bash -lc \
-    "gsettings set org.gnome.shell favorite-apps \"[
-      'org.gnome.Nautilus.desktop',
-      'brave-browser.desktop',
-      'terminator.desktop',
-      'sublime_text.desktop',
-      'obsidian_obsidian.desktop',
-      'code.desktop'
-    ]\"" >/dev/null 2>&1 || true
-  ok "GNOME preferences applied"
+  # Apply now, inside this provisioning run. When GNOME is already running,
+  # target its real per-user bus; during headless SSH/Vagrant provisioning,
+  # use the temporary-bus fallback from run_as_gnome_user().
+  apply_gnome_preferences || true
 else
   info "server variant detected; skipping GNOME preferences"
 fi
