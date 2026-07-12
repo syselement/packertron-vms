@@ -1,3 +1,12 @@
+# [0.26.0](https://github.com/syselement/packertron-vms/compare/v0.25.0...v0.26.0) (2026-07-12)
+
+
+### Features
+
+* improve installation process for System Monitor Panel extension ([e169d65](https://github.com/syselement/packertron-vms/commit/e169d6539be9de78740d55dcf1f503f4f42a12f5))
+
+
+
 # [0.25.0](https://github.com/syselement/packertron-vms/compare/v0.24.0...v0.25.0) (2026-07-12)
 
 
@@ -31,16 +40,6 @@
 ### Features
 
 * enhance GNOME settings and add battery health preservation functionality ([ed6be33](https://github.com/syselement/packertron-vms/commit/ed6be3350916ced4498d72c705fcf56c340aacbe))
-
-
-
-# [0.21.0](https://github.com/syselement/packertron-vms/compare/v0.20.0...v0.21.0) (2026-07-12)
-
-
-### Features
-
-* add function to configure Git identity for user ([bc9124d](https://github.com/syselement/packertron-vms/commit/bc9124d4520277a4fb155fed5fc7e2eb1e9aa8e4))
-* update Git configuration function to include pull-rebase policy ([3400b51](https://github.com/syselement/packertron-vms/commit/3400b51d2d2a436a91913eb681d67928bce9116b))
 
 
 
