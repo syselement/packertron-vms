@@ -750,6 +750,21 @@ install_postman_snap() {
   ok "Postman installed"
 }
 
+install_snapx_snap() {
+  if command -v snap >/dev/null 2>&1 && snap list ui-snapx >/dev/null 2>&1; then
+    info "SnapX snap already installed, skipping"
+    return
+  fi
+
+  if ! command -v snap >/dev/null 2>&1; then
+    warn "snap command not found, cannot install SnapX"
+    return
+  fi
+
+  snap install ui-snapx --edge
+  ok "SnapX installed"
+}
+
 install_telegram_snap() {
   if command -v snap >/dev/null 2>&1 && snap list telegram-desktop >/dev/null 2>&1; then
     info "Telegram Desktop snap already installed, skipping"
@@ -1383,6 +1398,7 @@ if [[ "$UBUNTU_VARIANT" == "desktop" ]]; then
   install_emote_snap
   install_obsidian_snap
   install_postman_snap
+  install_snapx_snap
   install_telegram_snap
   ok "Desktop-specific tools installed/configured"
 else
