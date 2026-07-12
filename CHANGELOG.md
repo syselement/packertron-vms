@@ -1,3 +1,12 @@
+# [0.22.0](https://github.com/syselement/packertron-vms/compare/v0.21.0...v0.22.0) (2026-07-12)
+
+
+### Features
+
+* enhance GNOME settings and add battery health preservation functionality ([ed6be33](https://github.com/syselement/packertron-vms/commit/ed6be3350916ced4498d72c705fcf56c340aacbe))
+
+
+
 # [0.21.0](https://github.com/syselement/packertron-vms/compare/v0.20.0...v0.21.0) (2026-07-12)
 
 
@@ -37,15 +46,6 @@
 ### Features
 
 * add fastfetch support to bash configuration ([879590b](https://github.com/syselement/packertron-vms/commit/879590be5e1dc9d0faa0f93d8205aaaff5692143))
-
-
-
-# [0.18.0](https://github.com/syselement/packertron-vms/compare/v0.17.0...v0.18.0) (2026-07-02)
-
-
-### Features
-
-* update format strings in Starship configuration for enhanced terminal output ([58a63d7](https://github.com/syselement/packertron-vms/commit/58a63d7624b9f24fc6cd0f4af763e9f483d132e2))
 
 
 
