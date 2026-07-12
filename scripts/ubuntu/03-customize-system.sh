@@ -76,7 +76,6 @@ DESKTOP_PACKAGES=(
   brave-browser
   dbeaver-ce
   filezilla
-  flameshot
   flatpak
   fonts-noto-color-emoji
   gnome-shell-extension-manager
@@ -750,21 +749,6 @@ install_postman_snap() {
   ok "Postman installed"
 }
 
-install_snapx_snap() {
-  if command -v snap >/dev/null 2>&1 && snap list ui-snapx >/dev/null 2>&1; then
-    info "SnapX snap already installed, skipping"
-    return
-  fi
-
-  if ! command -v snap >/dev/null 2>&1; then
-    warn "snap command not found, cannot install SnapX"
-    return
-  fi
-
-  snap install ui-snapx --edge
-  ok "SnapX installed"
-}
-
 install_telegram_snap() {
   if command -v snap >/dev/null 2>&1 && snap list telegram-desktop >/dev/null 2>&1; then
     info "Telegram Desktop snap already installed, skipping"
@@ -779,6 +763,122 @@ install_telegram_snap() {
   snap install telegram-desktop
   ok "Telegram Desktop installed"
 }
+
+install_flameshot() (
+  set -euo pipefail
+
+  local api_url="https://api.github.com/repos/flameshot-org/flameshot/releases/latest"
+  local release_json tag latest_version installed_version
+  local architecture platform asset_url asset_name
+  local tmp_dir deb_file checksum_file
+  local -a platform_candidates
+
+  for cmd in curl jq unzip sha256sum dpkg-query apt-get; do
+    command -v "$cmd" >/dev/null 2>&1 ||
+      die "${cmd} is required to install Flameshot"
+  done
+
+  architecture="$(dpkg --print-architecture)"
+  case "$architecture" in
+    amd64|arm64) ;;
+    *)
+      warn "unsupported Flameshot architecture: ${architecture}"
+      return
+      ;;
+  esac
+
+  case "$VERSION_ID" in
+    24.*)
+      platform_candidates=("ubuntu-24.04")
+      ;;
+    26.*)
+      # Use a native 26.04 artifact when upstream provides one;
+      # otherwise fall back to the Ubuntu 24.04 package.
+      platform_candidates=("ubuntu-26.04" "ubuntu-24.04")
+      ;;
+    *)
+      warn "Flameshot release installation not configured for Ubuntu ${VERSION_ID}"
+      return
+      ;;
+  esac
+
+  info "checking latest Flameshot GitHub release"
+
+  release_json="$(curl -fsSL "$api_url")"
+  tag="$(jq -r '.tag_name // empty' <<<"$release_json")"
+  [[ -n "$tag" ]] || die "could not determine latest Flameshot release"
+
+  latest_version="${tag#v}"
+  installed_version="$(
+    dpkg-query -W -f='${Version}' flameshot 2>/dev/null || true
+  )"
+
+  if [[ -n "$installed_version" ]] &&
+    dpkg --compare-versions "$installed_version" ge "$latest_version"; then
+    info "Flameshot ${installed_version} already installed, skipping"
+    return
+  fi
+
+  asset_url=""
+  for platform in "${platform_candidates[@]}"; do
+    asset_url="$(
+      jq -r \
+        --arg suffix "artifact-${platform}-${architecture}.zip" \
+        '[.assets[]
+          | select(.name | endswith($suffix))
+        ][0].browser_download_url // empty' \
+        <<<"$release_json"
+    )"
+
+    [[ -n "$asset_url" ]] && break
+  done
+
+  [[ -n "$asset_url" ]] ||
+    die "no compatible Flameshot artifact for Ubuntu ${VERSION_ID}/${architecture}"
+
+  asset_name="${asset_url##*/}"
+  tmp_dir="$(mktemp -d)"
+  trap 'rm -rf -- "$tmp_dir"' EXIT
+
+  info "downloading Flameshot ${tag} (${platform}/${architecture})"
+  curl -fL "$asset_url" -o "$tmp_dir/$asset_name"
+
+  unzip -q "$tmp_dir/$asset_name" -d "$tmp_dir/extracted"
+
+  deb_file="$(
+    find "$tmp_dir/extracted" -maxdepth 2 -type f \
+      -name 'flameshot*.deb' -print -quit
+  )"
+
+  checksum_file="$(
+    find "$tmp_dir/extracted" -maxdepth 2 -type f \
+      -name 'flameshot*.deb.sha256sum' -print -quit
+  )"
+
+  [[ -n "$deb_file" ]] ||
+    die "Flameshot archive does not contain a Debian package"
+
+  [[ -n "$checksum_file" ]] ||
+    die "Flameshot archive does not contain the Debian package checksum"
+
+  info "verifying Flameshot package checksum"
+  (
+    cd "$(dirname "$deb_file")"
+    sha256sum --check "$(basename "$checksum_file")"
+  )
+
+  info "installing Flameshot ${tag}"
+  apt-get install -y "$deb_file"
+
+  installed_version="$(
+    dpkg-query -W -f='${Version}' flameshot 2>/dev/null || true
+  )"
+
+  [[ -n "$installed_version" ]] ||
+    die "Flameshot installation could not be verified"
+
+  ok "Flameshot ${installed_version} installed from the official GitHub release"
+)
 
 configure_flameshot() {
   if sudo -u "$USER_NAME" -H bash -lc '
@@ -1392,13 +1492,13 @@ ok "common user tools and shell configuration completed"
 # --- Install/configure Desktop-specific tools ---
 if [[ "$UBUNTU_VARIANT" == "desktop" ]]; then
   info "installing/configuring Desktop-specific tools"
+  install_flameshot
   configure_flameshot
   configure_terminator
   configure_terminator_as_default "$USER_NAME"
   install_emote_snap
   install_obsidian_snap
   install_postman_snap
-  install_snapx_snap
   install_telegram_snap
   ok "Desktop-specific tools installed/configured"
 else
