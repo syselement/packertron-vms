@@ -791,6 +791,42 @@ EOF
   esac
 }
 
+install_bitwarden_snap() {
+  if ! command -v snap >/dev/null 2>&1; then
+    warn "snap command not found, cannot install Bitwarden"
+    return
+  fi
+
+  if snap list bitwarden >/dev/null 2>&1; then
+    info "Bitwarden snap already installed"
+  else
+    snap install bitwarden
+    ok "Bitwarden installed"
+  fi
+
+  # Required for secure token storage through GNOME Keyring.
+  snap connect bitwarden:password-manager-service
+
+  ok "Bitwarden secure-storage interface connected"
+}
+
+install_discord_snap() {
+  if ! command -v snap >/dev/null 2>&1; then
+    warn "snap command not found, cannot install Discord"
+    return
+  fi
+
+  if snap list discord >/dev/null 2>&1; then
+    info "Discord snap already installed"
+  else
+    snap install discord
+    ok "Discord installed"
+  fi
+
+  # Optional: reduces AppArmor noise and enables extra system visibility.
+  snap connect discord:system-observe 2>/dev/null || true
+}
+
 install_emote_snap() {
   if command -v snap >/dev/null 2>&1 && snap list emote >/dev/null 2>&1; then
     info "Emote snap already installed, skipping"
@@ -1583,6 +1619,8 @@ if [[ "$UBUNTU_VARIANT" == "desktop" ]]; then
   configure_flameshot
   configure_terminator
   configure_terminator_as_default "$USER_NAME"
+  install_bitwarden_snap
+  install_discord_snap
   install_emote_snap
   install_obsidian_snap
   install_postman_snap
