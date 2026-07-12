@@ -1,3 +1,12 @@
+## [0.28.1](https://github.com/syselement/packertron-vms/compare/v0.28.0...v0.28.1) (2026-07-12)
+
+
+### Bug Fixes
+
+* suppress errors for version checks and improve reboot handling in bootstrap script ([e1ea59a](https://github.com/syselement/packertron-vms/commit/e1ea59a5d87253ffcd3541ff6422529905f1b4c2))
+
+
+
 # [0.28.0](https://github.com/syselement/packertron-vms/compare/v0.27.0...v0.28.0) (2026-07-12)
 
 
@@ -31,15 +40,6 @@
 ### Features
 
 * add support for System Monitor Panel extension installation and management ([2a15ecb](https://github.com/syselement/packertron-vms/commit/2a15ecb13e34847f2c3ce8b1f2883ef0303be9c9))
-
-
-
-# [0.24.0](https://github.com/syselement/packertron-vms/compare/v0.23.0...v0.24.0) (2026-07-12)
-
-
-### Features
-
-* remove SnapX installation and add Flameshot installation script ([b9a7f7c](https://github.com/syselement/packertron-vms/commit/b9a7f7c528596a6fc570a7e44c80c4d757a8d780))
 
 
 
