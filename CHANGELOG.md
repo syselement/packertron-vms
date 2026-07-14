@@ -1,3 +1,12 @@
+# [0.32.0](https://github.com/syselement/packertron-vms/compare/v0.31.0...v0.32.0) (2026-07-14)
+
+
+### Features
+
+* add new aliases for Brave browser and improved command utilities ([4e8a44c](https://github.com/syselement/packertron-vms/commit/4e8a44c148db60d375beffb0c3dc44355f161abb))
+
+
+
 # [0.31.0](https://github.com/syselement/packertron-vms/compare/v0.30.1...v0.31.0) (2026-07-14)
 
 
@@ -31,15 +40,6 @@
 ### Features
 
 * add Bitwarden and Discord snap installation functions and create new autoinstall configuration file ([7377b73](https://github.com/syselement/packertron-vms/commit/7377b73591e5c6967acdc1434a26c9fe002b0934))
-
-
-
-## [0.28.1](https://github.com/syselement/packertron-vms/compare/v0.28.0...v0.28.1) (2026-07-12)
-
-
-### Bug Fixes
-
-* suppress errors for version checks and improve reboot handling in bootstrap script ([e1ea59a](https://github.com/syselement/packertron-vms/commit/e1ea59a5d87253ffcd3541ff6422529905f1b4c2))
 
 
 
