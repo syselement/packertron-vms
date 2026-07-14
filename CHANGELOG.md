@@ -1,3 +1,12 @@
+# [0.31.0](https://github.com/syselement/packertron-vms/compare/v0.30.1...v0.31.0) (2026-07-14)
+
+
+### Features
+
+* enhance user workspace setup and add Homebrew installation instructions ([0619183](https://github.com/syselement/packertron-vms/commit/06191838c76afa6f75d9c9d59891662326938e98))
+
+
+
 ## [0.30.1](https://github.com/syselement/packertron-vms/compare/v0.30.0...v0.30.1) (2026-07-12)
 
 
@@ -31,15 +40,6 @@
 ### Bug Fixes
 
 * suppress errors for version checks and improve reboot handling in bootstrap script ([e1ea59a](https://github.com/syselement/packertron-vms/commit/e1ea59a5d87253ffcd3541ff6422529905f1b4c2))
-
-
-
-# [0.28.0](https://github.com/syselement/packertron-vms/compare/v0.27.0...v0.28.0) (2026-07-12)
-
-
-### Features
-
-* add first-boot orchestration and autoinstall configuration for Ubuntu 26.04 ([4be123e](https://github.com/syselement/packertron-vms/commit/4be123e7453095f625a1a46d8ca1b442979246a1))
 
 
 
