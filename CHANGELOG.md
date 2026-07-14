@@ -1,3 +1,12 @@
+# [0.33.0](https://github.com/syselement/packertron-vms/compare/v0.32.0...v0.33.0) (2026-07-14)
+
+
+### Features
+
+* update manual setup hints for keyboard shortcuts and add Emote command ([c4196ba](https://github.com/syselement/packertron-vms/commit/c4196ba6bba55a64a335c31898c5330a26762831))
+
+
+
 # [0.32.0](https://github.com/syselement/packertron-vms/compare/v0.31.0...v0.32.0) (2026-07-14)
 
 
@@ -31,15 +40,6 @@
 ### Features
 
 * replace Obsidian snap installation with direct Debian package installation and adjust GNOME settings ([6616e6e](https://github.com/syselement/packertron-vms/commit/6616e6ec0f2113c44d7ec6318f676e5c45da9cab))
-
-
-
-# [0.29.0](https://github.com/syselement/packertron-vms/compare/v0.28.1...v0.29.0) (2026-07-12)
-
-
-### Features
-
-* add Bitwarden and Discord snap installation functions and create new autoinstall configuration file ([7377b73](https://github.com/syselement/packertron-vms/commit/7377b73591e5c6967acdc1434a26c9fe002b0934))
 
 
 
