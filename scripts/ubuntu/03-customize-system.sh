@@ -1129,7 +1129,52 @@ EOF
   ok "Flameshot configured"
 }
 
-# --- Common user tools ---
+# --- Common user tools and shell configuration ---
+prepare_user_workspace() (
+  set -euo pipefail
+
+  local account="${1:-$USER_NAME}"
+  local home
+  local group
+  local repos_root
+  local obsidian_dir
+  local ssh_dir
+
+  home="$(user_home "$account")"
+  [[ -n "$home" && -d "$home" ]] ||
+    die "could not determine home directory for ${account}"
+
+  group="$(id -gn "$account")"
+
+  repos_root="$home/repos"
+  obsidian_dir="$home/obsidian"
+  ssh_dir="$home/.ssh"
+
+  info "preparing workspace directories for ${account}"
+
+  install -d \
+    -o "$account" \
+    -g "$group" \
+    -m 0755 \
+    "$repos_root" \
+    "$repos_root/github" \
+    "$repos_root/gitlab" \
+    "$repos_root/forgejo" \
+    "$obsidian_dir"
+
+  install -d \
+    -o "$account" \
+    -g "$group" \
+    -m 0700 \
+    "$ssh_dir"
+
+  ok "GitHub repository directory ready: ${repos_root}/github"
+  ok "GitLab repository directory ready: ${repos_root}/gitlab"
+  ok "Forgejo repository directory ready: ${repos_root}/forgejo"
+  ok "Obsidian directory ready: ${obsidian_dir}"
+  ok "SSH directory ready: ${ssh_dir}"
+)
+
 install_tldr_pipx() {
   if sudo -u "$USER_NAME" -H bash -lc 'pipx list 2>/dev/null | grep -q "package tldr"'; then
     info "tldr already installed via pipx, skipping"
@@ -1227,16 +1272,18 @@ aliases_path = home / ".bash_aliases"
 aliases = r'''# $HOME/.bash_aliases — centralized interactive aliases
 
 # System update
-alias updateos='sudo sh -c "apt update && apt -y upgrade && apt -y autoremove"'
+# alias updateos='sudo sh -c "apt update && apt -y upgrade && apt -y autoremove"'
+# Comment above & Uncomment the following for full Ubuntu + Snap + Brew update
+alias updateos='sudo sh -c "sudo apt update && sudo apt -y upgrade && sudo apt -y autoremove && sudo snap refresh" && brew upgrade'
 
 # Core utils
 alias cat='batcat --paging=never'
 alias df='df -h'
 alias diff='diff --color=auto'
 alias dir='dir --color=auto'
-alias grep='grep --color=auto'
-alias fgrep='fgrep --color=auto'
 alias egrep='egrep --color=auto'
+alias fgrep='fgrep --color=auto'
+alias grep='grep --color=auto'
 alias vdir='vdir --color=auto'
 
 # Listing
@@ -1594,6 +1641,132 @@ configure_git_for_user() {
   ok "Git configured for ${account}: identity and pull-rebase policy"
 }
 
+install_homebrew_for_user() {
+  local home
+  local group
+  local prefix="/home/linuxbrew/.linuxbrew"
+  local brew_bin="${prefix}/bin/brew"
+  local install_url="https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh"
+
+  home="$(user_home "$USER_NAME")"
+  [[ -n "$home" ]] ||
+    die "could not determine home directory for ${USER_NAME}"
+
+  group="$(id -gn "$USER_NAME")"
+
+  info "installing Homebrew prerequisites"
+  DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
+    build-essential \
+    procps \
+    curl \
+    file \
+    git
+
+  if [[ -x "$brew_bin" ]]; then
+    info "Homebrew already installed"
+  else
+    info "installing Homebrew for ${USER_NAME}"
+
+    # Pre-create the supported Linux prefix so the non-interactive installer does not require password-based sudo access.
+    install -d -o "$USER_NAME" -g "$group" /home/linuxbrew
+    install -d -o "$USER_NAME" -g "$group" "$prefix"
+
+    sudo -u "$USER_NAME" -H env NONINTERACTIVE=1 USER="$USER_NAME" \
+      /bin/bash -c "$(curl -fsSL --retry 3 --retry-all-errors --connect-timeout 15 "$install_url")"
+
+    [[ -x "$brew_bin" ]] ||
+      die "Homebrew installation did not provide ${brew_bin}"
+  fi
+
+  # Add Homebrew to Bash PATH idempotently.
+  sudo -u "$USER_NAME" -H bash -c '
+    set -euo pipefail
+
+    rc="$HOME/.bashrc"
+    line='\''eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"'\''
+
+    touch "$rc"
+
+    if ! grep -Fqx "$line" "$rc"; then
+      {
+        printf "\n# Homebrew\n"
+        printf "%s\n" "$line"
+      } >> "$rc"
+    fi
+  '
+
+  ok "$("$brew_bin" --version | sed -n '1p') installed"
+}
+
+show_manual_setup_hints() {
+  local home
+  home="$(user_home "$USER_NAME")"
+
+  warn "=============================================================="
+  warn "MANUAL POST-INSTALL SETUP"
+  warn "=============================================================="
+  info "1. Fingerprint login"
+  info "   Settings → System → Users → Fingerprint Login"
+  info "   Enroll at least two fingers and verify sudo authentication."
+  info "=============================================================="
+  info "2. Flameshot keyboard shortcut"
+  info "   Settings → Keyboard → View and Customize Shortcuts"
+  info "   → Custom Shortcuts → Add Shortcut"
+  info "   Name: Flameshot"
+  info "   Command:"
+  info "   script --quiet --command \"/usr/bin/flameshot gui --clipboard --path ${home}/Pictures/flameshot\" /dev/null"
+  info "   Recommended shortcut: Print, or Shift+Alt+S"
+  info "=============================================================="
+  info "3. Bluetooth devices"
+  info "   Settings → Bluetooth"
+  info "   Pair the mouse, soundbar, etc."
+  info "=============================================================="
+  info "4. Visual Studio Code"
+  info "   Open VS Code → Accounts → Sign in with GitHub"
+  info "   Enable Settings Sync and verify extensions/settings are restored."
+  info "=============================================================="
+  info "5. Bitwarden"
+  info "   Sign in and complete MFA."
+  info "   Verify vault synchronization."
+  info "   Review Settings → App Settings → Start automatically on login."
+  info "=============================================================="
+  info "6. Brave"
+  info "   Open brave://settings/braveSync/setup"
+  info "   Join the existing sync chain and verify bookmarks/extensions."
+  info "=============================================================="
+  info "7. Obsidian"
+  info "   Create Obsidian vault inside:"
+  info "   ${home}/obsidian"
+  info "   Configure Obsidian Sync, Git, or the selected backup method."
+  info "=============================================================="
+  info "8. Telegram"
+  info "   Sign in and verify the session."
+  info "=============================================================="
+  info "9. SSH private key"
+  info "   - Copy the private key from a trusted offline source:"
+  info "   cat > ${home}/.ssh/id_ed25519"
+  info "   # paste key, then Ctrl-D"
+  info "   chmod 600 ${home}/.ssh/id_ed25519"
+  info ""
+  info "   - Generate the matching public key:"
+  info "   ssh-keygen -y -f ${home}/.ssh/id_ed25519 > ${home}/.ssh/id_ed25519.pub"
+  info "   chmod 0644 ${home}/.ssh/id_ed25519.pub"
+  info ""
+  info "   - Load and test the key:"
+  info "   ssh-add ${home}/.ssh/id_ed25519 || { eval \"\$(ssh-agent -s)\"; ssh-add ${home}/.ssh/id_ed25519; }"
+  info "   ssh -T git@github.com"
+  info "=============================================================="
+  info "10. Clone GitHub repositories over SSH"
+  info "    - GitHub:  cd ${home}/repos/github"
+  info "    - GitLab:  cd ${home}/repos/gitlab"
+  info "    - Forgejo: cd ${home}/repos/forgejo"
+  info "    git clone git@github.com:syselement/<repository>.git"
+  info ""
+  info "    - Verify configured Git identity:"
+  info "    git config list"
+  warn "=============================================================="
+}
+
 echo "################################"
 echo "# Customize System"
 echo "################################"
@@ -1692,6 +1865,7 @@ fi
 
 # --- Install common user tools and shell configuration ---
 info "installing common user tools and shell configuration"
+prepare_user_workspace "$USER_NAME"
 install_starship
 for account in "$USER_NAME" root; do
   install_fzf_for_user "$account"
@@ -1701,6 +1875,7 @@ for account in "$USER_NAME" root; do
 done
 install_tldr_pipx
 configure_git_for_user "$USER_NAME"
+install_homebrew_for_user
 ok "common user tools and shell configuration completed"
 
 # --- Install/configure Desktop-specific tools ---
@@ -1745,21 +1920,8 @@ rm -rf /var/lib/apt/lists/*
 apt-get -y update >/dev/null 2>&1 || true
 ok "cleanup completed"
 
-# --- Manual SSH key setup hint ---
-warn "=============================================================="
-warn "MANUAL SECTION"
-warn "=============================================================="
-info "--- SSH private key setup (run as ${USER_NAME}):"
-info "mkdir -p \$HOME/.ssh && chmod 700 \$HOME/.ssh"
-info "cat > \$HOME/.ssh/id_ed25519"
-info "# paste key, then Ctrl-D"
-info "chmod 600 \$HOME/.ssh/id_ed25519"
-info "eval \"\$(ssh-agent -s)\" && ssh-add \$HOME/.ssh/id_ed25519"
-if [[ "$UBUNTU_VARIANT" == "desktop" ]]; then
-  info "--- Flameshot keyboard shortcut command:"
-  info "script --quiet --command \"/usr/bin/flameshot gui --clipboard --path /home/${USER_NAME}/Pictures/flameshot\" /dev/null"
-fi
-warn "=============================================================="
+# --- Manual setup hints ---
+show_manual_setup_hints
 
 END_TS="$(date +%s)"
 ELAPSED="$((END_TS - START_TS))"
@@ -1775,7 +1937,7 @@ echo "################################"
 
 if [[ "${REBOOT_AT_END:-false}" == "true" ]]; then
   echo "[provision-system] rebooting in 5 seconds..."
-  sleep 5
+  sleep 10
   sync
   shutdown -r now
 else
