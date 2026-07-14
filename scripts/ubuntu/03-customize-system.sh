@@ -1277,7 +1277,8 @@ aliases = r'''# $HOME/.bash_aliases — centralized interactive aliases
 alias updateos='sudo sh -c "sudo apt update && sudo apt -y upgrade && sudo apt -y autoremove && sudo snap refresh" && brew upgrade'
 
 # Core utils
-alias cat='batcat --paging=never'
+alias brave='brave-browser'
+alias cat='batcat -pp'
 alias df='df -h'
 alias diff='diff --color=auto'
 alias dir='dir --color=auto'
@@ -1285,6 +1286,7 @@ alias egrep='egrep --color=auto'
 alias fgrep='fgrep --color=auto'
 alias grep='grep --color=auto'
 alias vdir='vdir --color=auto'
+alias which-command='type'
 
 # Listing
 alias ls='ls -lh --color=auto'
@@ -1299,6 +1301,7 @@ alias hs='history | grep'
 alias hsi='history | grep -i'
 
 # Network / ports
+alias ip='ip --color=auto'
 alias ipa='ip -br -c a'
 alias ports='ss -tunlp'
 
@@ -1743,7 +1746,7 @@ show_manual_setup_hints() {
   info "   Sign in and verify the session."
   info "=============================================================="
   info "9. SSH private key"
-  info "   - Copy the private key from a trusted offline source:"
+  info "   - Copy the private key from a trusted offline source/password manager:"
   info "   cat > ${home}/.ssh/id_ed25519"
   info "   # paste key, then Ctrl-D"
   info "   chmod 600 ${home}/.ssh/id_ed25519"
