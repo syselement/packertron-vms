@@ -1,3 +1,12 @@
+# [0.35.0](https://github.com/syselement/packertron-vms/compare/v0.34.0...v0.35.0) (2026-07-16)
+
+
+### Features
+
+* add gsetting value comparison function and update GNOME settings ([335bc5a](https://github.com/syselement/packertron-vms/commit/335bc5ae9c35bf4f5a0704dbaf402674e2847561))
+
+
+
 # [0.34.0](https://github.com/syselement/packertron-vms/compare/v0.33.0...v0.34.0) (2026-07-16)
 
 
@@ -31,15 +40,6 @@
 ### Features
 
 * enhance user workspace setup and add Homebrew installation instructions ([0619183](https://github.com/syselement/packertron-vms/commit/06191838c76afa6f75d9c9d59891662326938e98))
-
-
-
-## [0.30.1](https://github.com/syselement/packertron-vms/compare/v0.30.0...v0.30.1) (2026-07-12)
-
-
-### Bug Fixes
-
-* correct Obsidian desktop entry name in GNOME favorites ([0e926a7](https://github.com/syselement/packertron-vms/commit/0e926a758ff7dd36fc89f21f89b0ec0516df8ae2))
 
 
 
