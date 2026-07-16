@@ -1,3 +1,12 @@
+# [0.36.0](https://github.com/syselement/packertron-vms/compare/v0.35.0...v0.36.0) (2026-07-16)
+
+
+### Features
+
+* add functionality to clone and synchronize Packertron repository for desktop wallpaper configuration ([38f51d7](https://github.com/syselement/packertron-vms/commit/38f51d754d6c98b8a9383967fc8f170269076bfa))
+
+
+
 # [0.35.0](https://github.com/syselement/packertron-vms/compare/v0.34.0...v0.35.0) (2026-07-16)
 
 
@@ -31,15 +40,6 @@
 ### Features
 
 * add new aliases for Brave browser and improved command utilities ([4e8a44c](https://github.com/syselement/packertron-vms/commit/4e8a44c148db60d375beffb0c3dc44355f161abb))
-
-
-
-# [0.31.0](https://github.com/syselement/packertron-vms/compare/v0.30.1...v0.31.0) (2026-07-14)
-
-
-### Features
-
-* enhance user workspace setup and add Homebrew installation instructions ([0619183](https://github.com/syselement/packertron-vms/commit/06191838c76afa6f75d9c9d59891662326938e98))
 
 
 
