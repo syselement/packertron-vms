@@ -1,3 +1,12 @@
+# [0.34.0](https://github.com/syselement/packertron-vms/compare/v0.33.0...v0.34.0) (2026-07-16)
+
+
+### Features
+
+* enhance GNOME settings and add wallpaper configuration ([b453075](https://github.com/syselement/packertron-vms/commit/b4530755ddecb21dd667cdb80ffd9c900bd61d44))
+
+
+
 # [0.33.0](https://github.com/syselement/packertron-vms/compare/v0.32.0...v0.33.0) (2026-07-14)
 
 
@@ -31,15 +40,6 @@
 ### Bug Fixes
 
 * correct Obsidian desktop entry name in GNOME favorites ([0e926a7](https://github.com/syselement/packertron-vms/commit/0e926a758ff7dd36fc89f21f89b0ec0516df8ae2))
-
-
-
-# [0.30.0](https://github.com/syselement/packertron-vms/compare/v0.29.0...v0.30.0) (2026-07-12)
-
-
-### Features
-
-* replace Obsidian snap installation with direct Debian package installation and adjust GNOME settings ([6616e6e](https://github.com/syselement/packertron-vms/commit/6616e6ec0f2113c44d7ec6318f676e5c45da9cab))
 
 
 
