@@ -781,6 +781,7 @@ EOF
 configure_desktop_wallpaper() (
   set -euo pipefail
 
+  local repo_url="https://github.com/syselement/packertron-vms.git"
   local repo_dir="/opt/packertron-vms"
   local source_file="${repo_dir}/scripts/ubuntu/ubuntu-wallpaper.png"
   local home
@@ -804,11 +805,28 @@ configure_desktop_wallpaper() (
   command -v git >/dev/null 2>&1 ||
     die "git is required to synchronize ${repo_dir}"
 
-  [[ -d "$repo_dir/.git" ]] ||
-    die "${repo_dir} is not a Git repository"
+  install -d -m 0755 "$(dirname "$repo_dir")"
 
-  info "synchronizing Packertron repository"
-  git -C "$repo_dir" pull --ff-only
+  if [[ ! -e "$repo_dir" ]]; then
+    info "cloning Packertron repository"
+
+    git clone \
+      --branch main \
+      --single-branch \
+      --depth 1 \
+      "$repo_url" \
+      "$repo_dir"
+
+    ok "Packertron repository cloned"
+  elif [[ -d "$repo_dir/.git" ]]; then
+    info "synchronizing Packertron repository"
+
+    git -C "$repo_dir" pull --ff-only
+
+    ok "Packertron repository synchronized"
+  else
+    die "${repo_dir} exists but is not a Git repository"
+  fi
 
   [[ -f "$source_file" ]] ||
     die "wallpaper not found: ${source_file}"
