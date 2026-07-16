@@ -39,6 +39,7 @@ COMMON_PACKAGES=(
   duf
   eza
   fastfetch
+  fd-find
   fontconfig
   gdu
   git
@@ -1495,6 +1496,7 @@ alias diff='diff --color=auto'
 alias dir='dir --color=auto'
 alias egrep='egrep --color=auto'
 alias fgrep='fgrep --color=auto'
+alias fd='fdfind -H'
 alias grep='grep --color=auto'
 alias vdir='vdir --color=auto'
 alias which-command='type'
