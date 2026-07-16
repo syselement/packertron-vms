@@ -315,22 +315,26 @@ PYTHON_ARRAY
 
 # Appearance
 set_gsetting org.gnome.desktop.interface color-scheme "'prefer-dark'"
+set_gsetting org.gnome.desktop.interface document-font-name 'JetBrainsMono Nerd Font 11'
+set_gsetting org.gnome.desktop.interface font-name 'JetBrainsMono Nerd Font 11'
 set_gsetting org.gnome.desktop.interface gtk-theme "'Yaru-yellow-dark'"
+set_gsetting org.gnome.desktop.interface monospace-font-name 'JetBrainsMono Nerd Font Mono 11'
 set_gsetting org.gnome.desktop.interface show-battery-percentage "true"
+set_gsetting org.gnome.desktop.interface text-scaling-factor  1.10
 
 # Ubuntu Dock
+set_gsetting org.gnome.shell.extensions.dash-to-dock click-action "'minimize'"
+set_gsetting org.gnome.shell.extensions.dash-to-dock dash-max-icon-size "34"
 set_gsetting org.gnome.shell.extensions.dash-to-dock dock-position "'BOTTOM'"
 set_gsetting org.gnome.shell.extensions.dash-to-dock extend-height "true"
-set_gsetting org.gnome.shell.extensions.dash-to-dock dash-max-icon-size "24"
-set_gsetting org.gnome.shell.extensions.dash-to-dock click-action "'minimize'"
 set_gsetting org.gnome.shell.extensions.dash-to-dock show-trash "false"
 
 # Power and lock screen
-set_gsetting org.gnome.desktop.session idle-delay "uint32 0"
-set_gsetting org.gnome.desktop.screensaver lock-enabled "false"
-set_gsetting org.gnome.desktop.screensaver lock-delay "uint32 0"
 set_gsetting org.gnome.desktop.notifications show-in-lock-screen "false"
+set_gsetting org.gnome.desktop.screensaver lock-delay "uint32 0"
+set_gsetting org.gnome.desktop.screensaver lock-enabled "false"
 set_gsetting org.gnome.desktop.screensaver ubuntu-lock-on-suspend "false"
+set_gsetting org.gnome.desktop.session idle-delay "uint32 0"
 set_gsetting org.gnome.system.location enabled "false"
 
 # Display color / Night Light
@@ -409,6 +413,73 @@ GNOME_SETTINGS
 
   ok "GNOME preferences applied and verified"
 }
+
+install_hide_universal_access_extension() (
+  set -euo pipefail
+
+  local account="$1"
+  local uuid="hide-universal-access@akiirui.github.io"
+  local download_url=""
+  local home metadata_file
+
+  case "$VERSION_ID" in
+    26.*)
+      download_url="https://extensions.gnome.org/review/download/69554.shell-extension.zip"
+      ;;
+    24.*)
+      download_url="https://extensions.gnome.org/review/download/52417.shell-extension.zip"
+      ;;
+    *)
+      warn "Hide Universal Access installation not configured for Ubuntu ${VERSION_ID}"
+      return
+      ;;
+  esac
+
+  command -v curl >/dev/null 2>&1 ||
+    die "curl is required to install Hide Universal Access"
+
+  command -v gnome-extensions >/dev/null 2>&1 ||
+    die "gnome-extensions is required to install Hide Universal Access"
+
+  home="$(user_home "$account")"
+  [[ -n "$home" ]] ||
+    die "could not determine home directory for ${account}"
+
+  metadata_file="$home/.local/share/gnome-shell/extensions/$uuid/metadata.json"
+
+  if [[ -f "$metadata_file" ]]; then
+    info "Hide Universal Access extension already installed, skipping"
+    return
+  fi
+
+  info "downloading Hide Universal Access extension"
+
+  sudo -u "$account" -H bash -s -- "$download_url" <<'USER_INSTALL'
+set -euo pipefail
+
+download_url="$1"
+tmp_file="$(mktemp --suffix=.shell-extension.zip)"
+
+cleanup() {
+  rm -f -- "$tmp_file"
+}
+trap cleanup EXIT
+
+curl -fsSL \
+  --retry 3 \
+  --retry-all-errors \
+  --connect-timeout 15 \
+  "$download_url" \
+  -o "$tmp_file"
+
+gnome-extensions install --force "$tmp_file"
+USER_INSTALL
+
+  [[ -f "$metadata_file" ]] ||
+    die "Hide Universal Access extension installation failed"
+
+  ok "Hide Universal Access extension installed for ${account}"
+)
 
 install_system_monitor_panel_extension() (
   set -euo pipefail
@@ -679,6 +750,101 @@ EOF
 }
 
 # --- Desktop tools ---
+
+configure_desktop_wallpaper() (
+  set -euo pipefail
+
+  local repo_dir="/opt/packertron-vms"
+  local source_file="${repo_dir}/scripts/ubuntu/ubuntu-wallpaper.png"
+  local home
+  local group
+  local uid
+  local runtime_dir
+  local destination_file
+  local wallpaper_uri
+
+  home="$(user_home "$USER_NAME")"
+  [[ -n "$home" && -d "$home" ]] ||
+    die "could not determine home directory for ${USER_NAME}"
+
+  group="$(id -gn "$USER_NAME")"
+  uid="$(id -u "$USER_NAME")"
+  runtime_dir="/run/user/${uid}"
+
+  destination_file="$home/.config/background"
+  wallpaper_uri="file://${destination_file}"
+
+  command -v git >/dev/null 2>&1 ||
+    die "git is required to synchronize ${repo_dir}"
+
+  [[ -d "$repo_dir/.git" ]] ||
+    die "${repo_dir} is not a Git repository"
+
+  info "synchronizing Packertron repository"
+  git -C "$repo_dir" pull --ff-only
+
+  [[ -f "$source_file" ]] ||
+    die "wallpaper not found: ${source_file}"
+
+  install -d \
+    -o "$USER_NAME" \
+    -g "$group" \
+    -m 0755 \
+    "$home/.config"
+
+  install \
+    -o "$USER_NAME" \
+    -g "$group" \
+    -m 0644 \
+    "$source_file" \
+    "$destination_file"
+
+  run_gsettings() {
+    if [[ -S "$runtime_dir/bus" ]]; then
+      sudo -u "$USER_NAME" \
+        env \
+          HOME="$home" \
+          XDG_RUNTIME_DIR="$runtime_dir" \
+          DBUS_SESSION_BUS_ADDRESS="unix:path=${runtime_dir}/bus" \
+        gsettings "$@"
+    else
+      sudo -u "$USER_NAME" -H \
+        dbus-run-session -- gsettings "$@"
+    fi
+  }
+
+  info "configuring GNOME wallpaper"
+
+  run_gsettings set \
+    org.gnome.desktop.background \
+    picture-uri \
+    "$wallpaper_uri"
+
+  run_gsettings set \
+    org.gnome.desktop.background \
+    picture-uri-dark \
+    "$wallpaper_uri"
+
+  run_gsettings set \
+    org.gnome.desktop.background \
+    picture-options \
+    "zoom"
+
+  [[ "$(run_gsettings get org.gnome.desktop.background picture-uri)" \
+      == "'${wallpaper_uri}'" ]] ||
+    die "failed to configure light wallpaper"
+
+  [[ "$(run_gsettings get org.gnome.desktop.background picture-uri-dark)" \
+      == "'${wallpaper_uri}'" ]] ||
+    die "failed to configure dark wallpaper"
+
+  [[ "$(run_gsettings get org.gnome.desktop.background picture-options)" \
+      == "'zoom'" ]] ||
+    die "failed to configure wallpaper display mode"
+
+  ok "GNOME wallpaper configured: ${destination_file}"
+)
+
 configure_terminator() {
   if sudo -u "$USER_NAME" -H bash -lc '
     [[ -f "$HOME/.config/terminator/config" ]] && \
@@ -1115,7 +1281,7 @@ copyOnDoubleClick=true
 copyPathAfterSave=false
 saveAfterCopy=true
 saveAsFileExtension=png
-saveLastRegion=true
+saveLastRegion=false
 savePath=/home/'"$USER_NAME"'/Pictures/flameshot
 savePathFixed=true
 showHelp=false
@@ -1892,6 +2058,7 @@ ok "common user tools and shell configuration completed"
 # --- Install/configure Desktop-specific tools ---
 if [[ "$UBUNTU_VARIANT" == "desktop" ]]; then
   info "installing/configuring Desktop-specific tools"
+  configure_desktop_wallpaper
   install_flameshot
   configure_flameshot
   configure_terminator
@@ -1917,6 +2084,7 @@ if [[ "$UBUNTU_VARIANT" == "desktop" ]]; then
   # target its real per-user bus; during headless SSH/Vagrant provisioning,
   # use the temporary-bus fallback from run_as_gnome_user().
   install_system_monitor_panel_extension "$USER_NAME"
+  install_hide_universal_access_extension "$USER_NAME"
   apply_gnome_preferences
   enable_battery_health_preservation
 else
