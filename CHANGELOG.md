@@ -1,3 +1,12 @@
+# [0.38.0](https://github.com/syselement/packertron-vms/compare/v0.37.0...v0.38.0) (2026-07-16)
+
+
+### Features
+
+* add fd-find to common packages and alias for fdfind ([e8a350e](https://github.com/syselement/packertron-vms/commit/e8a350e9c69a5443e19dbe1d4dca4bcc2709f090))
+
+
+
 # [0.37.0](https://github.com/syselement/packertron-vms/compare/v0.36.0...v0.37.0) (2026-07-16)
 
 
@@ -31,15 +40,6 @@
 ### Features
 
 * enhance GNOME settings and add wallpaper configuration ([b453075](https://github.com/syselement/packertron-vms/commit/b4530755ddecb21dd667cdb80ffd9c900bd61d44))
-
-
-
-# [0.33.0](https://github.com/syselement/packertron-vms/compare/v0.32.0...v0.33.0) (2026-07-14)
-
-
-### Features
-
-* update manual setup hints for keyboard shortcuts and add Emote command ([c4196ba](https://github.com/syselement/packertron-vms/commit/c4196ba6bba55a64a335c31898c5330a26762831))
 
 
 
