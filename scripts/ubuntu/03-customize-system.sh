@@ -358,10 +358,10 @@ set_gsetting org.gnome.shell.extensions.dash-to-dock show-trash "false"
 
 # Power and lock screen
 set_gsetting org.gnome.desktop.notifications show-in-lock-screen "false"
-set_gsetting org.gnome.desktop.screensaver lock-delay "uint32 0"
-set_gsetting org.gnome.desktop.screensaver lock-enabled "false"
-set_gsetting org.gnome.desktop.screensaver ubuntu-lock-on-suspend "false"
-set_gsetting org.gnome.desktop.session idle-delay "uint32 0"
+set_gsetting org.gnome.desktop.screensaver lock-delay "uint32 1800"
+set_gsetting org.gnome.desktop.screensaver lock-enabled "true"
+set_gsetting org.gnome.desktop.screensaver ubuntu-lock-on-suspend "true"
+set_gsetting org.gnome.desktop.session idle-delay "uint32 1800"
 set_gsetting org.gnome.system.location enabled "false"
 
 # Display color / Night Light
