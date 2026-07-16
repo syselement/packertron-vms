@@ -1,3 +1,12 @@
+# [0.37.0](https://github.com/syselement/packertron-vms/compare/v0.36.0...v0.37.0) (2026-07-16)
+
+
+### Features
+
+* update GNOME screensaver settings for enhanced security and user experience ([905a83a](https://github.com/syselement/packertron-vms/commit/905a83a5a921c1c97f0d7202630583f60cd8b0d3))
+
+
+
 # [0.36.0](https://github.com/syselement/packertron-vms/compare/v0.35.0...v0.36.0) (2026-07-16)
 
 
@@ -31,15 +40,6 @@
 ### Features
 
 * update manual setup hints for keyboard shortcuts and add Emote command ([c4196ba](https://github.com/syselement/packertron-vms/commit/c4196ba6bba55a64a335c31898c5330a26762831))
-
-
-
-# [0.32.0](https://github.com/syselement/packertron-vms/compare/v0.31.0...v0.32.0) (2026-07-14)
-
-
-### Features
-
-* add new aliases for Brave browser and improved command utilities ([4e8a44c](https://github.com/syselement/packertron-vms/commit/4e8a44c148db60d375beffb0c3dc44355f161abb))
 
 
 
