@@ -232,6 +232,33 @@ key_exists() {
   grep -Fx -- "$key" < <(gsettings list-keys "$schema") >/dev/null
 }
 
+gsetting_values_equal() {
+  local expected="$1"
+  local actual="$2"
+  local number_re='^[-+]?[0-9]+([.][0-9]+)?([eE][-+]?[0-9]+)?$'
+
+  if [[ "$expected" =~ $number_re && "$actual" =~ $number_re ]]; then
+    awk -v expected="$expected" -v actual="$actual" '
+      BEGIN {
+        delta = actual - expected
+        if (delta < 0)
+          delta = -delta
+
+        expected_abs = expected < 0 ? -expected : expected
+        actual_abs   = actual   < 0 ? -actual   : actual
+        scale = expected_abs > actual_abs ? expected_abs : actual_abs
+
+        if (scale < 1)
+          scale = 1
+
+        exit !(delta <= 1e-9 * scale)
+      }
+    '
+  else
+    [[ "$actual" == "$expected" ]]
+  fi
+}
+
 set_gsetting() {
   local schema="$1"
   local key="$2"
@@ -255,9 +282,9 @@ set_gsetting() {
   fi
 
   actual="$(gsettings get "$schema" "$key")"
-  if [[ "$actual" != "$value" ]]; then
-    printf '[gnome-settings] ERROR verify failed: %s %s; requested=%s actual=%s\n' \
-      "$schema" "$key" "$value" "$actual" >&2
+
+  if ! gsetting_values_equal "$value" "$actual"; then
+    printf '[gnome-settings] ERROR verify failed: %s %s; requested=%s actual=%s\n' "$schema" "$key" "$value" "$actual" >&2
     failures=$((failures + 1))
     return 0
   fi
@@ -315,12 +342,12 @@ PYTHON_ARRAY
 
 # Appearance
 set_gsetting org.gnome.desktop.interface color-scheme "'prefer-dark'"
-set_gsetting org.gnome.desktop.interface document-font-name 'JetBrainsMono Nerd Font 11'
-set_gsetting org.gnome.desktop.interface font-name 'JetBrainsMono Nerd Font 11'
+set_gsetting org.gnome.desktop.interface document-font-name "'JetBrainsMono Nerd Font 11'"
+set_gsetting org.gnome.desktop.interface font-name "'JetBrainsMono Nerd Font 11'"
 set_gsetting org.gnome.desktop.interface gtk-theme "'Yaru-yellow-dark'"
-set_gsetting org.gnome.desktop.interface monospace-font-name 'JetBrainsMono Nerd Font Mono 11'
+set_gsetting org.gnome.desktop.interface monospace-font-name "'JetBrainsMono Nerd Font Mono 11'"
 set_gsetting org.gnome.desktop.interface show-battery-percentage "true"
-set_gsetting org.gnome.desktop.interface text-scaling-factor  1.10
+set_gsetting org.gnome.desktop.interface text-scaling-factor "1.1"
 
 # Ubuntu Dock
 set_gsetting org.gnome.shell.extensions.dash-to-dock click-action "'minimize'"
