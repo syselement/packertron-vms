@@ -1200,6 +1200,41 @@ install_flameshot() (
   ok "Flameshot ${installed_version} installed from the official GitHub release"
 )
 
+configure_flameshot() {
+  if sudo -u "$USER_NAME" -H bash -lc '
+    [[ -f "$HOME/.config/flameshot/flameshot.ini" ]] && \
+    grep -q "^startupLaunch=true$" "$HOME/.config/flameshot/flameshot.ini" && \
+    grep -q "^savePathFixed=true$" "$HOME/.config/flameshot/flameshot.ini"
+  '; then
+    info "Flameshot already configured, skipping"
+    return
+  fi
+
+  install -d -o "$USER_NAME" -g "$USER_NAME" "/home/${USER_NAME}/Pictures/flameshot"
+  sudo -u "$USER_NAME" -H bash -lc '
+    set -euo pipefail
+    mkdir -p "$HOME/.config/flameshot"
+    cat > "$HOME/.config/flameshot/flameshot.ini" << '"'"'EOF'"'"'
+[General]
+contrastOpacity=188
+copyOnDoubleClick=true
+copyPathAfterSave=false
+saveAfterCopy=true
+saveAsFileExtension=png
+saveLastRegion=false
+savePath=/home/'"$USER_NAME"'/Pictures/flameshot
+savePathFixed=true
+showHelp=false
+showMagnifier=true
+showStartupLaunchMessage=false
+squareMagnifier=true
+startupLaunch=true
+EOF
+  '
+
+  ok "Flameshot configured"
+}
+
 install_obsidian() (
   set -euo pipefail
 
@@ -1306,40 +1341,71 @@ asset_url="$(
   ok "Obsidian ${installed_version} installed from the official GitHub release"
 )
 
-configure_flameshot() {
-  if sudo -u "$USER_NAME" -H bash -lc '
-    [[ -f "$HOME/.config/flameshot/flameshot.ini" ]] && \
-    grep -q "^startupLaunch=true$" "$HOME/.config/flameshot/flameshot.ini" && \
-    grep -q "^savePathFixed=true$" "$HOME/.config/flameshot/flameshot.ini"
-  '; then
-    info "Flameshot already configured, skipping"
+install_ente_auth() (
+  set -euo pipefail
+
+  local api_url="https://api.github.com/repos/ente-io/ente/releases?per_page=100"
+  local releases release tag asset asset_name asset_url asset_digest
+  local tmp_dir deb_file package_name package_version
+
+  if [[ "$UBUNTU_VARIANT" != "desktop" ]]; then
+    info "Ente Auth is desktop-only; skipping"
     return
   fi
 
-  install -d -o "$USER_NAME" -g "$USER_NAME" "/home/${USER_NAME}/Pictures/flameshot"
-  sudo -u "$USER_NAME" -H bash -lc '
-    set -euo pipefail
-    mkdir -p "$HOME/.config/flameshot"
-    cat > "$HOME/.config/flameshot/flameshot.ini" << '"'"'EOF'"'"'
-[General]
-contrastOpacity=188
-copyOnDoubleClick=true
-copyPathAfterSave=false
-saveAfterCopy=true
-saveAsFileExtension=png
-saveLastRegion=false
-savePath=/home/'"$USER_NAME"'/Pictures/flameshot
-savePathFixed=true
-showHelp=false
-showMagnifier=true
-showStartupLaunchMessage=false
-squareMagnifier=true
-startupLaunch=true
-EOF
-  '
+  for cmd in curl jq dpkg dpkg-query dpkg-deb apt-get sha256sum; do
+    command -v "$cmd" >/dev/null 2>&1 || die "${cmd} is required to install Ente Auth"
+  done
 
-  ok "Flameshot configured"
-}
+  if [[ "$(dpkg --print-architecture)" != "amd64" ]]; then
+    warn "Ente Auth Debian installer currently supports amd64 only"
+    return
+  fi
+
+  info "finding latest stable Ente Auth release"
+
+  releases="$(curl -fsSL --retry 3 --retry-all-errors --connect-timeout 15 -H 'Accept: application/vnd.github+json' -H 'User-Agent: packertron-customize-system' "$api_url")"
+
+  release="$(jq -c '[.[] | select(.draft == false and .prerelease == false) | select(.tag_name | test("^auth-v4\\."))] | sort_by(.published_at) | last // empty' <<<"$releases")"
+  [[ -n "$release" ]] || die "could not determine the latest stable Ente Auth release"
+
+  tag="$(jq -r '.tag_name' <<<"$release")"
+  asset="$(jq -c 'first(.assets[] | select(.name | endswith("-x86_64.deb"))) // empty' <<<"$release")"
+  [[ -n "$asset" ]] || die "no Ente Auth x86_64 Debian package found in ${tag}"
+
+  asset_name="$(jq -r '.name' <<<"$asset")"
+  asset_url="$(jq -r '.browser_download_url' <<<"$asset")"
+  asset_digest="$(jq -r '.digest // empty' <<<"$asset")"
+
+  tmp_dir="$(mktemp -d)"
+  trap 'rm -rf -- "$tmp_dir"' EXIT
+  deb_file="$tmp_dir/$asset_name"
+
+  info "downloading ${asset_name}"
+  curl -fL --retry 3 --retry-all-errors --connect-timeout 15 -o "$deb_file" "$asset_url"
+
+  if [[ "$asset_digest" == sha256:* ]]; then
+    printf '%s  %s\n' "${asset_digest#sha256:}" "$deb_file" | sha256sum --check -
+    ok "Ente Auth package checksum verified"
+  else
+    warn "GitHub did not provide an asset digest; validating Debian metadata only"
+  fi
+
+  dpkg-deb --info "$deb_file" >/dev/null
+
+  package_name="$(dpkg-deb -f "$deb_file" Package)"
+  package_version="$(dpkg-deb -f "$deb_file" Version)"
+
+  [[ "$package_name" == "enteauth" ]] || die "unexpected Debian package name: ${package_name}"
+
+  info "installing Ente Auth ${package_version}"
+  DEBIAN_FRONTEND=noninteractive apt-get install -y "$deb_file"
+
+  dpkg-query -W -f='${Status}' enteauth 2>/dev/null | grep -qx 'install ok installed' || die "Ente Auth installation could not be verified"
+
+  ok "Ente Auth ${package_version} installed from ${tag}"
+)
+
 
 # --- Common user tools and shell configuration ---
 prepare_user_workspace() (
@@ -2106,10 +2172,11 @@ ok "common user tools and shell configuration completed"
 if [[ "$UBUNTU_VARIANT" == "desktop" ]]; then
   info "installing/configuring Desktop-specific tools"
   configure_desktop_wallpaper
+  install_ente_auth
   install_flameshot
   configure_flameshot
-  configure_terminator
   install_obsidian
+  configure_terminator
   configure_terminator_as_default "$USER_NAME"
   install_bitwarden_snap
   install_discord_snap
