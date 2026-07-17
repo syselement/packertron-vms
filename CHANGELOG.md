@@ -1,3 +1,12 @@
+# [0.39.0](https://github.com/syselement/packertron-vms/compare/v0.38.0...v0.39.0) (2026-07-17)
+
+
+### Features
+
+* add configuration for Flameshot and install Ente Auth package ([1afc9df](https://github.com/syselement/packertron-vms/commit/1afc9df45fa8cc31ce30a518f4cc7881cd2281e9))
+
+
+
 # [0.38.0](https://github.com/syselement/packertron-vms/compare/v0.37.0...v0.38.0) (2026-07-16)
 
 
@@ -31,15 +40,6 @@
 ### Features
 
 * add gsetting value comparison function and update GNOME settings ([335bc5a](https://github.com/syselement/packertron-vms/commit/335bc5ae9c35bf4f5a0704dbaf402674e2847561))
-
-
-
-# [0.34.0](https://github.com/syselement/packertron-vms/compare/v0.33.0...v0.34.0) (2026-07-16)
-
-
-### Features
-
-* enhance GNOME settings and add wallpaper configuration ([b453075](https://github.com/syselement/packertron-vms/commit/b4530755ddecb21dd667cdb80ffd9c900bd61d44))
 
 
 
