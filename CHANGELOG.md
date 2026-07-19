@@ -1,3 +1,12 @@
+## [0.42.1](https://github.com/syselement/packertron-vms/compare/v0.42.0...v0.42.1) (2026-07-19)
+
+
+### Bug Fixes
+
+* update Brave repository URL to remove trailing slash in customization script and tests ([3f4246b](https://github.com/syselement/packertron-vms/commit/3f4246beb952c21a0f531a7c5091c36a3c7a4de0))
+
+
+
 # [0.42.0](https://github.com/syselement/packertron-vms/compare/v0.41.0...v0.42.0) (2026-07-19)
 
 
@@ -31,15 +40,6 @@
 ### Features
 
 * add support for Flatpak packages and configure Flathub remote ([55c8e52](https://github.com/syselement/packertron-vms/commit/55c8e5251cff4bf64d38139a8b26bf408a64fe69))
-
-
-
-# [0.39.0](https://github.com/syselement/packertron-vms/compare/v0.38.0...v0.39.0) (2026-07-17)
-
-
-### Features
-
-* add configuration for Flameshot and install Ente Auth package ([1afc9df](https://github.com/syselement/packertron-vms/commit/1afc9df45fa8cc31ce30a518f4cc7881cd2281e9))
 
 
 
