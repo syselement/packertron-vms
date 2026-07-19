@@ -10,6 +10,12 @@ The set currently covers:
 - baseline sysadmin/devops/IaC tooling installation
 - desktop customization, user preferences, and extra apps
 
+`02-provision-system.sh` and `03-customize-system.sh` share
+`lib/ubuntu-context.sh`. The helper verifies Ubuntu, detects Desktop or Server
+from installed Ubuntu metapackages, records whether execution is interactive,
+and resolves the non-root target user. Set `TARGET_USER` explicitly when an
+automated root run has more than one eligible local user.
+
 ---
 
 ## Files
@@ -105,4 +111,3 @@ Recommended execution order:
 ```
 
 ---
-

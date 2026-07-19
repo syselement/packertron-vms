@@ -7,12 +7,27 @@ set -euo pipefail
 
 export DEBIAN_FRONTEND=noninteractive
 
-USER_NAME="syselement"
+SCRIPT_DIR="$(
+  cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd
+)"
+
+# shellcheck source=lib/ubuntu-context.sh
+. "$SCRIPT_DIR/lib/ubuntu-context.sh"
+
 SCRIPT_NAME="provision-system"
 LOG_PREFIX="[${SCRIPT_NAME}]"
 RUN_ID="$(date +%Y%m%d-%H%M%S)"
 REBOOT_AT_END="${REBOOT_AT_END:-true}"
 LOG_FILE="/var/log/${SCRIPT_NAME}-${RUN_ID}.log"
+
+initialize_ubuntu_context
+USER_NAME="$TARGET_USER"
+
+if [[ "${EUID}" -ne 0 ]]; then
+  printf '[%s] ERROR must run as root\n' "$SCRIPT_NAME" >&2
+  exit 1
+fi
+
 exec > >(tee "$LOG_FILE") 2>&1
 
 # --- Logging setup ---
@@ -100,7 +115,7 @@ setup_docker_repo() {
   cat > /etc/apt/sources.list.d/docker.sources <<EOF
 Types: deb
 URIs: https://download.docker.com/linux/ubuntu
-Suites: $(. /etc/os-release && echo "${UBUNTU_CODENAME:-$VERSION_CODENAME}")
+Suites: ${UBUNTU_CODENAME}
 Components: stable
 Architectures: amd64
 Signed-By: /etc/apt/keyrings/docker.asc
@@ -165,22 +180,11 @@ echo "################################"
 log "start: $(date -Is)"
 START_TS="$(date +%s)"
 
-CODENAME="$(. /etc/os-release && echo "$VERSION_CODENAME")"
+CODENAME="$UBUNTU_CODENAME"
 ARCH="$(dpkg --print-architecture)"
-log "distro codename=${CODENAME} arch=${ARCH}"
-
-# --- must be root ---
-if [[ "${EUID}" -ne 0 ]]; then
-  log "must run as root"
-  exit 1
-fi
-
-if id "$USER_NAME" >/dev/null 2>&1; then
-  log "running user-scoped commands as: ${USER_NAME}"
-else
-  log "user not found: ${USER_NAME}"
-  exit 1
-fi
+log "distro version=${UBUNTU_VERSION_ID} codename=${CODENAME} variant=${UBUNTU_VARIANT} arch=${ARCH}"
+log "execution mode=${EXECUTION_MODE} context=${EXECUTION_CONTEXT} interactive=${EXECUTION_INTERACTIVE}"
+log "target user=${TARGET_USER} home=${TARGET_HOME}"
 
 # --- Expand LVM root to use all free space ---
 log "expand LVM root to use all free space (if any)"
@@ -276,16 +280,16 @@ echo "tofu:    $(tofu --version 2>/dev/null | head -n1 || true)"
 # --- System info ---
 log "system info"
 echo "---uname---"
-echo "$(uname -a || true)"
+uname -a || true
 echo "---lsb---"
-echo "$(lsb_release -a || true)"
+lsb_release -a || true
 echo "---disk---"
-echo "$(lsblk || true)"
-echo "$(df -h || true)"
+lsblk || true
+df -h || true
 echo "---mem---"
-echo "$(free -h || true)"
+free -h || true
 echo "---cpu---"
-echo "$(lscpu || true)"
+lscpu || true
 
 # --- done ---
 END_TS="$(date +%s)"

@@ -13,13 +13,18 @@ set -euo pipefail
 
 export DEBIAN_FRONTEND=noninteractive
 
-USER_NAME="syselement"
+SCRIPT_DIR="$(
+  cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd
+)"
+
+# shellcheck source=lib/ubuntu-context.sh
+. "$SCRIPT_DIR/lib/ubuntu-context.sh"
+
 SCRIPT_NAME="customize-system"
 LOG_PREFIX="[${SCRIPT_NAME}]"
 RUN_ID="$(date +%Y%m%d-%H%M%S)"
 REBOOT_AT_END="${REBOOT_AT_END:-true}"
 LOG_FILE="/var/log/${SCRIPT_NAME}-${RUN_ID}.log"
-UBUNTU_VARIANT="server"
 APT_SOURCES_CHANGED=false
 
 APT_BOOTSTRAP_PACKAGES=(
@@ -106,6 +111,10 @@ require_root() {
 }
 
 # --- must be root ---
+initialize_ubuntu_context
+USER_NAME="$TARGET_USER"
+VERSION_ID="$UBUNTU_VERSION_ID"
+CODENAME="$UBUNTU_CODENAME"
 require_root
 
 # --- Logging setup ---
@@ -138,24 +147,6 @@ die()   { error "$*"; exit 1; }
 user_home() {
   local account="$1"
   getent passwd "$account" | cut -d: -f6
-}
-
-detect_ubuntu_variant() {
-  local default_target=""
-
-  if dpkg-query -W -f='${Status}' ubuntu-desktop 2>/dev/null | grep -q "install ok installed"; then
-    UBUNTU_VARIANT="desktop"
-    return
-  fi
-
-  default_target="$(systemctl get-default 2>/dev/null || true)"
-  if [[ "$default_target" == "graphical.target" ]] &&
-    { compgen -G '/usr/share/xsessions/*.desktop' >/dev/null ||
-      compgen -G '/usr/share/wayland-sessions/*.desktop' >/dev/null; }; then
-    UBUNTU_VARIANT="desktop"
-  else
-    UBUNTU_VARIANT="server"
-  fi
 }
 
 install_package_array() {
@@ -1009,12 +1000,14 @@ EOF
 configure_terminator_as_default() {
   local account="$1"
   local home
+  local group
   local terminator_bin
   local desktop_file="/usr/share/applications/terminator.desktop"
   local desktop_id="terminator.desktop"
 
   home="$(user_home "$account")"
   [[ -n "$home" ]] || die "could not determine home directory for ${account}"
+  group="$(id -gn "$account")"
 
   terminator_bin="$(command -v terminator 2>/dev/null || true)"
   if [[ -z "$terminator_bin" ]]; then
@@ -1042,7 +1035,7 @@ configure_terminator_as_default() {
         return
       fi
 
-      install -d -m 0755 -o "$account" -g "$account" "$home/.config"
+      install -d -m 0755 -o "$account" -g "$group" "$home/.config"
 
       sudo -u "$account" -H bash -s -- "$desktop_id" <<'EOF'
 set -euo pipefail
@@ -1258,6 +1251,8 @@ install_flameshot() (
 )
 
 configure_flameshot() {
+  local flameshot_dir="${TARGET_HOME}/Pictures/flameshot"
+
   if sudo -u "$USER_NAME" -H bash -lc '
     [[ -f "$HOME/.config/flameshot/flameshot.ini" ]] && \
     grep -q "^startupLaunch=true$" "$HOME/.config/flameshot/flameshot.ini" && \
@@ -1267,11 +1262,13 @@ configure_flameshot() {
     return
   fi
 
-  install -d -o "$USER_NAME" -g "$USER_NAME" "/home/${USER_NAME}/Pictures/flameshot"
-  sudo -u "$USER_NAME" -H bash -lc '
-    set -euo pipefail
-    mkdir -p "$HOME/.config/flameshot"
-    cat > "$HOME/.config/flameshot/flameshot.ini" << '"'"'EOF'"'"'
+  install -d -o "$TARGET_USER" -g "$TARGET_GROUP" "$flameshot_dir"
+  sudo -u "$TARGET_USER" -H bash -s -- "$flameshot_dir" <<'USER_CONFIG'
+set -euo pipefail
+
+flameshot_dir="$1"
+mkdir -p "$HOME/.config/flameshot"
+cat > "$HOME/.config/flameshot/flameshot.ini" <<EOF
 [General]
 contrastOpacity=188
 copyOnDoubleClick=true
@@ -1279,7 +1276,7 @@ copyPathAfterSave=false
 saveAfterCopy=true
 saveAsFileExtension=png
 saveLastRegion=false
-savePath=/home/'"$USER_NAME"'/Pictures/flameshot
+savePath=${flameshot_dir}
 savePathFixed=true
 showHelp=false
 showMagnifier=true
@@ -1287,7 +1284,7 @@ showStartupLaunchMessage=false
 squareMagnifier=true
 startupLaunch=true
 EOF
-  '
+USER_CONFIG
 
   ok "Flameshot configured"
 }
@@ -2056,21 +2053,10 @@ info "run_id: ${RUN_ID}"
 info "started_at: $(date -Is)"
 START_TS="$(date +%s)"
 
-# shellcheck disable=SC1091
-. /etc/os-release
-VERSION_ID="${VERSION_ID:-unknown}"
-CODENAME="${VERSION_CODENAME:-${UBUNTU_CODENAME:-unknown}}"
 ARCH="$(dpkg --print-architecture)"
-info "distro version=${VERSION_ID} codename=${CODENAME} arch=${ARCH}"
-
-detect_ubuntu_variant
-ok "detected Ubuntu variant: ${UBUNTU_VARIANT}"
-
-if id "$USER_NAME" >/dev/null 2>&1; then
-  ok "running user-scoped commands as: ${USER_NAME} and root"
-else
-  die "user not found: ${USER_NAME}"
-fi
+info "distro version=${VERSION_ID} codename=${CODENAME} variant=${UBUNTU_VARIANT} arch=${ARCH}"
+info "execution mode=${EXECUTION_MODE} context=${EXECUTION_CONTEXT} interactive=${EXECUTION_INTERACTIVE}"
+ok "target user=${TARGET_USER} home=${TARGET_HOME}"
 
 # --- Connectivity checks ---
 info "checking internet and DNS"
