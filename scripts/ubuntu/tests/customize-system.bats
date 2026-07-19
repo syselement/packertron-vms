@@ -27,6 +27,97 @@ setup() {
   [[ -z "$ARCH" ]]
 }
 
+@test "GNOME preferences persist dock position and enable installed user extensions" {
+  local fake_bin="$BATS_TEST_TMPDIR/bin"
+  local settings_dir="$BATS_TEST_TMPDIR/settings"
+  local command_log="$BATS_TEST_TMPDIR/gsettings.log"
+
+  mkdir -p \
+    "$fake_bin" \
+    "$settings_dir" \
+    "$BATS_TEST_TMPDIR/.local/share/gnome-shell/extensions/system-monitor-panel@naimur" \
+    "$BATS_TEST_TMPDIR/.local/share/gnome-shell/extensions/hide-universal-access@akiirui.github.io"
+
+  cat >"$fake_bin/gsettings" <<'FAKE_GSETTINGS'
+#!/usr/bin/env bash
+set -euo pipefail
+
+command="$1"
+schema="${2:-}"
+key="${3:-}"
+state_file="${FAKE_SETTINGS_DIR}/${schema}.${key}"
+
+case "$command" in
+  list-schemas)
+    printf '%s\n' \
+      org.gnome.desktop.interface \
+      org.gnome.shell.extensions.dash-to-dock \
+      org.gnome.desktop.notifications \
+      org.gnome.desktop.screensaver \
+      org.gnome.desktop.session \
+      org.gnome.system.location \
+      org.gnome.settings-daemon.plugins.color \
+      org.gnome.desktop.sound \
+      org.gnome.settings-daemon.plugins.power \
+      org.gnome.shell.extensions.ding \
+      org.gnome.desktop.peripherals.touchpad \
+      org.gnome.shell
+    ;;
+  list-keys)
+    printf '%s\n' \
+      color-scheme document-font-name font-name gtk-theme monospace-font-name \
+      show-battery-percentage text-scaling-factor click-action dash-max-icon-size \
+      dock-position extend-height show-trash show-in-lock-screen lock-delay \
+      lock-enabled ubuntu-lock-on-suspend idle-delay enabled night-light-enabled \
+      night-light-schedule-automatic night-light-schedule-from night-light-schedule-to \
+      night-light-temperature allow-volume-above-100-percent power-button-action \
+      show-home natural-scroll favorite-apps disable-user-extensions \
+      enabled-extensions disabled-extensions
+    ;;
+  writable)
+    printf 'true\n'
+    ;;
+  get)
+    if [[ -f "$state_file" ]]; then
+      cat "$state_file"
+    elif [[ "$key" == "dock-position" ]]; then
+      printf "'BOTTOM'\n"
+    elif [[ "$key" == "enabled-extensions" || "$key" == "disabled-extensions" ]]; then
+      printf '@as []\n'
+    else
+      printf 'false\n'
+    fi
+    ;;
+  set)
+    printf '%s\t%s\t%s\n' "$schema" "$key" "$4" >>"$FAKE_GSETTINGS_LOG"
+    printf '%s\n' "$4" >"$state_file"
+    ;;
+  *)
+    exit 2
+    ;;
+esac
+FAKE_GSETTINGS
+  chmod +x "$fake_bin/gsettings"
+
+  gnome_user_bus_available() {
+    return 1
+  }
+  run_as_gnome_user() {
+    HOME="$BATS_TEST_TMPDIR" \
+      PATH="$fake_bin:$PATH" \
+      FAKE_SETTINGS_DIR="$settings_dir" \
+      FAKE_GSETTINGS_LOG="$command_log" \
+      "$@"
+  }
+
+  run apply_gnome_preferences
+
+  [[ "$status" -eq 0 ]]
+  grep -Fq $'org.gnome.shell.extensions.dash-to-dock\tdock-position\t\x27BOTTOM\x27' "$command_log"
+  grep -Fq 'hide-universal-access@akiirui.github.io' \
+    "$settings_dir/org.gnome.shell.enabled-extensions"
+}
+
 @test "APT package helper skips packages that are already installed" {
   dpkg-query() {
     printf 'install ok installed\n'
