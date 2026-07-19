@@ -90,6 +90,11 @@ DESKTOP_PACKAGES=(
   xclip
 )
 
+FLATPAK_PACKAGES=(
+  com.bitwarden.desktop
+  io.ente.auth
+)
+
 require_root() {
   if [[ "${EUID}" -ne 0 ]]; then
     echo "[${SCRIPT_NAME}] ERROR must run as root (use: sudo bash $0)" >&2
@@ -162,6 +167,51 @@ install_package_array() {
 
   info "installing ${#packages[@]} ${description} packages"
   DEBIAN_FRONTEND=noninteractive apt-get install -y -qq "${packages[@]}"
+  ok "${description} package installation completed"
+}
+
+install_flatpak_package_array() {
+  local description="$1"
+  shift
+
+  local packages=("$@")
+  local missing=()
+  local app
+
+  if [[ "$UBUNTU_VARIANT" != "desktop" ]]; then
+    info "${description}: desktop-only, skipping"
+    return
+  fi
+
+  command -v flatpak >/dev/null 2>&1 || die "flatpak is required to install ${description}"
+
+  flatpak remotes --system --columns=name | grep -qx flathub || die "system-wide Flathub remote is not configured"
+
+  if (( ${#packages[@]} == 0 )); then
+    info "${description}: no packages requested, skipping"
+    return
+  fi
+
+  for app in "${packages[@]}"; do
+    if flatpak info --system "$app" >/dev/null 2>&1; then
+      info "${app} already installed"
+    else
+      missing+=("$app")
+    fi
+  done
+
+  if (( ${#missing[@]} == 0 )); then
+    info "${description}: all packages already installed"
+    return
+  fi
+
+  info "installing ${#missing[@]} ${description} packages"
+  flatpak install --system --noninteractive -y flathub "${missing[@]}"
+
+  for app in "${missing[@]}"; do
+    flatpak info --system "$app" >/dev/null 2>&1 || die "Flatpak installation could not be verified: ${app}"
+  done
+
   ok "${description} package installation completed"
 }
 
@@ -777,6 +827,29 @@ EOF
   rm -f "$tmp_key" "$tmp_source"
 }
 
+configure_flathub() (
+  set -euo pipefail
+
+  local remote_url="https://dl.flathub.org/repo/flathub.flatpakrepo"
+
+  if [[ "$UBUNTU_VARIANT" != "desktop" ]]; then
+    info "Flathub is desktop-only; skipping"
+    return
+  fi
+
+  command -v flatpak >/dev/null 2>&1 || die "flatpak is required to configure Flathub"
+
+  info "configuring the system-wide Flathub remote"
+
+  flatpak remote-add --system --if-not-exists flathub "$remote_url"
+  flatpak remote-modify --system --enable flathub
+
+  flatpak remotes --system --columns=name | grep -qx flathub ||
+    die "Flathub remote configuration could not be verified"
+
+  ok "Flathub system remote configured"
+)
+
 # --- Desktop tools ---
 
 configure_desktop_wallpaper() (
@@ -1001,25 +1074,6 @@ EOF
       warn "default terminal configuration not implemented for Ubuntu ${VERSION_ID}"
       ;;
   esac
-}
-
-install_bitwarden_snap() {
-  if ! command -v snap >/dev/null 2>&1; then
-    warn "snap command not found, cannot install Bitwarden"
-    return
-  fi
-
-  if snap list bitwarden >/dev/null 2>&1; then
-    info "Bitwarden snap already installed"
-  else
-    snap install bitwarden
-    ok "Bitwarden installed"
-  fi
-
-  # Required for secure token storage through GNOME Keyring.
-  snap connect bitwarden:password-manager-service
-
-  ok "Bitwarden secure-storage interface connected"
 }
 
 install_discord_snap() {
@@ -1341,72 +1395,6 @@ asset_url="$(
   ok "Obsidian ${installed_version} installed from the official GitHub release"
 )
 
-install_ente_auth() (
-  set -euo pipefail
-
-  local api_url="https://api.github.com/repos/ente-io/ente/releases?per_page=100"
-  local releases release tag asset asset_name asset_url asset_digest
-  local tmp_dir deb_file package_name package_version
-
-  if [[ "$UBUNTU_VARIANT" != "desktop" ]]; then
-    info "Ente Auth is desktop-only; skipping"
-    return
-  fi
-
-  for cmd in curl jq dpkg dpkg-query dpkg-deb apt-get sha256sum; do
-    command -v "$cmd" >/dev/null 2>&1 || die "${cmd} is required to install Ente Auth"
-  done
-
-  if [[ "$(dpkg --print-architecture)" != "amd64" ]]; then
-    warn "Ente Auth Debian installer currently supports amd64 only"
-    return
-  fi
-
-  info "finding latest stable Ente Auth release"
-
-  releases="$(curl -fsSL --retry 3 --retry-all-errors --connect-timeout 15 -H 'Accept: application/vnd.github+json' -H 'User-Agent: packertron-customize-system' "$api_url")"
-
-  release="$(jq -c '[.[] | select(.draft == false and .prerelease == false) | select(.tag_name | test("^auth-v4\\."))] | sort_by(.published_at) | last // empty' <<<"$releases")"
-  [[ -n "$release" ]] || die "could not determine the latest stable Ente Auth release"
-
-  tag="$(jq -r '.tag_name' <<<"$release")"
-  asset="$(jq -c 'first(.assets[] | select(.name | endswith("-x86_64.deb"))) // empty' <<<"$release")"
-  [[ -n "$asset" ]] || die "no Ente Auth x86_64 Debian package found in ${tag}"
-
-  asset_name="$(jq -r '.name' <<<"$asset")"
-  asset_url="$(jq -r '.browser_download_url' <<<"$asset")"
-  asset_digest="$(jq -r '.digest // empty' <<<"$asset")"
-
-  tmp_dir="$(mktemp -d)"
-  trap 'rm -rf -- "$tmp_dir"' EXIT
-  deb_file="$tmp_dir/$asset_name"
-
-  info "downloading ${asset_name}"
-  curl -fL --retry 3 --retry-all-errors --connect-timeout 15 -o "$deb_file" "$asset_url"
-
-  if [[ "$asset_digest" == sha256:* ]]; then
-    printf '%s  %s\n' "${asset_digest#sha256:}" "$deb_file" | sha256sum --check -
-    ok "Ente Auth package checksum verified"
-  else
-    warn "GitHub did not provide an asset digest; validating Debian metadata only"
-  fi
-
-  dpkg-deb --info "$deb_file" >/dev/null
-
-  package_name="$(dpkg-deb -f "$deb_file" Package)"
-  package_version="$(dpkg-deb -f "$deb_file" Version)"
-
-  [[ "$package_name" == "enteauth" ]] || die "unexpected Debian package name: ${package_name}"
-
-  info "installing Ente Auth ${package_version}"
-  DEBIAN_FRONTEND=noninteractive apt-get install -y "$deb_file"
-
-  dpkg-query -W -f='${Status}' enteauth 2>/dev/null | grep -qx 'install ok installed' || die "Ente Auth installation could not be verified"
-
-  ok "Ente Auth ${package_version} installed from ${tag}"
-)
-
-
 # --- Common user tools and shell configuration ---
 prepare_user_workspace() (
   set -euo pipefail
@@ -1552,7 +1540,7 @@ aliases = r'''# $HOME/.bash_aliases — centralized interactive aliases
 # System update
 # alias updateos='sudo sh -c "apt update && apt -y upgrade && apt -y autoremove"'
 # Comment above & Uncomment the following for full Ubuntu + Snap + Brew update
-alias updateos='sudo sh -c "sudo apt update && sudo apt -y upgrade && sudo apt -y autoremove && sudo snap refresh" && brew upgrade'
+alias updateos='sudo sh -c "apt update && apt -y upgrade && apt -y autoremove && snap refresh && flatpak update -y" && brew upgrade'
 
 # Core utils
 alias brave='brave-browser'
@@ -1594,8 +1582,8 @@ alias ugq='ugrep --pretty --hidden -Qria'
 # Mask stdin after first 5 chars
 alias mask='awk '\''{ printf substr($0, 1, 5); for (i=6; i<=length($0); i++) printf "*"; print "" }'\'''
 
-# Keep sudo credentials warm before sudo commands
-alias sudo='sudo -v; sudo '
+# Preserve alias expansion after sudo
+alias sudo='sudo '
 
 # Ubuntu default long-running command notification
 alias alert='notify-send --urgency=low -i "$([ $? = 0 ] && echo terminal || echo error)" "$(history|tail -n1|sed -e '\''s/^\s*[0-9]\+\s*//;s/[;&|]\s*alert$//'\'')"'
@@ -2015,10 +2003,9 @@ show_manual_setup_hints() {
   info "   Open VS Code → Accounts → Sign in with GitHub"
   info "   Enable Settings Sync and verify extensions/settings are restored."
   info "=============================================================="
-  info "5. Bitwarden"
+  info "5. Bitwarden and EnteAuth"
   info "   Sign in and complete MFA."
   info "   Verify vault synchronization."
-  info "   Review Settings → App Settings → Start automatically on login."
   info "=============================================================="
   info "6. Brave"
   info "   Open brave://settings/braveSync/setup"
@@ -2149,6 +2136,8 @@ fi
 install_package_array "common" "${COMMON_PACKAGES[@]}"
 if [[ "$UBUNTU_VARIANT" == "desktop" ]]; then
   install_package_array "Desktop" "${DESKTOP_PACKAGES[@]}"
+  configure_flathub
+  install_flatpak_package_array "Desktop Flatpak" "${FLATPAK_PACKAGES[@]}"
 else
   info "server variant detected; skipping Desktop packages"
 fi
@@ -2172,13 +2161,11 @@ ok "common user tools and shell configuration completed"
 if [[ "$UBUNTU_VARIANT" == "desktop" ]]; then
   info "installing/configuring Desktop-specific tools"
   configure_desktop_wallpaper
-  install_ente_auth
   install_flameshot
   configure_flameshot
   install_obsidian
   configure_terminator
   configure_terminator_as_default "$USER_NAME"
-  install_bitwarden_snap
   install_discord_snap
   install_emote_snap
   install_postman_snap
