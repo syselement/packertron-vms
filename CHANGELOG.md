@@ -1,3 +1,12 @@
+# [0.41.0](https://github.com/syselement/packertron-vms/compare/v0.40.1...v0.41.0) (2026-07-19)
+
+
+### Features
+
+* add 'bats', 'shellcheck', and 'shfmt' to common packages ([eb9628b](https://github.com/syselement/packertron-vms/commit/eb9628b37271e7201dabb3ac7a44b8193eb53970))
+
+
+
 ## [0.40.1](https://github.com/syselement/packertron-vms/compare/v0.40.0...v0.40.1) (2026-07-19)
 
 
@@ -31,15 +40,6 @@
 ### Features
 
 * add fd-find to common packages and alias for fdfind ([e8a350e](https://github.com/syselement/packertron-vms/commit/e8a350e9c69a5443e19dbe1d4dca4bcc2709f090))
-
-
-
-# [0.37.0](https://github.com/syselement/packertron-vms/compare/v0.36.0...v0.37.0) (2026-07-16)
-
-
-### Features
-
-* update GNOME screensaver settings for enhanced security and user experience ([905a83a](https://github.com/syselement/packertron-vms/commit/905a83a5a921c1c97f0d7202630583f60cd8b0d3))
 
 
 
