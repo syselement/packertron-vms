@@ -112,25 +112,37 @@ require_root() {
   fi
 }
 
-# --- must be root ---
-initialize_ubuntu_context
-USER_NAME="$TARGET_USER"
-VERSION_ID="$UBUNTU_VERSION_ID"
-CODENAME="$UBUNTU_CODENAME"
-require_root
+USER_NAME=""
+VERSION_ID=""
+CODENAME=""
+ARCH=""
+t_bold=""
+t_dim=""
+t_green=""
+t_yellow=""
+t_red=""
+t_reset=""
 
-# --- Logging setup ---
-# --- ANSI Colors for console output ---
-if [[ -t 1 ]]; then
-  t_bold=$'\e[1m'; t_dim=$'\e[2m'
-  t_green=$'\e[32m'; t_yellow=$'\e[33m'; t_red=$'\e[31m'
-  t_reset=$'\e[0m'
-else
-  t_bold=""; t_dim=""; t_green=""; t_yellow=""; t_red=""; t_reset=""
-fi
+initialize_runtime() {
+  require_root
 
-# Console keeps ANSI colors, log file stores ANSI-stripped output.
-exec > >(tee >(sed -u -r 's/\x1B\[[0-9;]*[[:alpha:]]//g' > "$LOG_FILE")) 2>&1
+  # Console keeps ANSI colors, while the log file stores plain text.
+  if [[ -t 1 ]]; then
+    t_bold=$'\e[1m'
+    t_dim=$'\e[2m'
+    t_green=$'\e[32m'
+    t_yellow=$'\e[33m'
+    t_red=$'\e[31m'
+    t_reset=$'\e[0m'
+  fi
+  exec > >(tee >(sed -u -r 's/\x1B\[[0-9;]*[[:alpha:]]//g' >"$LOG_FILE")) 2>&1
+
+  initialize_ubuntu_context
+  USER_NAME="$TARGET_USER"
+  VERSION_ID="$UBUNTU_VERSION_ID"
+  CODENAME="$UBUNTU_CODENAME"
+  ARCH="$(dpkg --print-architecture)"
+}
 
 _ts() { date +'%F %T'; }
 log() {
@@ -2086,6 +2098,12 @@ show_manual_setup_hints() {
   warn "=============================================================="
 }
 
+if [[ "${BASH_SOURCE[0]}" != "$0" ]]; then
+  return 0
+fi
+
+initialize_runtime
+
 echo "################################"
 echo "# Customize System"
 echo "################################"
@@ -2095,7 +2113,6 @@ info "run_id: ${RUN_ID}"
 info "started_at: $(date -Is)"
 START_TS="$(date +%s)"
 
-ARCH="$(dpkg --print-architecture)"
 info "distro version=${VERSION_ID} codename=${CODENAME} variant=${UBUNTU_VARIANT} arch=${ARCH}"
 info "execution mode=${EXECUTION_MODE} context=${EXECUTION_CONTEXT} interactive=${EXECUTION_INTERACTIVE}"
 ok "target user=${TARGET_USER} home=${TARGET_HOME}"
