@@ -33,6 +33,7 @@ COMMON_PACKAGES=(
   aptitude
   bash-completion
   bat
+  bats
   btop
   build-essential
   docker-ctop
@@ -60,6 +61,8 @@ COMMON_PACKAGES=(
   pipx
   plocate
   s-tui
+  shellcheck
+  shfmt
   speedtest-cli
   sshpass
   stress
