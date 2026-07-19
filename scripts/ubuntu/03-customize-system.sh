@@ -464,6 +464,7 @@ set_gsetting() {
   local schema="$1"
   local key="$2"
   local value="$3"
+  local persist_value="${4:-false}"
   local actual
 
   if ! key_exists "$schema" "$key"; then
@@ -477,7 +478,7 @@ set_gsetting() {
   fi
 
   actual="$(gsettings get "$schema" "$key")"
-  if gsetting_values_equal "$value" "$actual"; then
+  if [[ "$persist_value" != true ]] && gsetting_values_equal "$value" "$actual"; then
     return 0
   fi
 
@@ -562,7 +563,8 @@ set_gsetting org.gnome.desktop.interface text-scaling-factor "1.1"
 # Ubuntu Dock
 set_gsetting org.gnome.shell.extensions.dash-to-dock click-action "'minimize'"
 set_gsetting org.gnome.shell.extensions.dash-to-dock dash-max-icon-size "34"
-set_gsetting org.gnome.shell.extensions.dash-to-dock dock-position "'BOTTOM'"
+# Persist this override even when the pre-login schema default already matches.
+set_gsetting org.gnome.shell.extensions.dash-to-dock dock-position "'BOTTOM'" true
 set_gsetting org.gnome.shell.extensions.dash-to-dock extend-height "true"
 set_gsetting org.gnome.shell.extensions.dash-to-dock show-trash "false"
 
@@ -606,9 +608,11 @@ set_gsetting org.gnome.shell favorite-apps \
 # Fall back to the packaged System Monitor extension on Ubuntu 24.04.
 new_ext_uuid='system-monitor-panel@naimur'
 old_ext_uuid='system-monitor@gnome-shell-extensions.gcampax.github.com'
+hide_access_ext_uuid='hide-universal-access@akiirui.github.io'
 
 new_ext_installed=false
 old_ext_installed=false
+hide_access_ext_installed=false
 
 if [[ -d "/usr/share/gnome-shell/extensions/${new_ext_uuid}" ||
       -d "$HOME/.local/share/gnome-shell/extensions/${new_ext_uuid}" ]]; then
@@ -618,6 +622,11 @@ fi
 if [[ -d "/usr/share/gnome-shell/extensions/${old_ext_uuid}" ||
       -d "$HOME/.local/share/gnome-shell/extensions/${old_ext_uuid}" ]]; then
   old_ext_installed=true
+fi
+
+if [[ -d "/usr/share/gnome-shell/extensions/${hide_access_ext_uuid}" ||
+      -d "$HOME/.local/share/gnome-shell/extensions/${hide_access_ext_uuid}" ]]; then
+  hide_access_ext_installed=true
 fi
 
 if [[ "$new_ext_installed" == true ]]; then
@@ -636,6 +645,14 @@ elif [[ "$old_ext_installed" == true ]]; then
   update_string_array org.gnome.shell disabled-extensions remove "$old_ext_uuid"
 else
   printf '[gnome-settings] SKIP no supported System Monitor extension installed\n'
+fi
+
+if [[ "$hide_access_ext_installed" == true ]]; then
+  set_gsetting org.gnome.shell disable-user-extensions "false"
+  update_string_array org.gnome.shell enabled-extensions add "$hide_access_ext_uuid"
+  update_string_array org.gnome.shell disabled-extensions remove "$hide_access_ext_uuid"
+else
+  printf '[gnome-settings] SKIP Hide Universal Access extension is not installed\n'
 fi
 
 # Force a final read through the same backend before the process/session exits.
