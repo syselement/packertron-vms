@@ -245,7 +245,7 @@ setup() {
 
   fetch_file() {
     if [[ "$1" == *"brave-browser.sources" ]]; then
-      printf 'Types: deb\nURIs: https://brave-browser-apt-release.s3.brave.com/\nSigned-By: %s/brave-browser-archive-keyring.gpg\n' \
+      printf 'Types: deb\nURIs: https://brave-browser-apt-release.s3.brave.com\nSigned-By: %s/brave-browser-archive-keyring.gpg\n' \
         "$SYSTEM_KEYRING_DIR" >"$2"
     else
       printf 'test signing key\n' >"$2"

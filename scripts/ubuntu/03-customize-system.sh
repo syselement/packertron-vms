@@ -982,7 +982,7 @@ ensure_brave_browser_repository() (
   validate_openpgp_key "$temporary_dir/brave-browser-archive-keyring.gpg" "Brave"
   validate_repository_source \
     "$temporary_dir/brave-browser-release.sources" \
-    "https://brave-browser-apt-release.s3.brave.com/" \
+    "https://brave-browser-apt-release.s3.brave.com" \
     "$key_file"
 
   if write_file_if_changed "$temporary_dir/brave-browser-archive-keyring.gpg" "$key_file"; then
