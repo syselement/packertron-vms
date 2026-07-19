@@ -1,3 +1,12 @@
+# [0.42.0](https://github.com/syselement/packertron-vms/compare/v0.41.0...v0.42.0) (2026-07-19)
+
+
+### Features
+
+* add Mullvad VPN support and enhance repository management in customization script ([2a836ae](https://github.com/syselement/packertron-vms/commit/2a836aeed2b7dcd6338a8d0fb7b6297f24221020))
+
+
+
 # [0.41.0](https://github.com/syselement/packertron-vms/compare/v0.40.1...v0.41.0) (2026-07-19)
 
 
@@ -31,15 +40,6 @@
 ### Features
 
 * add configuration for Flameshot and install Ente Auth package ([1afc9df](https://github.com/syselement/packertron-vms/commit/1afc9df45fa8cc31ce30a518f4cc7881cd2281e9))
-
-
-
-# [0.38.0](https://github.com/syselement/packertron-vms/compare/v0.37.0...v0.38.0) (2026-07-16)
-
-
-### Features
-
-* add fd-find to common packages and alias for fdfind ([e8a350e](https://github.com/syselement/packertron-vms/commit/e8a350e9c69a5443e19dbe1d4dca4bcc2709f090))
 
 
 
