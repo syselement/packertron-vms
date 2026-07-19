@@ -62,8 +62,8 @@ autoinstall:
   # The commands are run in the installer environment with the installed system mounted at /target
   late-commands:
     - curtin in-target -- truncate -s 0 /etc/machine-id /var/lib/dbus/machine-id
-    - echo 'syselement ALL=(ALL) NOPASSWD:ALL' > /target/etc/sudoers.d/syselement
-    - chmod 0440 /target/etc/sudoers.d/syselement
+    - echo 'syselement ALL=(ALL) NOPASSWD:ALL' > /target/etc/sudoers.d/99-syselement
+    - chmod 0440 /target/etc/sudoers.d/99-syselement
 
 
 # Validate this file with
