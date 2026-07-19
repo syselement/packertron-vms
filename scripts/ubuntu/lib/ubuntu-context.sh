@@ -73,6 +73,7 @@ detect_ubuntu_variant() {
     for package in "${desktop_metapackages[@]}"; do
         if ubuntu_package_is_installed "$package"; then
             UBUNTU_VARIANT="desktop"
+            UBUNTU_VARIANT_SOURCE="metapackage:${package}"
             return 0
         fi
     done
@@ -80,12 +81,14 @@ detect_ubuntu_variant() {
     for package in "${server_metapackages[@]}"; do
         if ubuntu_package_is_installed "$package"; then
             UBUNTU_VARIANT="server"
+            UBUNTU_VARIANT_SOURCE="metapackage:${package}"
             return 0
         fi
     done
 
-    ubuntu_context_error \
-        "cannot determine Ubuntu Desktop or Server from installed metapackages; install a supported Ubuntu metapackage or set up the image before provisioning"
+    UBUNTU_VARIANT="server"
+    UBUNTU_VARIANT_SOURCE="default:no-flavor-metapackage"
+    printf 'WARNING: no supported Ubuntu flavor metapackage is installed; defaulting to Ubuntu Server\n' >&2
 }
 
 target_user_record() {

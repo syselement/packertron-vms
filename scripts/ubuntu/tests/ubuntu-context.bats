@@ -51,6 +51,7 @@ EOF
   [[ "$UBUNTU_VERSION_ID" == "24.04" ]]
   [[ "$UBUNTU_CODENAME" == "noble" ]]
   [[ "$UBUNTU_VARIANT" == "desktop" ]]
+  [[ "$UBUNTU_VARIANT_SOURCE" == "metapackage:ubuntu-desktop-minimal" ]]
   [[ "$TARGET_USER" == "testuser" ]]
   [[ "$TARGET_HOME" == "$TEST_HOME" ]]
   [[ "$TARGET_GROUP" == "testgroup" ]]
@@ -65,6 +66,7 @@ EOF
   initialize_ubuntu_context
 
   [[ "$UBUNTU_VARIANT" == "server" ]]
+  [[ "$UBUNTU_VARIANT_SOURCE" == "metapackage:ubuntu-server" ]]
 }
 
 @test "rejects non-Ubuntu systems" {
@@ -80,15 +82,18 @@ EOF
   [[ "$output" == *"Ubuntu is required"* ]]
 }
 
-@test "fails when package state cannot distinguish Desktop from Server" {
+@test "defaults to Server when no flavor metapackage is installed" {
+  local warning_file="$BATS_TEST_TMPDIR/variant-warning"
+
   ubuntu_package_is_installed() {
     return 1
   }
 
-  run initialize_ubuntu_context
+  initialize_ubuntu_context 2>"$warning_file"
 
-  [[ "$status" -ne 0 ]]
-  [[ "$output" == *"cannot determine Ubuntu Desktop or Server"* ]]
+  [[ "$(<"$warning_file")" == *"defaulting to Ubuntu Server"* ]]
+  [[ "$UBUNTU_VARIANT" == "server" ]]
+  [[ "$UBUNTU_VARIANT_SOURCE" == "default:no-flavor-metapackage" ]]
 }
 
 @test "uses SUDO_USER when no explicit target is supplied" {

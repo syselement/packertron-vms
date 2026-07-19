@@ -92,6 +92,8 @@ DESKTOP_PACKAGES=(
   gnome-shell-extensions
   gnome-system-monitor
   gnome-tweaks
+  mullvad-vpn
+  qbittorrent
   sublime-text
   terminator
   vlc
@@ -818,6 +820,46 @@ EOF
   if write_file_if_changed "$tmp_source" "$source_file"; then
     APT_SOURCES_CHANGED=true
   fi
+  rm -f "$tmp_key" "$tmp_source"
+}
+
+ensure_mullvad_repository() {
+  local key_file="/usr/share/keyrings/mullvad-keyring.asc"
+  local source_file="/etc/apt/sources.list.d/mullvad.list"
+  local tmp_key
+  local tmp_source
+
+  if [[ "$UBUNTU_VARIANT" != "desktop" ]]; then
+    info "Mullvad VPN is desktop-only; skipping"
+    return
+  fi
+
+  tmp_key="$(mktemp)"
+  tmp_source="$(mktemp)"
+
+  if ! curl -fsSLo "$tmp_key" https://repository.mullvad.net/deb/mullvad-keyring.asc; then
+    rm -f "$tmp_key" "$tmp_source"
+    die "failed to download the Mullvad repository signing key"
+  fi
+
+  cat > "$tmp_source" <<EOF
+deb [signed-by=/usr/share/keyrings/mullvad-keyring.asc arch=$(dpkg --print-architecture)] https://repository.mullvad.net/deb/stable stable main
+EOF
+
+  if write_file_if_changed "$tmp_key" "$key_file"; then
+    APT_SOURCES_CHANGED=true
+    ok "installed Mullvad repository signing key"
+  else
+    info "Mullvad repository signing key already current"
+  fi
+
+  if write_file_if_changed "$tmp_source" "$source_file"; then
+    APT_SOURCES_CHANGED=true
+    ok "configured Mullvad repository"
+  else
+    info "Mullvad repository already configured"
+  fi
+
   rm -f "$tmp_key" "$tmp_source"
 }
 
@@ -2110,6 +2152,7 @@ if [[ "$UBUNTU_VARIANT" == "desktop" ]]; then
   ensure_sublime_text_repository
   ensure_brave_browser_repository
   ensure_dbeaver_repository
+  ensure_mullvad_repository
 else
   info "server variant detected; skipping Desktop application repositories"
 fi
