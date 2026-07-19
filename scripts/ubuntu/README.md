@@ -10,6 +10,13 @@ The set currently covers:
 - baseline sysadmin/devops/IaC tooling installation
 - desktop customization, user preferences, and extra apps
 
+`02-provision-system.sh` and `03-customize-system.sh` share
+`lib/ubuntu-context.sh`. The helper verifies Ubuntu, detects Desktop or Server
+from installed Ubuntu metapackages, defaults to Server when no flavor
+metapackage is installed, records whether execution is interactive, and
+resolves the non-root target user. Set `TARGET_USER` explicitly when an
+automated root run has more than one eligible local user.
+
 ---
 
 ## Files
@@ -59,6 +66,9 @@ Installs the main tooling stack for the Ubuntu ops workstation. It:
   - `packer`
   - `tofu`
 - enables Docker and adds the configured user to the `docker` group
+- waits for APT/dpkg locks and fails when required package or repository setup fails
+- installs repository keys and source definitions only after validating staged files
+- expands the standard Ubuntu LVM root when free extents exist (`EXPAND_LVM_ROOT=false` disables this)
 - prints validation output and basic system information
 - reboots at the end
 
@@ -105,4 +115,3 @@ Recommended execution order:
 ```
 
 ---
-

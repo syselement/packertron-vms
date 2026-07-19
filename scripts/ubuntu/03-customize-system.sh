@@ -2,6 +2,9 @@
 #
 # Customize Ubuntu Desktop or Server
 #
+# Run:
+# git clone https://github.com/syselement/packertron-vms.git && cd packertron-vms/scripts/ubuntu && sudo ./03-customize-system.sh
+#
 # Notes:
 # - Run as root.
 # - Console output is colorized when interactive.
@@ -13,23 +16,29 @@ set -euo pipefail
 
 export DEBIAN_FRONTEND=noninteractive
 
-USER_NAME="syselement"
+SCRIPT_DIR="$(
+  cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd
+)"
+
+# shellcheck source=lib/ubuntu-context.sh
+. "$SCRIPT_DIR/lib/ubuntu-context.sh"
+
 SCRIPT_NAME="customize-system"
 LOG_PREFIX="[${SCRIPT_NAME}]"
 RUN_ID="$(date +%Y%m%d-%H%M%S)"
 REBOOT_AT_END="${REBOOT_AT_END:-true}"
 LOG_FILE="/var/log/${SCRIPT_NAME}-${RUN_ID}.log"
-UBUNTU_VARIANT="server"
 APT_SOURCES_CHANGED=false
+STARSHIP_INSTALL_URL="${STARSHIP_INSTALL_URL:-https://starship.rs/install.sh}"
 
-APT_BOOTSTRAP_PACKAGES=(
+readonly -a APT_BOOTSTRAP_PACKAGES=(
   ca-certificates
   curl
   gnupg
   lsb-release
 )
 
-COMMON_PACKAGES=(
+readonly -a COMMON_PACKAGES=(
   aptitude
   bash-completion
   bat
@@ -77,7 +86,7 @@ COMMON_PACKAGES=(
   zsh
 )
 
-DESKTOP_PACKAGES=(
+readonly -a DESKTOP_PACKAGES=(
   brave-browser
   dbeaver-ce
   filezilla
@@ -87,15 +96,18 @@ DESKTOP_PACKAGES=(
   gnome-shell-extensions
   gnome-system-monitor
   gnome-tweaks
+  mullvad-vpn
+  qbittorrent
   sublime-text
   terminator
   vlc
   xclip
 )
 
-FLATPAK_PACKAGES=(
+readonly -a FLATPAK_PACKAGES=(
   com.bitwarden.desktop
   io.ente.auth
+  org.gnome.Boxes
 )
 
 require_root() {
@@ -105,21 +117,37 @@ require_root() {
   fi
 }
 
-# --- must be root ---
-require_root
+USER_NAME=""
+VERSION_ID=""
+CODENAME=""
+ARCH=""
+t_bold=""
+t_dim=""
+t_green=""
+t_yellow=""
+t_red=""
+t_reset=""
 
-# --- Logging setup ---
-# --- ANSI Colors for console output ---
-if [[ -t 1 ]]; then
-  t_bold=$'\e[1m'; t_dim=$'\e[2m'
-  t_green=$'\e[32m'; t_yellow=$'\e[33m'; t_red=$'\e[31m'
-  t_reset=$'\e[0m'
-else
-  t_bold=""; t_dim=""; t_green=""; t_yellow=""; t_red=""; t_reset=""
-fi
+initialize_runtime() {
+  require_root
 
-# Console keeps ANSI colors, log file stores ANSI-stripped output.
-exec > >(tee >(sed -u -r 's/\x1B\[[0-9;]*[[:alpha:]]//g' > "$LOG_FILE")) 2>&1
+  # Console keeps ANSI colors, while the log file stores plain text.
+  if [[ -t 1 ]]; then
+    t_bold=$'\e[1m'
+    t_dim=$'\e[2m'
+    t_green=$'\e[32m'
+    t_yellow=$'\e[33m'
+    t_red=$'\e[31m'
+    t_reset=$'\e[0m'
+  fi
+  exec > >(tee >(sed -u -r 's/\x1B\[[0-9;]*[[:alpha:]]//g' >"$LOG_FILE")) 2>&1
+
+  initialize_ubuntu_context
+  USER_NAME="$TARGET_USER"
+  VERSION_ID="$UBUNTU_VERSION_ID"
+  CODENAME="$UBUNTU_CODENAME"
+  ARCH="$(dpkg --print-architecture)"
+}
 
 _ts() { date +'%F %T'; }
 log() {
@@ -140,36 +168,61 @@ user_home() {
   getent passwd "$account" | cut -d: -f6
 }
 
-detect_ubuntu_variant() {
-  local default_target=""
-
-  if dpkg-query -W -f='${Status}' ubuntu-desktop 2>/dev/null | grep -q "install ok installed"; then
-    UBUNTU_VARIANT="desktop"
-    return
-  fi
-
-  default_target="$(systemctl get-default 2>/dev/null || true)"
-  if [[ "$default_target" == "graphical.target" ]] &&
-    { compgen -G '/usr/share/xsessions/*.desktop' >/dev/null ||
-      compgen -G '/usr/share/wayland-sessions/*.desktop' >/dev/null; }; then
-    UBUNTU_VARIANT="desktop"
-  else
-    UBUNTU_VARIANT="server"
-  fi
+run_apt_get() {
+  DEBIAN_FRONTEND=noninteractive apt-get \
+    -o DPkg::Lock::Timeout=300 \
+    "$@"
 }
+
+run_quiet_command() (
+  local description="$1"
+  local line
+  local output_file
+  local status
+  shift
+
+  output_file="$(mktemp)"
+  trap 'rm -f -- "$output_file"' EXIT
+
+  if "$@" >"$output_file" 2>&1; then
+    return 0
+  else
+    status=$?
+  fi
+
+  while IFS= read -r line; do
+    error "${description}: ${line}"
+  done <"$output_file"
+  return "$status"
+)
 
 install_package_array() {
   local description="$1"
   shift
-  local packages=("$@")
+  local package
+  local -a missing=()
+  local -a packages=("$@")
 
   if (( ${#packages[@]} == 0 )); then
     info "${description}: no packages requested, skipping"
-    return
+    return 0
   fi
 
-  info "installing ${#packages[@]} ${description} packages"
-  DEBIAN_FRONTEND=noninteractive apt-get install -y -qq "${packages[@]}"
+  for package in "${packages[@]}"; do
+    if [[ "$(dpkg-query -W -f='${Status}' "$package" 2>/dev/null || true)" != "install ok installed" ]]; then
+      missing+=("$package")
+    fi
+  done
+
+  if (( ${#missing[@]} == 0 )); then
+    info "${description}: all packages already installed"
+    return 0
+  fi
+
+  info "installing ${#missing[@]} missing ${description} packages: ${missing[*]}"
+  if ! run_apt_get install -y -qq "${missing[@]}"; then
+    die "failed installing ${description} packages: ${missing[*]}"
+  fi
   ok "${description} package installation completed"
 }
 
@@ -329,6 +382,11 @@ set_gsetting() {
     return 0
   fi
 
+  actual="$(gsettings get "$schema" "$key")"
+  if gsetting_values_equal "$value" "$actual"; then
+    return 0
+  fi
+
   if ! gsettings set "$schema" "$key" "$value"; then
     printf '[gnome-settings] ERROR failed: %s %s = %s\n' "$schema" "$key" "$value" >&2
     failures=$((failures + 1))
@@ -381,6 +439,10 @@ PYTHON_ARRAY
   )"; then
     printf '[gnome-settings] ERROR cannot parse/update %s %s\n' "$schema" "$key" >&2
     failures=$((failures + 1))
+    return 0
+  fi
+
+  if [[ "$current" == "$updated" ]]; then
     return 0
   fi
 
@@ -830,6 +892,46 @@ EOF
   rm -f "$tmp_key" "$tmp_source"
 }
 
+ensure_mullvad_repository() {
+  local key_file="/usr/share/keyrings/mullvad-keyring.asc"
+  local source_file="/etc/apt/sources.list.d/mullvad.list"
+  local tmp_key
+  local tmp_source
+
+  if [[ "$UBUNTU_VARIANT" != "desktop" ]]; then
+    info "Mullvad VPN is desktop-only; skipping"
+    return
+  fi
+
+  tmp_key="$(mktemp)"
+  tmp_source="$(mktemp)"
+
+  if ! curl -fsSLo "$tmp_key" https://repository.mullvad.net/deb/mullvad-keyring.asc; then
+    rm -f "$tmp_key" "$tmp_source"
+    die "failed to download the Mullvad repository signing key"
+  fi
+
+  cat > "$tmp_source" <<EOF
+deb [signed-by=/usr/share/keyrings/mullvad-keyring.asc arch=$(dpkg --print-architecture)] https://repository.mullvad.net/deb/stable stable main
+EOF
+
+  if write_file_if_changed "$tmp_key" "$key_file"; then
+    APT_SOURCES_CHANGED=true
+    ok "installed Mullvad repository signing key"
+  else
+    info "Mullvad repository signing key already current"
+  fi
+
+  if write_file_if_changed "$tmp_source" "$source_file"; then
+    APT_SOURCES_CHANGED=true
+    ok "configured Mullvad repository"
+  else
+    info "Mullvad repository already configured"
+  fi
+
+  rm -f "$tmp_key" "$tmp_source"
+}
+
 configure_flathub() (
   set -euo pipefail
 
@@ -887,7 +989,7 @@ configure_desktop_wallpaper() (
   if [[ ! -e "$repo_dir" ]]; then
     info "cloning Packertron repository"
 
-    git clone \
+    git clone --quiet \
       --branch main \
       --single-branch \
       --depth 1 \
@@ -898,7 +1000,7 @@ configure_desktop_wallpaper() (
   elif [[ -d "$repo_dir/.git" ]]; then
     info "synchronizing Packertron repository"
 
-    git -C "$repo_dir" pull --ff-only
+    git -C "$repo_dir" pull --quiet --ff-only
 
     ok "Packertron repository synchronized"
   else
@@ -1009,12 +1111,14 @@ EOF
 configure_terminator_as_default() {
   local account="$1"
   local home
+  local group
   local terminator_bin
   local desktop_file="/usr/share/applications/terminator.desktop"
   local desktop_id="terminator.desktop"
 
   home="$(user_home "$account")"
   [[ -n "$home" ]] || die "could not determine home directory for ${account}"
+  group="$(id -gn "$account")"
 
   terminator_bin="$(command -v terminator 2>/dev/null || true)"
   if [[ -z "$terminator_bin" ]]; then
@@ -1042,7 +1146,7 @@ configure_terminator_as_default() {
         return
       fi
 
-      install -d -m 0755 -o "$account" -g "$account" "$home/.config"
+      install -d -m 0755 -o "$account" -g "$group" "$home/.config"
 
       sudo -u "$account" -H bash -s -- "$desktop_id" <<'EOF'
 set -euo pipefail
@@ -1079,66 +1183,39 @@ EOF
   esac
 }
 
-install_discord_snap() {
+install_snap_package() {
+  local snap_name="$1"
+  local display_name="$2"
+
   if ! command -v snap >/dev/null 2>&1; then
-    warn "snap command not found, cannot install Discord"
-    return
+    warn "snap command not found; cannot install ${display_name}"
+    return 0
   fi
 
-  if snap list discord >/dev/null 2>&1; then
-    info "Discord snap already installed"
+  if snap list "$snap_name" >/dev/null 2>&1; then
+    info "${display_name} snap already installed, skipping"
+    return 0
+  fi
+
+  if ! snap install "$snap_name"; then
+    die "failed installing ${display_name} snap (${snap_name})"
+  fi
+  ok "${display_name} snap installed"
+}
+
+connect_snap_interface() {
+  local connection="$1"
+  local description="$2"
+
+  if ! command -v snap >/dev/null 2>&1; then
+    return 0
+  fi
+
+  if snap connect "$connection" >/dev/null 2>&1; then
+    info "${description} interface connected"
   else
-    snap install discord
-    ok "Discord installed"
+    warn "could not connect ${description} interface (${connection})"
   fi
-
-  # Optional: reduces AppArmor noise and enables extra system visibility.
-  snap connect discord:system-observe 2>/dev/null || true
-}
-
-install_emote_snap() {
-  if command -v snap >/dev/null 2>&1 && snap list emote >/dev/null 2>&1; then
-    info "Emote snap already installed, skipping"
-    return
-  fi
-
-  if ! command -v snap >/dev/null 2>&1; then
-    warn "snap command not found, cannot install Emote"
-    return
-  fi
-
-  snap install emote
-  ok "Emote installed"
-}
-
-install_postman_snap() {
-  if command -v snap >/dev/null 2>&1 && snap list postman >/dev/null 2>&1; then
-    info "Postman snap already installed, skipping"
-    return
-  fi
-
-  if ! command -v snap >/dev/null 2>&1; then
-    warn "snap command not found, cannot install Postman"
-    return
-  fi
-
-  snap install postman
-  ok "Postman installed"
-}
-
-install_telegram_snap() {
-  if command -v snap >/dev/null 2>&1 && snap list telegram-desktop >/dev/null 2>&1; then
-    info "Telegram Desktop snap already installed, skipping"
-    return
-  fi
-
-  if ! command -v snap >/dev/null 2>&1; then
-    warn "snap command not found, cannot install Telegram Desktop"
-    return
-  fi
-
-  snap install telegram-desktop
-  ok "Telegram Desktop installed"
 }
 
 install_flameshot() (
@@ -1245,7 +1322,7 @@ install_flameshot() (
   )
 
   info "installing Flameshot ${tag}"
-  apt-get install -y "$deb_file"
+  run_apt_get install -y "$deb_file"
 
   installed_version="$(
     dpkg-query -W -f='${Version}' flameshot 2>/dev/null || true
@@ -1258,6 +1335,8 @@ install_flameshot() (
 )
 
 configure_flameshot() {
+  local flameshot_dir="${TARGET_HOME}/Pictures/flameshot"
+
   if sudo -u "$USER_NAME" -H bash -lc '
     [[ -f "$HOME/.config/flameshot/flameshot.ini" ]] && \
     grep -q "^startupLaunch=true$" "$HOME/.config/flameshot/flameshot.ini" && \
@@ -1267,11 +1346,13 @@ configure_flameshot() {
     return
   fi
 
-  install -d -o "$USER_NAME" -g "$USER_NAME" "/home/${USER_NAME}/Pictures/flameshot"
-  sudo -u "$USER_NAME" -H bash -lc '
-    set -euo pipefail
-    mkdir -p "$HOME/.config/flameshot"
-    cat > "$HOME/.config/flameshot/flameshot.ini" << '"'"'EOF'"'"'
+  install -d -o "$TARGET_USER" -g "$TARGET_GROUP" "$flameshot_dir"
+  sudo -u "$TARGET_USER" -H bash -s -- "$flameshot_dir" <<'USER_CONFIG'
+set -euo pipefail
+
+flameshot_dir="$1"
+mkdir -p "$HOME/.config/flameshot"
+cat > "$HOME/.config/flameshot/flameshot.ini" <<EOF
 [General]
 contrastOpacity=188
 copyOnDoubleClick=true
@@ -1279,7 +1360,7 @@ copyPathAfterSave=false
 saveAfterCopy=true
 saveAsFileExtension=png
 saveLastRegion=false
-savePath=/home/'"$USER_NAME"'/Pictures/flameshot
+savePath=${flameshot_dir}
 savePathFixed=true
 showHelp=false
 showMagnifier=true
@@ -1287,7 +1368,7 @@ showStartupLaunchMessage=false
 squareMagnifier=true
 startupLaunch=true
 EOF
-  '
+USER_CONFIG
 
   ok "Flameshot configured"
 }
@@ -1386,7 +1467,7 @@ asset_url="$(
     die "unexpected Debian package name: ${package_name}"
 
   info "installing Obsidian ${tag}"
-  apt-get install -y "$deb_file"
+  run_apt_get install -y "$deb_file"
 
   installed_version="$(
     dpkg-query -W -f='${Version}' obsidian 2>/dev/null || true
@@ -1462,26 +1543,50 @@ install_fzf_for_user() {
 
   if [[ -d "$home/.fzf/.git" ]]; then
     info "updating fzf checkout for ${account}"
-    sudo -u "$account" -H git -C "$home/.fzf" pull --ff-only
+    sudo -u "$account" -H git -C "$home/.fzf" pull --quiet --ff-only
   elif [[ -e "$home/.fzf" ]]; then
     warn "${home}/.fzf exists but is not a Git checkout; skipping fzf for ${account}"
     return
   else
     info "cloning fzf for ${account}"
-    sudo -u "$account" -H git clone --depth 1 https://github.com/junegunn/fzf.git "$home/.fzf"
+    sudo -u "$account" -H git clone --quiet --depth 1 https://github.com/junegunn/fzf.git "$home/.fzf"
   fi
 
-  sudo -u "$account" -H "$home/.fzf/install" \
-    --all --no-update-rc --no-zsh --no-fish --no-nushell
+  run_quiet_command \
+    "fzf installer for ${account}" \
+    sudo -u "$account" -H "$home/.fzf/install" \
+    --all --no-update-rc --no-zsh --no-fish --no-nushell ||
+    die "fzf installation failed for ${account}"
   ok "fzf installed for ${account}"
 }
 
-install_starship() {
+install_starship() (
+  set -Eeuo pipefail
+
+  local line
+  local temporary_dir
+  temporary_dir="$(mktemp -d)"
+  trap 'rm -rf -- "$temporary_dir"' EXIT
+
   info "installing/updating Starship"
-  curl -fsSL https://starship.rs/install.sh | sh -s -- --yes
+  curl \
+    --fail \
+    --show-error \
+    --silent \
+    --location \
+    --output "$temporary_dir/install.sh" \
+    "$STARSHIP_INSTALL_URL" || die "failed downloading the Starship installer"
+
+  if ! sh "$temporary_dir/install.sh" --yes >"$temporary_dir/install.log" 2>&1; then
+    while IFS= read -r line; do
+      error "Starship installer: ${line}"
+    done <"$temporary_dir/install.log"
+    die "Starship installation failed"
+  fi
+
   command -v starship >/dev/null 2>&1 || die "Starship installation did not provide a starship command"
   ok "Starship installed"
-}
+)
 
 install_jetbrainsmono_nerd_font_for_user() {
   local account="$1"
@@ -1499,7 +1604,7 @@ install_jetbrainsmono_nerd_font_for_user() {
     font_dir="$HOME/.local/share/fonts"
     archive="$(mktemp --suffix=.zip)"
     mkdir -p "$font_dir"
-    curl -fL -o "$archive" https://github.com/ryanoasis/nerd-fonts/releases/latest/download/JetBrainsMono.zip
+    curl --fail --show-error --silent --location --output "$archive" https://github.com/ryanoasis/nerd-fonts/releases/latest/download/JetBrainsMono.zip
     unzip -q -o "$archive" -d "$font_dir"
     rm -f "$archive"
     fc-cache -f "$font_dir"
@@ -1928,7 +2033,7 @@ install_homebrew_for_user() {
   group="$(id -gn "$USER_NAME")"
 
   info "installing Homebrew prerequisites"
-  DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
+  run_apt_get install -y -qq \
     build-essential \
     procps \
     curl \
@@ -2047,182 +2152,184 @@ show_manual_setup_hints() {
   warn "=============================================================="
 }
 
-echo "################################"
-echo "# Customize System"
-echo "################################"
+main() {
+  local end_ts elapsed start_ts
 
-info "================ RUN START ================"
-info "run_id: ${RUN_ID}"
-info "started_at: $(date -Is)"
-START_TS="$(date +%s)"
+  initialize_runtime
 
-# shellcheck disable=SC1091
-. /etc/os-release
-VERSION_ID="${VERSION_ID:-unknown}"
-CODENAME="${VERSION_CODENAME:-${UBUNTU_CODENAME:-unknown}}"
-ARCH="$(dpkg --print-architecture)"
-info "distro version=${VERSION_ID} codename=${CODENAME} arch=${ARCH}"
+  echo "################################"
+  echo "# Customize System"
+  echo "################################"
 
-detect_ubuntu_variant
-ok "detected Ubuntu variant: ${UBUNTU_VARIANT}"
+  info "================ RUN START ================"
+  info "run_id: ${RUN_ID}"
+  info "started_at: $(date -Is)"
+  start_ts="$(date +%s)"
 
-if id "$USER_NAME" >/dev/null 2>&1; then
-  ok "running user-scoped commands as: ${USER_NAME} and root"
-else
-  die "user not found: ${USER_NAME}"
-fi
+  info "distro version=${VERSION_ID} codename=${CODENAME} variant=${UBUNTU_VARIANT} variant_source=${UBUNTU_VARIANT_SOURCE} arch=${ARCH}"
+  info "execution mode=${EXECUTION_MODE} context=${EXECUTION_CONTEXT} interactive=${EXECUTION_INTERACTIVE}"
+  ok "target user=${TARGET_USER} home=${TARGET_HOME}"
 
-# --- Connectivity checks ---
-info "checking internet and DNS"
-if ping -c 1 -W 1 1.1.1.1 &>/dev/null || ping -c 1 -W 1 8.8.8.8 &>/dev/null || ping -c 1 -W 1 9.9.9.9 &>/dev/null; then
-  ok "Internet connected (ICMP ping)"
-else
-  warn "Internet not connected (ICMP ping failed)"
-fi
+  # --- Connectivity checks ---
+  info "checking internet and DNS"
+  if ping -c 1 -W 1 1.1.1.1 &>/dev/null || ping -c 1 -W 1 8.8.8.8 &>/dev/null || ping -c 1 -W 1 9.9.9.9 &>/dev/null; then
+    ok "Internet connected (ICMP ping)"
+  else
+    warn "Internet not connected (ICMP ping failed)"
+  fi
 
-if getent hosts ubuntu.com >/dev/null 2>&1; then
-  ok "DNS resolution OK (ubuntu.com)"
-else
-  warn "DNS resolution FAILED (ubuntu.com)"
-fi
+  if getent hosts ubuntu.com >/dev/null 2>&1; then
+    ok "DNS resolution OK (ubuntu.com)"
+  else
+    warn "DNS resolution FAILED (ubuntu.com)"
+  fi
 
-# --- Update system ---
-info "apt update/dist-upgrade"
-apt-get update -y -qq
-apt-get dist-upgrade -y -qq
-ok "apt update/dist-upgrade completed"
+  # --- Update system ---
+  info "apt update/dist-upgrade"
+  run_apt_get update -qq
+  run_apt_get dist-upgrade -y -qq
+  ok "apt update/dist-upgrade completed"
 
-# --- Update snaps (Desktop only) ---
-if [[ "$UBUNTU_VARIANT" == "desktop" ]]; then
-  if command -v snap >/dev/null 2>&1; then
-    info "snap refresh"
-    if snap refresh; then
-      ok "snap refresh completed"
+  # --- Update snaps (Desktop only) ---
+  if [[ "$UBUNTU_VARIANT" == "desktop" ]]; then
+    if command -v snap >/dev/null 2>&1; then
+      info "snap refresh"
+      if snap refresh; then
+        ok "snap refresh completed"
+      else
+        warn "snap refresh failed, continuing"
+      fi
     else
-      warn "snap refresh failed, continuing"
+      warn "snap command not found, skipping snap refresh"
     fi
   else
-    warn "snap command not found, skipping snap refresh"
+    info "server variant detected; skipping Desktop snap refresh"
   fi
-else
-  info "server variant detected; skipping Desktop snap refresh"
-fi
 
-# --- APT prerequisites ---
-install_package_array "APT bootstrap" "${APT_BOOTSTRAP_PACKAGES[@]}"
-if [[ "$VERSION_ID" == 24.* ]]; then
-  install_package_array "Ubuntu 24 repository bootstrap" software-properties-common
-fi
+  # --- APT prerequisites ---
+  install_package_array "APT bootstrap" "${APT_BOOTSTRAP_PACKAGES[@]}"
+  if [[ "$VERSION_ID" == 24.* ]]; then
+    install_package_array "Ubuntu 24 repository bootstrap" software-properties-common
+  fi
 
-# --- Configure repositories before one cache refresh ---
-info "ensuring common repositories"
-ensure_fastfetch_ppa
-install_docker_ctop_repository
+  # --- Configure repositories before one cache refresh ---
+  info "ensuring common repositories"
+  ensure_fastfetch_ppa
+  install_docker_ctop_repository
 
-if [[ "$UBUNTU_VARIANT" == "desktop" ]]; then
-  info "ensuring Desktop application repositories"
-  ensure_sublime_text_repository
-  ensure_brave_browser_repository
-  ensure_dbeaver_repository
-else
-  info "server variant detected; skipping Desktop application repositories"
-fi
+  if [[ "$UBUNTU_VARIANT" == "desktop" ]]; then
+    info "ensuring Desktop application repositories"
+    ensure_sublime_text_repository
+    ensure_brave_browser_repository
+    ensure_dbeaver_repository
+    ensure_mullvad_repository
+  else
+    info "server variant detected; skipping Desktop application repositories"
+  fi
 
-if [[ "$APT_SOURCES_CHANGED" == true ]]; then
-  info "apt update after repository changes"
-  apt-get update -y -qq
-else
-  info "APT repositories unchanged; existing package cache is current"
-fi
+  if [[ "$APT_SOURCES_CHANGED" == true ]]; then
+    info "apt update after repository changes"
+    run_apt_get update -qq
+  else
+    info "APT repositories unchanged; existing package cache is current"
+  fi
 
-# --- Install requested tools ---
-install_package_array "common" "${COMMON_PACKAGES[@]}"
-if [[ "$UBUNTU_VARIANT" == "desktop" ]]; then
-  install_package_array "Desktop" "${DESKTOP_PACKAGES[@]}"
-  configure_flathub
-  install_flatpak_package_array "Desktop Flatpak" "${FLATPAK_PACKAGES[@]}"
-else
-  info "server variant detected; skipping Desktop packages"
-fi
+  # --- Install requested tools ---
+  install_package_array "common" "${COMMON_PACKAGES[@]}"
+  if [[ "$UBUNTU_VARIANT" == "desktop" ]]; then
+    install_package_array "Desktop" "${DESKTOP_PACKAGES[@]}"
+    configure_flathub
+    install_flatpak_package_array "Desktop Flatpak" "${FLATPAK_PACKAGES[@]}"
+  else
+    info "server variant detected; skipping Desktop packages"
+  fi
 
-# --- Install common user tools and shell configuration ---
-info "installing common user tools and shell configuration"
-prepare_user_workspace "$USER_NAME"
-install_starship
-for account in "$USER_NAME" root; do
-  install_fzf_for_user "$account"
-  install_jetbrainsmono_nerd_font_for_user "$account"
-  configure_bash_for_user "$account"
-  configure_starship_for_user "$account"
-done
-install_tldr_pipx
-configure_git_for_user "$USER_NAME"
-install_homebrew_for_user
-ok "common user tools and shell configuration completed"
+  # --- Install common user tools and shell configuration ---
+  info "installing common user tools and shell configuration"
+  prepare_user_workspace "$USER_NAME"
+  install_starship
+  for account in "$USER_NAME" root; do
+    install_fzf_for_user "$account"
+    install_jetbrainsmono_nerd_font_for_user "$account"
+    configure_bash_for_user "$account"
+    configure_starship_for_user "$account"
+  done
+  install_tldr_pipx
+  configure_git_for_user "$USER_NAME"
+  install_homebrew_for_user
+  ok "common user tools and shell configuration completed"
 
-# --- Install/configure Desktop-specific tools ---
-if [[ "$UBUNTU_VARIANT" == "desktop" ]]; then
-  info "installing/configuring Desktop-specific tools"
-  configure_desktop_wallpaper
-  install_flameshot
-  configure_flameshot
-  install_obsidian
-  configure_terminator
-  configure_terminator_as_default "$USER_NAME"
-  install_discord_snap
-  install_emote_snap
-  install_postman_snap
-  install_telegram_snap
-  ok "Desktop-specific tools installed/configured"
-else
-  info "server variant detected; skipping Desktop-specific tools"
-fi
+  # --- Install/configure Desktop-specific tools ---
+  if [[ "$UBUNTU_VARIANT" == "desktop" ]]; then
+    info "installing/configuring Desktop-specific tools"
+    configure_desktop_wallpaper
+    install_flameshot
+    configure_flameshot
+    install_obsidian
+    configure_terminator
+    configure_terminator_as_default "$USER_NAME"
+    install_snap_package discord "Discord"
+    connect_snap_interface discord:system-observe "Discord system-observe"
+    install_snap_package emote "Emote"
+    install_snap_package postman "Postman"
+    install_snap_package telegram-desktop "Telegram Desktop"
+    ok "Desktop-specific tools installed/configured"
+  else
+    info "server variant detected; skipping Desktop-specific tools"
+  fi
 
-# --- Post-install tweaks ---
-info "updating locate database (best effort)"
-updatedb || true
+  # --- Post-install tweaks ---
+  info "updating locate database (best effort)"
+  updatedb || true
 
-# --- GNOME and Dock customization (Desktop only) ---
-if [[ "$UBUNTU_VARIANT" == "desktop" ]]; then
-  # Apply now, inside this provisioning run. When GNOME is already running,
-  # target its real per-user bus; during headless SSH/Vagrant provisioning,
-  # use the temporary-bus fallback from run_as_gnome_user().
-  install_system_monitor_panel_extension "$USER_NAME"
-  install_hide_universal_access_extension "$USER_NAME"
-  apply_gnome_preferences
-  enable_battery_health_preservation
-else
-  info "server variant detected; skipping GNOME preferences"
-fi
+  # --- GNOME and Dock customization (Desktop only) ---
+  if [[ "$UBUNTU_VARIANT" == "desktop" ]]; then
+    # Apply now, inside this provisioning run. When GNOME is already running,
+    # target its real per-user bus; during headless SSH/Vagrant provisioning,
+    # use the temporary-bus fallback from run_as_gnome_user().
+    install_system_monitor_panel_extension "$USER_NAME"
+    install_hide_universal_access_extension "$USER_NAME"
+    apply_gnome_preferences
+    enable_battery_health_preservation
+  else
+    info "server variant detected; skipping GNOME preferences"
+  fi
 
-# --- Cleanup and update repositories ---
-info "cleanup"
-apt-get -y autoremove --purge
-apt-get -y clean
-rm -rf /var/lib/apt/lists/*
-apt-get -y update >/dev/null 2>&1 || true
-ok "cleanup completed"
+  # --- Cleanup and update repositories ---
+  info "cleanup"
+  run_apt_get -y -qq autoremove --purge
+  run_apt_get -y clean
+  rm -rf /var/lib/apt/lists/*
+  if ! run_apt_get -y update >/dev/null 2>&1; then
+    warn "apt update after cleanup failed; package lists will be refreshed on the next run"
+  fi
+  ok "cleanup completed"
 
-# --- Manual setup hints ---
-show_manual_setup_hints
+  # --- Manual setup hints ---
+  show_manual_setup_hints
 
-END_TS="$(date +%s)"
-ELAPSED="$((END_TS - START_TS))"
-info "done: $(date -Is)"
-info "elapsed: $(printf '%02d:%02d:%02d' "$((ELAPSED / 3600))" "$((ELAPSED % 3600 / 60))" "$((ELAPSED % 60))")"
-info "log file: ${LOG_FILE}"
-info "run_id: ${RUN_ID}"
-info "================= RUN END ================="
+  end_ts="$(date +%s)"
+  elapsed="$((end_ts - start_ts))"
+  info "done: $(date -Is)"
+  info "elapsed: $(printf '%02d:%02d:%02d' "$((elapsed / 3600))" "$((elapsed % 3600 / 60))" "$((elapsed % 60))")"
+  info "log file: ${LOG_FILE}"
+  info "run_id: ${RUN_ID}"
+  info "================= RUN END ================="
 
-echo "################################"
-echo "# System Provisioning Complete"
-echo "################################"
+  echo "################################"
+  echo "# System Provisioning Complete"
+  echo "################################"
 
-if [[ "${REBOOT_AT_END:-false}" == "true" ]]; then
-  echo "[provision-system] rebooting in 5 seconds..."
-  sleep 10
-  sync
-  shutdown -r now
-else
-  echo "[provision-system] reboot deferred to orchestrator"
+  if [[ "$REBOOT_AT_END" == "true" ]]; then
+    echo "[${SCRIPT_NAME}] rebooting in 10 seconds..."
+    sleep 10
+    sync
+    shutdown -r now
+  else
+    echo "[${SCRIPT_NAME}] reboot deferred to orchestrator"
+  fi
+}
+
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+  main "$@"
 fi
