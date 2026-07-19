@@ -1,3 +1,12 @@
+## [0.40.1](https://github.com/syselement/packertron-vms/compare/v0.40.0...v0.40.1) (2026-07-19)
+
+
+### Bug Fixes
+
+* update sudoers file naming convention for consistency ([48661e9](https://github.com/syselement/packertron-vms/commit/48661e9cdea26da9b8e84feb2fc35a2d1580a73b))
+
+
+
 # [0.40.0](https://github.com/syselement/packertron-vms/compare/v0.39.0...v0.40.0) (2026-07-19)
 
 
@@ -31,15 +40,6 @@
 ### Features
 
 * update GNOME screensaver settings for enhanced security and user experience ([905a83a](https://github.com/syselement/packertron-vms/commit/905a83a5a921c1c97f0d7202630583f60cd8b0d3))
-
-
-
-# [0.36.0](https://github.com/syselement/packertron-vms/compare/v0.35.0...v0.36.0) (2026-07-16)
-
-
-### Features
-
-* add functionality to clone and synchronize Packertron repository for desktop wallpaper configuration ([38f51d7](https://github.com/syselement/packertron-vms/commit/38f51d754d6c98b8a9383967fc8f170269076bfa))
 
 
 
