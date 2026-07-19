@@ -1,3 +1,12 @@
+# [0.40.0](https://github.com/syselement/packertron-vms/compare/v0.39.0...v0.40.0) (2026-07-19)
+
+
+### Features
+
+* add support for Flatpak packages and configure Flathub remote ([55c8e52](https://github.com/syselement/packertron-vms/commit/55c8e5251cff4bf64d38139a8b26bf408a64fe69))
+
+
+
 # [0.39.0](https://github.com/syselement/packertron-vms/compare/v0.38.0...v0.39.0) (2026-07-17)
 
 
@@ -31,15 +40,6 @@
 ### Features
 
 * add functionality to clone and synchronize Packertron repository for desktop wallpaper configuration ([38f51d7](https://github.com/syselement/packertron-vms/commit/38f51d754d6c98b8a9383967fc8f170269076bfa))
-
-
-
-# [0.35.0](https://github.com/syselement/packertron-vms/compare/v0.34.0...v0.35.0) (2026-07-16)
-
-
-### Features
-
-* add gsetting value comparison function and update GNOME settings ([335bc5a](https://github.com/syselement/packertron-vms/commit/335bc5ae9c35bf4f5a0704dbaf402674e2847561))
 
 
 
