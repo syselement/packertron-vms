@@ -30,6 +30,8 @@ REBOOT_AT_END="${REBOOT_AT_END:-true}"
 LOG_FILE="/var/log/${SCRIPT_NAME}-${RUN_ID}.log"
 APT_SOURCES_CHANGED=false
 STARSHIP_INSTALL_URL="${STARSHIP_INSTALL_URL:-https://starship.rs/install.sh}"
+SYSTEM_KEYRING_DIR="${PACKERTRON_SYSTEM_KEYRING_DIR:-/usr/share/keyrings}"
+APT_SOURCES_DIR="${PACKERTRON_APT_SOURCES_DIR:-/etc/apt/sources.list.d}"
 
 readonly -a APT_BOOTSTRAP_PACKAGES=(
   ca-certificates
@@ -196,6 +198,84 @@ run_quiet_command() (
   return "$status"
 )
 
+fetch_file() {
+  local destination_file="$2"
+  local url="$1"
+
+  curl \
+    --fail \
+    --show-error \
+    --silent \
+    --location \
+    --connect-timeout 10 \
+    --retry 2 \
+    --retry-delay 2 \
+    --output "$destination_file" \
+    "$url"
+}
+
+validate_openpgp_key() {
+  local description="$2"
+  local expected_fingerprint="${3:-}"
+  local fingerprint
+  local key_file="$1"
+
+  if ! fingerprint="$(
+    gpg --batch --show-keys --with-colons "$key_file" 2>/dev/null |
+      awk -F: '$1 == "fpr" { print toupper($10); exit }'
+  )" || [[ -z "$fingerprint" ]]; then
+    die "invalid ${description} signing key"
+  fi
+
+  expected_fingerprint="${expected_fingerprint//[[:space:]]/}"
+  expected_fingerprint="${expected_fingerprint^^}"
+  if [[ -n "$expected_fingerprint" && "$fingerprint" != "$expected_fingerprint" ]]; then
+    die "unexpected ${description} signing-key fingerprint: ${fingerprint}"
+  fi
+}
+
+dearmor_openpgp_key() {
+  local description="$3"
+  local destination_file="$2"
+  local source_file="$1"
+
+  gpg \
+    --batch \
+    --yes \
+    --dearmor \
+    --output "$destination_file" \
+    "$source_file" || die "failed processing ${description} signing key"
+}
+
+validate_repository_source() {
+  local expected_key_file="$3"
+  local expected_uri="$2"
+  local source_file="$1"
+
+  grep -Fq -- "$expected_uri" "$source_file" ||
+    die "repository definition does not contain expected URI: ${expected_uri}"
+  grep -Fq -- "$expected_key_file" "$source_file" ||
+    die "repository definition does not reference expected signing key: ${expected_key_file}"
+}
+
+apply_repository_setup() {
+  local setup_function="$1"
+  local status
+
+  if "$setup_function"; then
+    return 0
+  else
+    status=$?
+  fi
+
+  if ((status == 10)); then
+    APT_SOURCES_CHANGED=true
+    return 0
+  fi
+
+  return "$status"
+}
+
 install_package_array() {
   local description="$1"
   shift
@@ -274,12 +354,26 @@ install_flatpak_package_array() {
 write_file_if_changed() {
   local source_file="$1"
   local destination_file="$2"
+  local destination_directory
+  local temporary_file
 
   if [[ -f "$destination_file" ]] && cmp -s "$source_file" "$destination_file"; then
     return 1
   fi
 
-  install -D -m 0644 "$source_file" "$destination_file"
+  destination_directory="$(dirname -- "$destination_file")"
+  install -d -m 0755 "$destination_directory"
+  temporary_file="$(mktemp "${destination_file}.tmp.XXXXXX")"
+
+  if ! install -m 0644 "$source_file" "$temporary_file"; then
+    rm -f -- "$temporary_file"
+    die "failed staging ${destination_file}"
+  fi
+  if ! mv -f -- "$temporary_file" "$destination_file"; then
+    rm -f -- "$temporary_file"
+    die "failed installing ${destination_file}"
+  fi
+
   return 0
 }
 
@@ -779,158 +873,228 @@ ensure_fastfetch_ppa() {
   esac
 }
 
-install_docker_ctop_repository() {
-  local key_file="/usr/share/keyrings/azlux-archive-keyring.gpg"
-  local source_file="/etc/apt/sources.list.d/azlux.sources"
-  local tmp_key
-  local tmp_source
+install_docker_ctop_repository() (
+  set -Eeuo pipefail
 
-  tmp_key="$(mktemp)"
-  tmp_source="$(mktemp)"
+  local changed=false
+  local key_file="${SYSTEM_KEYRING_DIR}/azlux-archive-keyring.gpg"
+  local source_file="${APT_SOURCES_DIR}/azlux.sources"
+  local temporary_dir
+  temporary_dir="$(mktemp -d)"
+  trap 'rm -rf -- "$temporary_dir"' EXIT
 
-  if ! curl -fsSL https://azlux.fr/repo.gpg.key | gpg --dearmor --yes -o "$tmp_key"; then
-    rm -f "$tmp_key" "$tmp_source"
-    die "failed to download the AZLux repository signing key"
-  fi
+  fetch_file "https://azlux.fr/repo.gpg" "$temporary_dir/azlux.asc" ||
+    die "failed downloading the AZLux repository signing key"
+  dearmor_openpgp_key "$temporary_dir/azlux.asc" "$temporary_dir/azlux.gpg" "AZLux"
+  validate_openpgp_key \
+    "$temporary_dir/azlux.gpg" \
+    "AZLux" \
+    "98B824A5FA7D3A10FDB225B7CA548A0A0312D8E6"
 
-  cat > "$tmp_source" <<'EOF'
+  cat >"$temporary_dir/azlux.sources" <<EOF
 Types: deb
-URIs: http://packages.azlux.fr/debian/
+URIs: https://packages.azlux.fr/debian/
 Suites: stable
 Components: main
-Signed-By: /usr/share/keyrings/azlux-archive-keyring.gpg
+Signed-By: ${key_file}
 EOF
+  validate_repository_source \
+    "$temporary_dir/azlux.sources" \
+    "https://packages.azlux.fr/debian/" \
+    "$key_file"
 
-  if write_file_if_changed "$tmp_key" "$key_file"; then
-    APT_SOURCES_CHANGED=true
+  if write_file_if_changed "$temporary_dir/azlux.gpg" "$key_file"; then
+    changed=true
     ok "installed AZLux repository signing key"
   else
     info "AZLux repository signing key already current"
   fi
-
-  if write_file_if_changed "$tmp_source" "$source_file"; then
-    APT_SOURCES_CHANGED=true
+  if write_file_if_changed "$temporary_dir/azlux.sources" "$source_file"; then
+    changed=true
     ok "configured AZLux repository"
   else
     info "AZLux repository already configured"
   fi
 
-  rm -f "$tmp_key" "$tmp_source"
-}
+  [[ "$changed" == false ]] || return 10
+)
 
-ensure_sublime_text_repository() {
-  local key_file="/usr/share/keyrings/sublimehq-pub.asc"
-  local source_file="/etc/apt/sources.list.d/sublime-text.sources"
-  local tmp_key
-  local tmp_source
+ensure_sublime_text_repository() (
+  set -Eeuo pipefail
 
-  tmp_key="$(mktemp)"
-  tmp_source="$(mktemp)"
-  curl -fsSL https://download.sublimetext.com/sublimehq-pub.gpg -o "$tmp_key"
-  cat > "$tmp_source" <<'EOF'
+  local changed=false
+  local key_file="${SYSTEM_KEYRING_DIR}/sublimehq-pub.asc"
+  local source_file="${APT_SOURCES_DIR}/sublime-text.sources"
+  local temporary_dir
+  temporary_dir="$(mktemp -d)"
+  trap 'rm -rf -- "$temporary_dir"' EXIT
+
+  fetch_file \
+    "https://download.sublimetext.com/sublimehq-pub.gpg" \
+    "$temporary_dir/sublimehq-pub.asc" || die "failed downloading the Sublime Text signing key"
+  validate_openpgp_key "$temporary_dir/sublimehq-pub.asc" "Sublime Text"
+
+  cat >"$temporary_dir/sublime-text.sources" <<EOF
 Types: deb
 URIs: https://download.sublimetext.com/
 Suites: apt/stable/
-Signed-By: /usr/share/keyrings/sublimehq-pub.asc
+Signed-By: ${key_file}
 EOF
+  validate_repository_source \
+    "$temporary_dir/sublime-text.sources" \
+    "https://download.sublimetext.com/" \
+    "$key_file"
 
-  if write_file_if_changed "$tmp_key" "$key_file"; then
-    APT_SOURCES_CHANGED=true
+  if write_file_if_changed "$temporary_dir/sublimehq-pub.asc" "$key_file"; then
+    changed=true
+    ok "installed Sublime Text repository signing key"
+  else
+    info "Sublime Text repository signing key already current"
   fi
-  if write_file_if_changed "$tmp_source" "$source_file"; then
-    APT_SOURCES_CHANGED=true
+  if write_file_if_changed "$temporary_dir/sublime-text.sources" "$source_file"; then
+    changed=true
+    ok "configured Sublime Text repository"
+  else
+    info "Sublime Text repository already configured"
   fi
-  rm -f "$tmp_key" "$tmp_source"
-}
 
-ensure_brave_browser_repository() {
-  local key_file="/usr/share/keyrings/brave-browser-archive-keyring.gpg"
-  local source_file="/etc/apt/sources.list.d/brave-browser-release.sources"
-  local tmp_key
-  local tmp_source
+  [[ "$changed" == false ]] || return 10
+)
 
-  tmp_key="$(mktemp)"
-  tmp_source="$(mktemp)"
-  curl -fsSL https://brave-browser-apt-release.s3.brave.com/brave-browser-archive-keyring.gpg -o "$tmp_key"
-  curl -fsSL https://brave-browser-apt-release.s3.brave.com/brave-browser.sources -o "$tmp_source"
+ensure_brave_browser_repository() (
+  set -Eeuo pipefail
 
-  if write_file_if_changed "$tmp_key" "$key_file"; then
-    APT_SOURCES_CHANGED=true
-  fi
-  if write_file_if_changed "$tmp_source" "$source_file"; then
-    APT_SOURCES_CHANGED=true
-  fi
-  rm -f "$tmp_key" "$tmp_source"
-  if compgen -G '/etc/apt/sources.list.d/brave-browser-*.list' >/dev/null; then
-    APT_SOURCES_CHANGED=true
-  fi
-  rm -f /etc/apt/sources.list.d/brave-browser-*.list
-}
+  local changed=false
+  local key_file="${SYSTEM_KEYRING_DIR}/brave-browser-archive-keyring.gpg"
+  local source_file="${APT_SOURCES_DIR}/brave-browser-release.sources"
+  local temporary_dir
+  local legacy_file
+  local -a legacy_files=()
+  temporary_dir="$(mktemp -d)"
+  trap 'rm -rf -- "$temporary_dir"' EXIT
 
-ensure_dbeaver_repository() {
-  local key_file="/usr/share/keyrings/dbeaver.gpg.key"
-  local source_file="/etc/apt/sources.list.d/dbeaver.list"
-  local tmp_key
-  local tmp_source
+  fetch_file \
+    "https://brave-browser-apt-release.s3.brave.com/brave-browser-archive-keyring.gpg" \
+    "$temporary_dir/brave-browser-archive-keyring.gpg" || die "failed downloading the Brave signing key"
+  fetch_file \
+    "https://brave-browser-apt-release.s3.brave.com/brave-browser.sources" \
+    "$temporary_dir/brave-browser-release.sources" || die "failed downloading the Brave repository definition"
+  validate_openpgp_key "$temporary_dir/brave-browser-archive-keyring.gpg" "Brave"
+  validate_repository_source \
+    "$temporary_dir/brave-browser-release.sources" \
+    "https://brave-browser-apt-release.s3.brave.com/" \
+    "$key_file"
 
-  tmp_key="$(mktemp)"
-  tmp_source="$(mktemp)"
-  if ! curl -fsSL https://dbeaver.io/debs/dbeaver.gpg.key | gpg --dearmor --yes -o "$tmp_key"; then
-    rm -f "$tmp_key" "$tmp_source"
-    die "failed to download the DBeaver repository signing key"
+  if write_file_if_changed "$temporary_dir/brave-browser-archive-keyring.gpg" "$key_file"; then
+    changed=true
+    ok "installed Brave repository signing key"
+  else
+    info "Brave repository signing key already current"
   fi
-  cat > "$tmp_source" <<'EOF'
-deb [signed-by=/usr/share/keyrings/dbeaver.gpg.key] https://dbeaver.io/debs/dbeaver-ce /
+  if write_file_if_changed "$temporary_dir/brave-browser-release.sources" "$source_file"; then
+    changed=true
+    ok "configured Brave repository"
+  else
+    info "Brave repository already configured"
+  fi
+
+  shopt -s nullglob
+  legacy_files=("${APT_SOURCES_DIR}"/brave-browser-*.list)
+  shopt -u nullglob
+  for legacy_file in "${legacy_files[@]}"; do
+    rm -f -- "$legacy_file"
+    changed=true
+    info "removed legacy Brave repository file: ${legacy_file}"
+  done
+
+  [[ "$changed" == false ]] || return 10
+)
+
+ensure_dbeaver_repository() (
+  set -Eeuo pipefail
+
+  local changed=false
+  local key_file="${SYSTEM_KEYRING_DIR}/dbeaver.gpg.key"
+  local source_file="${APT_SOURCES_DIR}/dbeaver.list"
+  local temporary_dir
+  temporary_dir="$(mktemp -d)"
+  trap 'rm -rf -- "$temporary_dir"' EXIT
+
+  fetch_file \
+    "https://dbeaver.io/debs/dbeaver.gpg.key" \
+    "$temporary_dir/dbeaver.asc" || die "failed downloading the DBeaver signing key"
+  dearmor_openpgp_key "$temporary_dir/dbeaver.asc" "$temporary_dir/dbeaver.gpg" "DBeaver"
+  validate_openpgp_key "$temporary_dir/dbeaver.gpg" "DBeaver"
+
+  cat >"$temporary_dir/dbeaver.list" <<EOF
+deb [signed-by=${key_file}] https://dbeaver.io/debs/dbeaver-ce /
 EOF
+  validate_repository_source \
+    "$temporary_dir/dbeaver.list" \
+    "https://dbeaver.io/debs/dbeaver-ce" \
+    "$key_file"
 
-  if write_file_if_changed "$tmp_key" "$key_file"; then
-    APT_SOURCES_CHANGED=true
+  if write_file_if_changed "$temporary_dir/dbeaver.gpg" "$key_file"; then
+    changed=true
+    ok "installed DBeaver repository signing key"
+  else
+    info "DBeaver repository signing key already current"
   fi
-  if write_file_if_changed "$tmp_source" "$source_file"; then
-    APT_SOURCES_CHANGED=true
+  if write_file_if_changed "$temporary_dir/dbeaver.list" "$source_file"; then
+    changed=true
+    ok "configured DBeaver repository"
+  else
+    info "DBeaver repository already configured"
   fi
-  rm -f "$tmp_key" "$tmp_source"
-}
 
-ensure_mullvad_repository() {
-  local key_file="/usr/share/keyrings/mullvad-keyring.asc"
-  local source_file="/etc/apt/sources.list.d/mullvad.list"
-  local tmp_key
-  local tmp_source
+  [[ "$changed" == false ]] || return 10
+)
+
+ensure_mullvad_repository() (
+  set -Eeuo pipefail
+
+  local architecture
+  local changed=false
+  local key_file="${SYSTEM_KEYRING_DIR}/mullvad-keyring.asc"
+  local source_file="${APT_SOURCES_DIR}/mullvad.list"
+  local temporary_dir
+  temporary_dir="$(mktemp -d)"
+  trap 'rm -rf -- "$temporary_dir"' EXIT
 
   if [[ "$UBUNTU_VARIANT" != "desktop" ]]; then
     info "Mullvad VPN is desktop-only; skipping"
-    return
+    return 0
   fi
 
-  tmp_key="$(mktemp)"
-  tmp_source="$(mktemp)"
+  architecture="$(dpkg --print-architecture)"
+  fetch_file \
+    "https://repository.mullvad.net/deb/mullvad-keyring.asc" \
+    "$temporary_dir/mullvad-keyring.asc" || die "failed downloading the Mullvad signing key"
+  validate_openpgp_key "$temporary_dir/mullvad-keyring.asc" "Mullvad"
 
-  if ! curl -fsSLo "$tmp_key" https://repository.mullvad.net/deb/mullvad-keyring.asc; then
-    rm -f "$tmp_key" "$tmp_source"
-    die "failed to download the Mullvad repository signing key"
-  fi
-
-  cat > "$tmp_source" <<EOF
-deb [signed-by=/usr/share/keyrings/mullvad-keyring.asc arch=$(dpkg --print-architecture)] https://repository.mullvad.net/deb/stable stable main
+  cat >"$temporary_dir/mullvad.list" <<EOF
+deb [signed-by=${key_file} arch=${architecture}] https://repository.mullvad.net/deb/stable stable main
 EOF
+  validate_repository_source \
+    "$temporary_dir/mullvad.list" \
+    "https://repository.mullvad.net/deb/stable" \
+    "$key_file"
 
-  if write_file_if_changed "$tmp_key" "$key_file"; then
-    APT_SOURCES_CHANGED=true
+  if write_file_if_changed "$temporary_dir/mullvad-keyring.asc" "$key_file"; then
+    changed=true
     ok "installed Mullvad repository signing key"
   else
     info "Mullvad repository signing key already current"
   fi
-
-  if write_file_if_changed "$tmp_source" "$source_file"; then
-    APT_SOURCES_CHANGED=true
+  if write_file_if_changed "$temporary_dir/mullvad.list" "$source_file"; then
+    changed=true
     ok "configured Mullvad repository"
   else
     info "Mullvad repository already configured"
   fi
 
-  rm -f "$tmp_key" "$tmp_source"
-}
+  [[ "$changed" == false ]] || return 10
+)
 
 configure_flathub() (
   set -euo pipefail
@@ -2215,14 +2379,14 @@ main() {
   # --- Configure repositories before one cache refresh ---
   info "ensuring common repositories"
   ensure_fastfetch_ppa
-  install_docker_ctop_repository
+  apply_repository_setup install_docker_ctop_repository
 
   if [[ "$UBUNTU_VARIANT" == "desktop" ]]; then
     info "ensuring Desktop application repositories"
-    ensure_sublime_text_repository
-    ensure_brave_browser_repository
-    ensure_dbeaver_repository
-    ensure_mullvad_repository
+    apply_repository_setup ensure_sublime_text_repository
+    apply_repository_setup ensure_brave_browser_repository
+    apply_repository_setup ensure_dbeaver_repository
+    apply_repository_setup ensure_mullvad_repository
   else
     info "server variant detected; skipping Desktop application repositories"
   fi

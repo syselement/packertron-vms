@@ -6,6 +6,10 @@ setup() {
   # shellcheck source=../03-customize-system.sh
   source "$CUSTOMIZE_SCRIPT"
 
+  SYSTEM_KEYRING_DIR="$BATS_TEST_TMPDIR/usr/share/keyrings"
+  APT_SOURCES_DIR="$BATS_TEST_TMPDIR/etc/apt/sources.list.d"
+  mkdir -p "$SYSTEM_KEYRING_DIR" "$APT_SOURCES_DIR"
+
   info() {
     printf 'INFO: %s\n' "$*"
   }
@@ -163,4 +167,113 @@ setup() {
   run run_quiet_command "test command" noisy_failure
   [[ "$status" -eq 23 ]]
   [[ "$output" == *"test command: actionable failure"* ]]
+}
+
+@test "failed repository download preserves existing files" {
+  local key_file="$SYSTEM_KEYRING_DIR/sublimehq-pub.asc"
+  local source_file="$APT_SOURCES_DIR/sublime-text.sources"
+
+  printf 'existing key\n' >"$key_file"
+  printf 'existing source\n' >"$source_file"
+  fetch_file() {
+    return 1
+  }
+
+  run apply_repository_setup ensure_sublime_text_repository
+
+  [[ "$status" -ne 0 ]]
+  [[ "$(<"$key_file")" == "existing key" ]]
+  [[ "$(<"$source_file")" == "existing source" ]]
+}
+
+@test "invalid OpenPGP repository key is rejected" {
+  local invalid_key="$BATS_TEST_TMPDIR/invalid-key"
+  printf 'not an OpenPGP key\n' >"$invalid_key"
+
+  run validate_openpgp_key "$invalid_key" "test repository"
+
+  [[ "$status" -ne 0 ]]
+  [[ "$output" == *"invalid test repository signing key"* ]]
+}
+
+@test "unchanged repository files do not request an APT refresh" {
+  fetch_file() {
+    printf 'Sublime test key\n' >"$2"
+  }
+  validate_openpgp_key() {
+    return 0
+  }
+
+  apply_repository_setup ensure_sublime_text_repository
+  [[ "$APT_SOURCES_CHANGED" == true ]]
+
+  APT_SOURCES_CHANGED=false
+  apply_repository_setup ensure_sublime_text_repository
+
+  [[ "$APT_SOURCES_CHANGED" == false ]]
+  grep -Fqx 'URIs: https://download.sublimetext.com/' "$APT_SOURCES_DIR/sublime-text.sources"
+}
+
+@test "AZLux repository uses HTTPS and validates its published fingerprint" {
+  local validation_record="$BATS_TEST_TMPDIR/azlux-validation"
+
+  fetch_file() {
+    printf 'AZLux test key\n' >"$2"
+  }
+  dearmor_openpgp_key() {
+    cp "$1" "$2"
+  }
+  validate_openpgp_key() {
+    printf '%s|%s\n' "$2" "$3" >"$validation_record"
+  }
+
+  apply_repository_setup install_docker_ctop_repository
+
+  [[ "$APT_SOURCES_CHANGED" == true ]]
+  grep -Fqx 'URIs: https://packages.azlux.fr/debian/' "$APT_SOURCES_DIR/azlux.sources"
+  [[ "$(<"$validation_record")" == 'AZLux|98B824A5FA7D3A10FDB225B7CA548A0A0312D8E6' ]]
+}
+
+@test "Desktop repositories are repeatable and reference their scoped keys" {
+  local setup_function
+  local -a setup_functions=(
+    ensure_brave_browser_repository
+    ensure_dbeaver_repository
+    ensure_mullvad_repository
+  )
+  UBUNTU_VARIANT="desktop"
+
+  fetch_file() {
+    if [[ "$1" == *"brave-browser.sources" ]]; then
+      printf 'Types: deb\nURIs: https://brave-browser-apt-release.s3.brave.com/\nSigned-By: %s/brave-browser-archive-keyring.gpg\n' \
+        "$SYSTEM_KEYRING_DIR" >"$2"
+    else
+      printf 'test signing key\n' >"$2"
+    fi
+  }
+  dearmor_openpgp_key() {
+    cp "$1" "$2"
+  }
+  validate_openpgp_key() {
+    return 0
+  }
+  dpkg() {
+    [[ "$1" == "--print-architecture" ]] || return 2
+    printf 'amd64\n'
+  }
+
+  for setup_function in "${setup_functions[@]}"; do
+    APT_SOURCES_CHANGED=false
+    apply_repository_setup "$setup_function"
+    [[ "$APT_SOURCES_CHANGED" == true ]]
+
+    APT_SOURCES_CHANGED=false
+    apply_repository_setup "$setup_function"
+    [[ "$APT_SOURCES_CHANGED" == false ]]
+  done
+
+  grep -Fq "$SYSTEM_KEYRING_DIR/brave-browser-archive-keyring.gpg" \
+    "$APT_SOURCES_DIR/brave-browser-release.sources"
+  grep -Fq "$SYSTEM_KEYRING_DIR/dbeaver.gpg.key" "$APT_SOURCES_DIR/dbeaver.list"
+  grep -Fq "$SYSTEM_KEYRING_DIR/mullvad-keyring.asc" "$APT_SOURCES_DIR/mullvad.list"
 }
