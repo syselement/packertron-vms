@@ -32,6 +32,8 @@ APT_SOURCES_CHANGED=false
 STARSHIP_INSTALL_URL="${STARSHIP_INSTALL_URL:-https://starship.rs/install.sh}"
 SYSTEM_KEYRING_DIR="${PACKERTRON_SYSTEM_KEYRING_DIR:-/usr/share/keyrings}"
 APT_SOURCES_DIR="${PACKERTRON_APT_SOURCES_DIR:-/etc/apt/sources.list.d}"
+HOMEBREW_PREFIX="${PACKERTRON_HOMEBREW_PREFIX:-/home/linuxbrew/.linuxbrew}"
+HOMEBREW_INSTALL_URL="${HOMEBREW_INSTALL_URL:-https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh}"
 
 readonly -a APT_BOOTSTRAP_PACKAGES=(
   ca-certificates
@@ -168,6 +170,37 @@ die()   { error "$*"; exit 1; }
 user_home() {
   local account="$1"
   getent passwd "$account" | cut -d: -f6
+}
+
+run_as_target_user() {
+  [[ -n "${TARGET_USER:-}" ]] || die "target user is not initialized"
+  [[ -n "${TARGET_HOME:-}" && "$TARGET_HOME" == /* ]] ||
+    die "target home is not initialized"
+  [[ "${TARGET_UID:-}" =~ ^[0-9]+$ ]] || die "target UID is not initialized"
+  [[ -n "${TARGET_GROUP:-}" ]] || die "target group is not initialized"
+  (($# > 0)) || die "run_as_target_user requires a command"
+
+  sudo -u "$TARGET_USER" -g "$TARGET_GROUP" -H env \
+    HOME="$TARGET_HOME" \
+    USER="$TARGET_USER" \
+    LOGNAME="$TARGET_USER" \
+    TARGET_USER="$TARGET_USER" \
+    TARGET_HOME="$TARGET_HOME" \
+    TARGET_UID="$TARGET_UID" \
+    TARGET_GROUP="$TARGET_GROUP" \
+    "$@"
+}
+
+verify_target_ownership() {
+  local description="$2"
+  local path="$1"
+  local owner owner_group
+
+  [[ -e "$path" ]] || die "${description} is missing: ${path}"
+  owner="$(stat -Lc '%U' "$path")"
+  owner_group="$(stat -Lc '%G' "$path")"
+  [[ "$owner" == "$TARGET_USER" && "$owner_group" == "$TARGET_GROUP" ]] ||
+    die "unexpected ${description} ownership: ${owner}:${owner_group}; expected ${TARGET_USER}:${TARGET_GROUP}"
 }
 
 run_apt_get() {
@@ -1707,12 +1740,27 @@ prepare_user_workspace() (
 )
 
 install_tldr_pipx() {
-  if sudo -u "$USER_NAME" -H bash -lc 'pipx list 2>/dev/null | grep -q "package tldr"'; then
+  local installed_packages
+
+  if ! installed_packages="$(run_as_target_user pipx list --short 2>/dev/null)"; then
+    die "could not inspect pipx packages for ${TARGET_USER}"
+  fi
+
+  if grep -Eq '^tldr[[:space:]]' <<<"$installed_packages"; then
     info "tldr already installed via pipx, skipping"
     return
   fi
 
-  sudo -u "$USER_NAME" -H bash -lc 'pipx install tldr && pipx ensurepath'
+  run_quiet_command "pipx tldr installation" run_as_target_user pipx install tldr ||
+    die "failed installing tldr via pipx"
+  run_quiet_command "pipx PATH configuration" run_as_target_user pipx ensurepath ||
+    die "failed configuring the pipx application path"
+
+  if ! installed_packages="$(run_as_target_user pipx list --short 2>/dev/null)"; then
+    die "could not verify pipx packages for ${TARGET_USER}"
+  fi
+  grep -Eq '^tldr[[:space:]]' <<<"$installed_packages" ||
+    die "tldr installation could not be verified"
   ok "tldr installed via pipx"
 }
 
@@ -1722,9 +1770,11 @@ install_fzf_for_user() {
   home="$(user_home "$account")"
   [[ -n "$home" ]] || die "could not determine home directory for ${account}"
 
-  if [[ -d "$home/.fzf/.git" ]]; then
-    info "updating fzf checkout for ${account}"
-    sudo -u "$account" -H git -C "$home/.fzf" pull --quiet --ff-only
+  if [[ -d "$home/.fzf/.git" && -x "$home/.fzf/bin/fzf" && -f "$home/.fzf.bash" ]]; then
+    info "fzf already installed for ${account}, skipping"
+    return
+  elif [[ -d "$home/.fzf/.git" ]]; then
+    info "repairing incomplete fzf installation for ${account}"
   elif [[ -e "$home/.fzf" ]]; then
     warn "${home}/.fzf exists but is not a Git checkout; skipping fzf for ${account}"
     return
@@ -1738,6 +1788,9 @@ install_fzf_for_user() {
     sudo -u "$account" -H "$home/.fzf/install" \
     --all --no-update-rc --no-zsh --no-fish --no-nushell ||
     die "fzf installation failed for ${account}"
+
+  [[ -x "$home/.fzf/bin/fzf" && -f "$home/.fzf.bash" ]] ||
+    die "fzf installation could not be verified for ${account}"
   ok "fzf installed for ${account}"
 }
 
@@ -1746,10 +1799,19 @@ install_starship() (
 
   local line
   local temporary_dir
+  local version_output
+
+  if command -v starship >/dev/null 2>&1; then
+    version_output="$(starship --version)" || die "existing Starship command is not usable"
+    [[ "$version_output" == starship* ]] || die "existing Starship version could not be verified"
+    info "${version_output%%$'\n'*} already installed, skipping"
+    return
+  fi
+
   temporary_dir="$(mktemp -d)"
   trap 'rm -rf -- "$temporary_dir"' EXIT
 
-  info "installing/updating Starship"
+  info "installing Starship"
   curl \
     --fail \
     --show-error \
@@ -1757,6 +1819,9 @@ install_starship() (
     --location \
     --output "$temporary_dir/install.sh" \
     "$STARSHIP_INSTALL_URL" || die "failed downloading the Starship installer"
+
+  [[ -s "$temporary_dir/install.sh" ]] || die "downloaded Starship installer is empty"
+  sh -n "$temporary_dir/install.sh" || die "downloaded Starship installer is not valid shell"
 
   if ! sh "$temporary_dir/install.sh" --yes >"$temporary_dir/install.log" 2>&1; then
     while IFS= read -r line; do
@@ -1772,10 +1837,15 @@ install_starship() (
 install_jetbrainsmono_nerd_font_for_user() {
   local account="$1"
   local home
+  local matched_family
   home="$(user_home "$account")"
   [[ -n "$home" ]] || die "could not determine home directory for ${account}"
 
-  if sudo -u "$account" -H fc-list 2>/dev/null | grep -qi "JetBrainsMono Nerd Font"; then
+  matched_family="$(
+    sudo -u "$account" -H fc-match --format='%{family}\n' 'JetBrainsMono Nerd Font' 2>/dev/null
+  )" || die "could not inspect fonts for ${account}"
+
+  if [[ "$matched_family" == *"JetBrainsMono Nerd Font"* ]]; then
     info "JetBrainsMono Nerd Font already installed for ${account}, skipping"
     return
   fi
@@ -1784,24 +1854,35 @@ install_jetbrainsmono_nerd_font_for_user() {
     set -euo pipefail
     font_dir="$HOME/.local/share/fonts"
     archive="$(mktemp --suffix=.zip)"
+    trap '\''rm -f -- "$archive"'\'' EXIT
     mkdir -p "$font_dir"
     curl --fail --show-error --silent --location --output "$archive" https://github.com/ryanoasis/nerd-fonts/releases/latest/download/JetBrainsMono.zip
+    unzip -tq "$archive" >/dev/null
     unzip -q -o "$archive" -d "$font_dir"
-    rm -f "$archive"
     fc-cache -f "$font_dir"
   '
+
+  matched_family="$(
+    sudo -u "$account" -H fc-match --format='%{family}\n' 'JetBrainsMono Nerd Font' 2>/dev/null
+  )" || die "could not verify fonts for ${account}"
+  [[ "$matched_family" == *"JetBrainsMono Nerd Font"* ]] ||
+    die "JetBrainsMono Nerd Font installation could not be verified for ${account}"
   ok "JetBrainsMono Nerd Font installed for ${account}"
 }
 
-configure_bash_for_user() {
+ensure_bat_symlink_for_user() {
   local account="$1"
-  local home
-  local bat_link
-  home="$(user_home "$account")"
-  [[ -n "$home" ]] || die "could not determine home directory for ${account}"
-  bat_link="$home/.local/bin/bat"
+  local home="$2"
+  local bat_link="$home/.local/bin/bat"
 
-  sudo -u "$account" -H mkdir -p "$home/.local/bin"
+  if [[ -L "$bat_link" && "$(readlink -- "$bat_link")" == "/usr/bin/batcat" ]]; then
+    return
+  fi
+
+  if [[ ! -d "$home/.local/bin" ]]; then
+    sudo -u "$account" -H mkdir -p "$home/.local/bin"
+  fi
+
   if [[ -L "$bat_link" ]]; then
     sudo -u "$account" -H ln -sfn /usr/bin/batcat "$bat_link"
   elif [[ -e "$bat_link" ]]; then
@@ -1809,6 +1890,15 @@ configure_bash_for_user() {
   else
     sudo -u "$account" -H ln -s /usr/bin/batcat "$bat_link"
   fi
+}
+
+configure_bash_for_user() {
+  local account="$1"
+  local home
+  home="$(user_home "$account")"
+  [[ -n "$home" ]] || die "could not determine home directory for ${account}"
+
+  ensure_bat_symlink_for_user "$account" "$home"
 
   sudo -u "$account" -H python3 - "$home" <<'PY'
 from datetime import datetime
@@ -2169,6 +2259,8 @@ PY
 
 configure_git_for_user() {
   local account="$1"
+  local changed=false
+  local current
   local git_name="syselement"
   local git_email="81392234+syselement@users.noreply.github.com"
 
@@ -2177,85 +2269,144 @@ configure_git_for_user() {
     return
   fi
 
-  sudo -u "$account" -H git config --global user.name "$git_name"
-  sudo -u "$account" -H git config --global user.email "$git_email"
-  sudo -u "$account" -H git config --global pull.rebase true
-  sudo -u "$account" -H git config --global rebase.autoStash true
+  [[ "$account" == "$TARGET_USER" ]] ||
+    die "Git configuration account does not match target user: ${account}"
+
+  if ! current="$(run_as_target_user git config --global --get user.name 2>/dev/null)"; then
+    current=""
+  fi
+  if [[ "$current" != "$git_name" ]]; then
+    run_as_target_user git config --global user.name "$git_name"
+    changed=true
+  fi
+
+  if ! current="$(run_as_target_user git config --global --get user.email 2>/dev/null)"; then
+    current=""
+  fi
+  if [[ "$current" != "$git_email" ]]; then
+    run_as_target_user git config --global user.email "$git_email"
+    changed=true
+  fi
+
+  if ! current="$(run_as_target_user git config --global --get pull.rebase 2>/dev/null)"; then
+    current=""
+  fi
+  if [[ "$current" != "true" ]]; then
+    run_as_target_user git config --global pull.rebase true
+    changed=true
+  fi
+
+  if ! current="$(run_as_target_user git config --global --get rebase.autoStash 2>/dev/null)"; then
+    current=""
+  fi
+  if [[ "$current" != "true" ]]; then
+    run_as_target_user git config --global rebase.autoStash true
+    changed=true
+  fi
 
   if [[ "$(
-    sudo -u "$account" -H git config --global --get user.name
+    run_as_target_user git config --global --get user.name
   )" != "$git_name" ]] ||
      [[ "$(
-       sudo -u "$account" -H git config --global --get user.email
+       run_as_target_user git config --global --get user.email
      )" != "$git_email" ]] ||
      [[ "$(
-       sudo -u "$account" -H git config --global --get pull.rebase
+       run_as_target_user git config --global --get pull.rebase
      )" != "true" ]] ||
      [[ "$(
-       sudo -u "$account" -H git config --global --get rebase.autoStash
+       run_as_target_user git config --global --get rebase.autoStash
      )" != "true" ]]; then
     die "failed to configure Git for ${account}"
   fi
 
-  ok "Git configured for ${account}: identity and pull-rebase policy"
+  if [[ "$changed" == true ]]; then
+    ok "Git configured for ${account}: identity and pull-rebase policy"
+  else
+    info "Git already configured for ${account}, skipping"
+  fi
 }
 
-install_homebrew_for_user() {
-  local home
-  local group
-  local prefix="/home/linuxbrew/.linuxbrew"
+install_homebrew_for_user() (
+  set -Eeuo pipefail
+
+  local configured_prefix
+  local installer_file
+  local prefix="$HOMEBREW_PREFIX"
   local brew_bin="${prefix}/bin/brew"
-  local install_url="https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh"
-
-  home="$(user_home "$USER_NAME")"
-  [[ -n "$home" ]] ||
-    die "could not determine home directory for ${USER_NAME}"
-
-  group="$(id -gn "$USER_NAME")"
-
-  info "installing Homebrew prerequisites"
-  run_apt_get install -y -qq \
-    build-essential \
-    procps \
-    curl \
-    file \
-    git
+  local temporary_dir
+  local version_output
 
   if [[ -x "$brew_bin" ]]; then
-    info "Homebrew already installed"
+    info "Homebrew already installed; skipping installer prerequisites"
   else
-    info "installing Homebrew for ${USER_NAME}"
+    install_package_array "Homebrew prerequisite" \
+      build-essential \
+      procps \
+      curl \
+      file \
+      git
+
+    info "staging Homebrew installer for ${TARGET_USER}"
+
+    temporary_dir="$(mktemp -d)"
+    trap 'rm -rf -- "$temporary_dir"' EXIT
+    chmod 0755 "$temporary_dir"
+    installer_file="${temporary_dir}/install.sh"
+
+    fetch_file "$HOMEBREW_INSTALL_URL" "$installer_file" ||
+      die "failed downloading the Homebrew installer"
+    [[ -s "$installer_file" ]] || die "downloaded Homebrew installer is empty"
+    chmod 0644 "$installer_file"
+    bash -n "$installer_file" || die "downloaded Homebrew installer is not valid Bash"
 
     # Pre-create the supported Linux prefix so the non-interactive installer does not require password-based sudo access.
-    install -d -o "$USER_NAME" -g "$group" /home/linuxbrew
-    install -d -o "$USER_NAME" -g "$group" "$prefix"
+    if [[ ! -d "$(dirname -- "$prefix")" ]]; then
+      install -d -m 0755 -o "$TARGET_USER" -g "$TARGET_GROUP" "$(dirname -- "$prefix")"
+    fi
+    if [[ ! -d "$prefix" ]]; then
+      install -d -m 0755 -o "$TARGET_USER" -g "$TARGET_GROUP" "$prefix"
+    fi
+    verify_target_ownership "$prefix" "Homebrew prefix"
 
-    sudo -u "$USER_NAME" -H env NONINTERACTIVE=1 USER="$USER_NAME" \
-      /bin/bash -c "$(curl -fsSL --retry 3 --retry-all-errors --connect-timeout 15 "$install_url")"
+    if ! run_quiet_command \
+      "Homebrew installer" \
+      run_as_target_user env NONINTERACTIVE=1 /bin/bash "$installer_file"; then
+      die "Homebrew installation failed"
+    fi
 
     [[ -x "$brew_bin" ]] ||
       die "Homebrew installation did not provide ${brew_bin}"
   fi
 
   # Add Homebrew to Bash PATH idempotently.
-  sudo -u "$USER_NAME" -H bash -c '
-    set -euo pipefail
+  run_as_target_user bash -s -- "$brew_bin" <<'TARGET_BASHRC'
+set -euo pipefail
 
-    rc="$HOME/.bashrc"
-    line='\''eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"'\''
+brew_bin="$1"
+rc="$HOME/.bashrc"
+line="eval \"\$(${brew_bin} shellenv)\""
 
-    touch "$rc"
+touch "$rc"
 
-    if ! grep -Fqx "$line" "$rc"; then
-      {
-        printf "\n# Homebrew\n"
-        printf "%s\n" "$line"
-      } >> "$rc"
-    fi
-  '
+if ! grep -Fqx "$line" "$rc"; then
+  {
+    printf "\n# Homebrew\n"
+    printf "%s\n" "$line"
+  } >> "$rc"
+fi
+TARGET_BASHRC
 
-  ok "$("$brew_bin" --version | sed -n '1p') installed"
-}
+  verify_target_ownership "$prefix" "Homebrew prefix"
+  verify_target_ownership "$brew_bin" "Homebrew binary"
+
+  configured_prefix="$(run_as_target_user "$brew_bin" --prefix)"
+  [[ "$configured_prefix" == "$prefix" ]] ||
+    die "Homebrew reported unexpected prefix: ${configured_prefix}"
+
+  version_output="$(run_as_target_user "$brew_bin" --version)"
+  [[ "$version_output" == Homebrew* ]] || die "Homebrew version verification failed"
+  ok "${version_output%%$'\n'*} installed and verified for ${TARGET_USER}"
+)
 
 show_manual_setup_hints() {
   local home
