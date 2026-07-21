@@ -15,9 +15,10 @@
 autoinstall:
   # version is an Autoinstall required field.
   version: 1
+  # shutdown: poweroff
 
   # Configure locale, keyboard and timezone
-  locale: en_US
+  locale: en_GB
   keyboard:
     layout: it
   timezone: Europe/Rome
@@ -48,9 +49,9 @@ autoinstall:
     install-server: true
     authorized-keys:
       - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPA3hxPOnJAjCFoZMz8mcT+fZTy5j0vjLWPGVM2vaA88
-    allow-pw: true
+    allow-pw: false
 
-  # Packages to install (via apt-get install) and 
+  # Packages to install (via apt-get install)
   # packages:
   #   - open-vm-tools
 
@@ -66,4 +67,7 @@ autoinstall:
     - chmod 0440 /target/etc/sudoers.d/99-syselement
 
 
-# Validate this file with `sudo cloud-init schema --config-file user-data --annotate`
+# Validate this file with
+# `sudo cloud-init schema --config-file user-data --annotate`
+# or
+# `sudo cloud-init schema --config-file autoinstall.yaml --annotate`
