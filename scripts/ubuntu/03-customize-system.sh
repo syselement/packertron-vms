@@ -1549,7 +1549,15 @@ install_flameshot() (
 )
 
 configure_flameshot() {
+  local pictures_dir="${TARGET_HOME}/Pictures"
   local flameshot_dir="${TARGET_HOME}/Pictures/flameshot"
+
+  install -d \
+    -m 0755 \
+    -o "$TARGET_USER" \
+    -g "$TARGET_GROUP" \
+    "$pictures_dir" \
+    "$flameshot_dir"
 
   if sudo -u "$USER_NAME" -H bash -lc '
     [[ -f "$HOME/.config/flameshot/flameshot.ini" ]] && \
@@ -1560,7 +1568,6 @@ configure_flameshot() {
     return
   fi
 
-  install -d -o "$TARGET_USER" -g "$TARGET_GROUP" "$flameshot_dir"
   sudo -u "$TARGET_USER" -H bash -s -- "$flameshot_dir" <<'USER_CONFIG'
 set -euo pipefail
 

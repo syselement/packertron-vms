@@ -239,6 +239,26 @@ FAKE_GSETTINGS
   [[ "$output" != *"Postman snap installed"* ]]
 }
 
+@test "Flameshot repairs Pictures ownership before an idempotent configuration skip" {
+  TARGET_USER="testuser"
+  TARGET_HOME="/home/testuser"
+  TARGET_GROUP="testgroup"
+  USER_NAME="$TARGET_USER"
+
+  install() {
+    printf 'install arguments: %s\n' "$*"
+  }
+  sudo() {
+    return 0
+  }
+
+  run configure_flameshot
+
+  [[ "$status" -eq 0 ]]
+  [[ "$output" == *"install arguments: -d -m 0755 -o testuser -g testgroup /home/testuser/Pictures /home/testuser/Pictures/flameshot"* ]]
+  [[ "$output" == *"Flameshot already configured, skipping"* ]]
+}
+
 @test "Starship installer output stays quiet on success" {
   export STARSHIP_TEST_MARKER="$BATS_TEST_TMPDIR/starship-installed"
 
