@@ -44,6 +44,7 @@ readonly -a APT_BOOTSTRAP_PACKAGES=(
 
 readonly -a COMMON_PACKAGES=(
   aptitude
+  arp-scan
   bash-completion
   bat
   bats
