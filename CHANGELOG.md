@@ -1,3 +1,12 @@
+## [0.42.2](https://github.com/syselement/packertron-vms/compare/v0.42.1...v0.42.2) (2026-07-21)
+
+
+### Bug Fixes
+
+* update GNOME system monitor panel extension download URL and enhance autoinstall.yaml documentation ([4812989](https://github.com/syselement/packertron-vms/commit/481298914ca12b4afba34f6e73d0957cfc6f3e58))
+
+
+
 ## [0.42.1](https://github.com/syselement/packertron-vms/compare/v0.42.0...v0.42.1) (2026-07-19)
 
 
@@ -31,15 +40,6 @@
 ### Bug Fixes
 
 * update sudoers file naming convention for consistency ([48661e9](https://github.com/syselement/packertron-vms/commit/48661e9cdea26da9b8e84feb2fc35a2d1580a73b))
-
-
-
-# [0.40.0](https://github.com/syselement/packertron-vms/compare/v0.39.0...v0.40.0) (2026-07-19)
-
-
-### Features
-
-* add support for Flatpak packages and configure Flathub remote ([55c8e52](https://github.com/syselement/packertron-vms/commit/55c8e5251cff4bf64d38139a8b26bf408a64fe69))
 
 
 
