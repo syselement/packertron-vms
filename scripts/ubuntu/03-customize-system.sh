@@ -773,7 +773,7 @@ install_system_monitor_panel_extension() (
 
   local account="$1"
   local uuid="system-monitor-panel@naimur"
-  local download_url="https://extensions.gnome.org/review/download/72705.shell-extension.zip"
+  local download_url="https://extensions.gnome.org/review/download/72725.shell-extension.zip"
   local home metadata_file
 
   case "$VERSION_ID" in

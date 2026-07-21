@@ -11,10 +11,13 @@
 #
 # Customize username, password, timezone, keyboard layout, ssh authorized keys and other settings as needed.
 #
+# To facilitate the automated install URL insertion, this file was made available with a short-URL which points to a raw gist on GitHub.
+# 
 
 autoinstall:
   # version is an Autoinstall required field.
   version: 1
+  # shutdown: poweroff
 
   # Configure locale, keyboard and timezone
   locale: en_GB
