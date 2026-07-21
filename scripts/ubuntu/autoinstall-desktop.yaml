@@ -11,6 +11,8 @@
 #
 # Customize username, password, timezone, keyboard layout, ssh authorized keys and other settings as needed.
 #
+# To facilitate the automated install URL insertion, this file was made available with a short-URL which points to a raw gist on GitHub.
+# 
 
 autoinstall:
   # version is an Autoinstall required field.
@@ -52,8 +54,69 @@ autoinstall:
     allow-pw: false
 
   # Packages to install (via apt-get install)
-  # packages:
-  #   - open-vm-tools
+  packages:
+    - ca-certificates
+    - git
+
+  # user-data scripts to run after the installation during the cloud-init stage of the first boot
+  user-data:
+    write_files:
+      - path: /usr/local/sbin/packertron-firstboot
+        owner: root:root
+        permissions: '0750'
+        content: |
+          #!/usr/bin/env bash
+          set -Eeuo pipefail
+
+          REPO_URL="https://github.com/syselement/packertron-vms.git"
+          REPO_BRANCH="main"
+          REPO_DIR="/opt/packertron-vms"
+          LOG_FILE="/var/log/packertron-firstboot.log"
+
+          exec > >(tee -a "$LOG_FILE") 2>&1
+
+          if [[ -f /var/lib/packertron-bootstrap/complete ]]; then
+            echo "Packertron bootstrap already completed"
+            exit 0
+          fi
+
+          echo "Waiting for GitHub connectivity..."
+
+          reachable=false
+          for attempt in $(seq 1 30); do
+            if git ls-remote "$REPO_URL" HEAD >/dev/null 2>&1; then
+              reachable=true
+              break
+            fi
+
+            echo "GitHub unavailable; retry ${attempt}/30"
+            sleep 10
+          done
+
+          if [[ "$reachable" != true ]]; then
+            echo "ERROR: GitHub remained unreachable" >&2
+            exit 1
+          fi
+
+          if [[ -d "$REPO_DIR/.git" ]]; then
+            echo "Updating managed repository checkout"
+          else
+            echo "Cloning managed repository checkout"
+            install -d -m 0755 "$(dirname "$REPO_DIR")"
+            git clone "$REPO_URL" "$REPO_DIR"
+          fi
+
+          # /opt/packertron-vms is a root-managed deployment checkout.
+          # Do not store manual edits inside it.
+          git -C "$REPO_DIR" fetch --prune origin
+          git -C "$REPO_DIR" checkout -B "$REPO_BRANCH" "origin/$REPO_BRANCH"
+          git -C "$REPO_DIR" reset --hard "origin/$REPO_BRANCH"
+
+          exec \
+            "$REPO_DIR/scripts/ubuntu/90-bootstrap-baremetal.sh"
+
+    runcmd:
+      - ["/usr/local/sbin/packertron-firstboot"]
 
   # Update the APT package database and upgrade installed packages automatically on first boot
   # package_update: true
