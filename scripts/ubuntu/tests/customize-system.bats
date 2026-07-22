@@ -205,6 +205,93 @@ FAKE_GSETTINGS
     "$settings_dir/org.gnome.shell.enabled-extensions"
 }
 
+@test "GNOME extension download is staged, validated, and installed as the target user" {
+  local command_record="$BATS_TEST_TMPDIR/extension-command"
+  local validation_record="$BATS_TEST_TMPDIR/extension-validation"
+  local uuid="test-extension@example.com"
+
+  TARGET_USER="$(id -un)"
+  TARGET_HOME="$BATS_TEST_TMPDIR/home"
+  TARGET_UID="$(id -u)"
+  TARGET_GROUP="$(id -gn)"
+  mkdir -p "$TARGET_HOME"
+
+  command() {
+    if [[ "$1" == "-v" ]]; then
+      return 0
+    fi
+    builtin command "$@"
+  }
+  fetch_file() {
+    printf 'staged extension\n' >"$2"
+  }
+  validate_zip_archive() {
+    printf '%s|%s\n' "$1" "$2" >"$validation_record"
+  }
+  validate_gnome_extension_archive() {
+    printf '%s\n' "$2" >>"$validation_record"
+  }
+  run_as_target_user() {
+    printf '%s\n' "$*" >"$command_record"
+    mkdir -p "$TARGET_HOME/.local/share/gnome-shell/extensions/$uuid"
+    printf '{"uuid":"%s"}\n' "$uuid" \
+      >"$TARGET_HOME/.local/share/gnome-shell/extensions/$uuid/metadata.json"
+  }
+
+  run install_gnome_extension_from_zip \
+    "Test Extension" "$uuid" "https://example.invalid/extension.zip"
+
+  [[ "$status" -eq 0 ]]
+  grep -Fq 'gnome-extensions install --force' "$command_record"
+  grep -Fq "$uuid" "$validation_record"
+  [[ "$output" == *"Test Extension extension installed for ${TARGET_USER}"* ]]
+
+  fetch_file() {
+    printf 'unexpected extension download\n' >&2
+    return 99
+  }
+  run_as_target_user() {
+    printf 'unexpected extension reinstall\n' >&2
+    return 99
+  }
+  run install_gnome_extension_from_zip \
+    "Test Extension" "$uuid" "https://example.invalid/extension.zip"
+  [[ "$status" -eq 0 ]]
+  [[ "$output" == *"already installed and verified, skipping"* ]]
+  [[ "$output" != *"unexpected extension"* ]]
+}
+
+@test "failed GNOME extension download does not invoke the target installer" {
+  TARGET_USER="$(id -un)"
+  TARGET_HOME="$BATS_TEST_TMPDIR/home"
+  TARGET_UID="$(id -u)"
+  TARGET_GROUP="$(id -gn)"
+  mkdir -p "$TARGET_HOME/.local/share/gnome-shell/extensions/test-extension@example.com"
+  printf 'preserve me\n' >"$TARGET_HOME/.local/share/gnome-shell/extensions/test-extension@example.com/local-state"
+
+  command() {
+    if [[ "$1" == "-v" ]]; then
+      return 0
+    fi
+    builtin command "$@"
+  }
+  fetch_file() {
+    return 28
+  }
+  run_as_target_user() {
+    printf 'unexpected target installer\n' >&2
+    return 99
+  }
+
+  run install_gnome_extension_from_zip \
+    "Test Extension" "test-extension@example.com" "https://example.invalid/extension.zip"
+
+  [[ "$status" -ne 0 ]]
+  [[ "$output" == *"failed downloading Test Extension extension"* ]]
+  [[ "$output" != *"unexpected target installer"* ]]
+  [[ "$(<"$TARGET_HOME/.local/share/gnome-shell/extensions/test-extension@example.com/local-state")" == "preserve me" ]]
+}
+
 @test "APT package helper skips packages that are already installed" {
   dpkg-query() {
     printf 'install ok installed\n'
@@ -303,24 +390,154 @@ FAKE_GSETTINGS
   [[ "$output" != *"Postman snap installed"* ]]
 }
 
-@test "Flameshot repairs Pictures ownership before an idempotent configuration skip" {
-  TARGET_USER="testuser"
-  TARGET_HOME="/home/testuser"
-  TARGET_GROUP="testgroup"
-  USER_NAME="$TARGET_USER"
+@test "Flameshot writes one exact target-owned configuration and skips an identical rerun" {
+  local config_file
+  local first_inode
 
-  install() {
-    printf 'install arguments: %s\n' "$*"
-  }
-  sudo() {
-    return 0
-  }
+  TARGET_USER="$(id -un)"
+  TARGET_HOME="$BATS_TEST_TMPDIR/home"
+  TARGET_UID="$(id -u)"
+  TARGET_GROUP="$(id -gn)"
+  config_file="$TARGET_HOME/.config/flameshot/flameshot.ini"
+  mkdir -p "$TARGET_HOME"
 
   run configure_flameshot
+  [[ "$status" -eq 0 ]]
+  [[ "$output" == *"Flameshot configured"* ]]
+  [[ "$(stat -c '%U:%G:%a' "$config_file")" == "$TARGET_USER:$TARGET_GROUP:644" ]]
+  grep -Fxq "savePath=${TARGET_HOME}/Pictures/flameshot" "$config_file"
+  [[ "$(grep -Fc '[General]' "$config_file")" -eq 1 ]]
+  first_inode="$(stat -c '%i' "$config_file")"
+
+  run configure_flameshot
+  [[ "$status" -eq 0 ]]
+  [[ "$output" == *"Flameshot already configured, skipping"* ]]
+  [[ "$(stat -c '%i' "$config_file")" == "$first_inode" ]]
+  [[ ! -e "${config_file}.packertron.bak" ]]
+}
+
+@test "changed target configuration is backed up once and replaced atomically" {
+  local destination_file="$BATS_TEST_TMPDIR/home/.config/test/config"
+  local source_file="$BATS_TEST_TMPDIR/expected-config"
+
+  TARGET_USER="$(id -un)"
+  TARGET_HOME="$BATS_TEST_TMPDIR/home"
+  TARGET_UID="$(id -u)"
+  TARGET_GROUP="$(id -gn)"
+  mkdir -p "$(dirname "$destination_file")"
+  printf 'old configuration\n' >"$destination_file"
+  printf 'expected configuration\n' >"$source_file"
+  chmod 0600 "$destination_file"
+
+  run install_target_config_file "$source_file" "$destination_file" "test application"
 
   [[ "$status" -eq 0 ]]
-  [[ "$output" == *"install arguments: -d -m 0755 -o testuser -g testgroup /home/testuser/Pictures /home/testuser/Pictures/flameshot"* ]]
-  [[ "$output" == *"Flameshot already configured, skipping"* ]]
+  [[ "$output" == *"preserved previous test application configuration"* ]]
+  [[ "$(<"$destination_file")" == "expected configuration" ]]
+  [[ "$(<"${destination_file}.packertron.bak")" == "old configuration" ]]
+  [[ "$(stat -c '%U:%G:%a' "$destination_file")" == "$TARGET_USER:$TARGET_GROUP:644" ]]
+
+  printf 'another local change\n' >"$destination_file"
+  run install_target_config_file "$source_file" "$destination_file" "test application"
+  [[ "$status" -eq 0 ]]
+  [[ "$(<"${destination_file}.packertron.bak")" == "old configuration" ]]
+}
+
+@test "failed atomic activation preserves the existing target configuration" {
+  local destination_file="$BATS_TEST_TMPDIR/home/.config/test/config"
+  local source_file="$BATS_TEST_TMPDIR/expected-config"
+
+  TARGET_USER="$(id -un)"
+  TARGET_HOME="$BATS_TEST_TMPDIR/home"
+  TARGET_UID="$(id -u)"
+  TARGET_GROUP="$(id -gn)"
+  mkdir -p "$(dirname "$destination_file")"
+  printf 'existing configuration\n' >"$destination_file"
+  printf 'expected configuration\n' >"$source_file"
+
+  mv() {
+    return 42
+  }
+
+  run install_target_config_file "$source_file" "$destination_file" "test application"
+
+  [[ "$status" -ne 0 ]]
+  [[ "$output" == *"failed activating test application configuration"* ]]
+  [[ "$(<"$destination_file")" == "existing configuration" ]]
+}
+
+@test "Terminator exact configuration is idempotent" {
+  local config_file
+  local first_inode
+
+  TARGET_USER="$(id -un)"
+  TARGET_HOME="$BATS_TEST_TMPDIR/home"
+  TARGET_UID="$(id -u)"
+  TARGET_GROUP="$(id -gn)"
+  config_file="$TARGET_HOME/.config/terminator/config"
+  mkdir -p "$TARGET_HOME"
+
+  configure_terminator
+  first_inode="$(stat -c '%i' "$config_file")"
+
+  run configure_terminator
+
+  [[ "$status" -eq 0 ]]
+  [[ "$output" == *"Terminator already configured, skipping"* ]]
+  [[ "$(stat -c '%i' "$config_file")" == "$first_inode" ]]
+  grep -Fxq '    font = JetBrainsMono Nerd Font Mono 16' "$config_file"
+  [[ ! -e "${config_file}.packertron.bak" ]]
+}
+
+@test "Ubuntu 26 Terminator default is written through the target-user helper only when changed" {
+  local config_file
+  local first_inode
+
+  TARGET_USER="$(id -un)"
+  TARGET_HOME="$BATS_TEST_TMPDIR/home"
+  TARGET_UID="$(id -u)"
+  TARGET_GROUP="$(id -gn)"
+  VERSION_ID="26.04"
+  TERMINATOR_DESKTOP_FILE="$BATS_TEST_TMPDIR/terminator.desktop"
+  config_file="$TARGET_HOME/.config/ubuntu-xdg-terminals.list"
+  mkdir -p "$TARGET_HOME/.config"
+  printf '[Desktop Entry]\n' >"$TERMINATOR_DESKTOP_FILE"
+  printf '%s\n' org.gnome.Console.desktop terminator.desktop >"$config_file"
+
+  command() {
+    if [[ "$1" == "-v" && "$2" == "terminator" ]]; then
+      printf '/usr/bin/terminator\n'
+      return
+    fi
+    builtin command "$@"
+  }
+  run_as_target_user() {
+    local target_group="$TARGET_GROUP"
+    local target_home="$TARGET_HOME"
+    local target_uid="$TARGET_UID"
+    local target_user="$TARGET_USER"
+
+    HOME="$target_home" \
+      USER="$target_user" \
+      LOGNAME="$target_user" \
+      TARGET_HOME="$target_home" \
+      TARGET_UID="$target_uid" \
+      TARGET_GROUP="$target_group" \
+      "$@"
+  }
+
+  run configure_terminator_as_default "$TARGET_USER"
+  [[ "$status" -eq 0 ]]
+  [[ "$output" == *"Terminator configured as default terminal"* ]]
+  [[ "$(sed -n '1p' "$config_file")" == "terminator.desktop" ]]
+  [[ "$(grep -Fc terminator.desktop "$config_file")" -eq 1 ]]
+  grep -Fxq org.gnome.Console.desktop "$config_file"
+  first_inode="$(stat -c '%i' "$config_file")"
+
+  run configure_terminator_as_default "$TARGET_USER"
+  [[ "$status" -eq 0 ]]
+  [[ "$output" == *"already configured as default terminal"* ]]
+  [[ "$(stat -c '%i' "$config_file")" == "$first_inode" ]]
 }
 
 @test "Starship installer output stays quiet on success" {
@@ -413,10 +630,15 @@ FAKE_GSETTINGS
 }
 
 @test "Nerd Font detection does not reinstall a matched font" {
+  TARGET_USER="$(id -un)"
+  TARGET_HOME="$BATS_TEST_TMPDIR/home"
+  TARGET_UID="$(id -u)"
+  TARGET_GROUP="$(id -gn)"
+
   user_home() {
     printf '%s\n' "$BATS_TEST_TMPDIR/home"
   }
-  sudo() {
+  run_as_target_user() {
     if [[ "$*" == *"fc-match"* ]]; then
       printf 'JetBrainsMono Nerd Font,JetBrainsMono NFM\n'
       return
@@ -425,11 +647,71 @@ FAKE_GSETTINGS
     return 99
   }
 
-  run install_jetbrainsmono_nerd_font_for_user testuser
+  run install_jetbrainsmono_nerd_font_for_user "$TARGET_USER"
 
   [[ "$status" -eq 0 ]]
-  [[ "$output" == *"Nerd Font already installed for testuser, skipping"* ]]
+  [[ "$output" == *"Nerd Font already installed for ${TARGET_USER}, skipping"* ]]
   [[ "$output" != *"unexpected font mutation"* ]]
+}
+
+@test "failed Nerd Font metadata download preserves the existing font directory" {
+  TARGET_USER="$(id -un)"
+  TARGET_HOME="$BATS_TEST_TMPDIR/home"
+  TARGET_UID="$(id -u)"
+  TARGET_GROUP="$(id -gn)"
+  mkdir -p "$TARGET_HOME/.local/share/fonts"
+  printf 'existing font\n' >"$TARGET_HOME/.local/share/fonts/existing.ttf"
+
+  user_home() {
+    printf '%s\n' "$TARGET_HOME"
+  }
+  run_as_target_user() {
+    if [[ "$*" == *"fc-match"* ]]; then
+      printf 'DejaVu Sans\n'
+      return
+    fi
+    printf 'unexpected font installer\n' >&2
+    return 99
+  }
+  fetch_file() {
+    return 28
+  }
+
+  run install_jetbrainsmono_nerd_font_for_user "$TARGET_USER"
+
+  [[ "$status" -ne 0 ]]
+  [[ "$output" == *"failed downloading JetBrainsMono Nerd Font release metadata"* ]]
+  [[ "$output" != *"unexpected font installer"* ]]
+  [[ "$(<"$TARGET_HOME/.local/share/fonts/existing.ttf")" == "existing font" ]]
+}
+
+@test "failed Obsidian metadata download preserves the installed snap" {
+  local snap_record="$BATS_TEST_TMPDIR/snap-record"
+
+  VERSION_ID="26.04"
+
+  dpkg() {
+    if [[ "$1" == "--print-architecture" ]]; then
+      printf 'amd64\n'
+      return
+    fi
+    return 2
+  }
+  snap() {
+    if [[ "$1" == "list" && "$2" == "obsidian" ]]; then
+      return 0
+    fi
+    printf '%s\n' "$*" >>"$snap_record"
+  }
+  fetch_file() {
+    return 28
+  }
+
+  run install_obsidian
+
+  [[ "$status" -ne 0 ]]
+  [[ "$output" == *"failed downloading Obsidian release metadata"* ]]
+  [[ ! -e "$snap_record" ]]
 }
 
 @test "correct bat symlink is left unchanged" {
@@ -588,6 +870,26 @@ FAKE_INSTALLER
   run run_quiet_command "test command" noisy_failure
   [[ "$status" -eq 23 ]]
   [[ "$output" == *"test command: actionable failure"* ]]
+}
+
+@test "GitHub asset digest helper accepts a match and rejects a mismatch" {
+  local asset_file="$BATS_TEST_TMPDIR/asset"
+  local digest
+
+  printf 'verified asset\n' >"$asset_file"
+  digest="$(sha256sum "$asset_file")"
+  digest="${digest%% *}"
+
+  run verify_github_asset_digest "$asset_file" "sha256:${digest}" "test asset"
+  [[ "$status" -eq 0 ]]
+  [[ -z "$output" ]]
+
+  run verify_github_asset_digest \
+    "$asset_file" \
+    'sha256:0000000000000000000000000000000000000000000000000000000000000000' \
+    "test asset"
+  [[ "$status" -ne 0 ]]
+  [[ "$output" == *"SHA-256 verification failed for test asset"* ]]
 }
 
 @test "failed repository download preserves existing files" {

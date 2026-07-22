@@ -248,6 +248,120 @@ fetch_file() {
     "$url"
 }
 
+validate_zip_archive() {
+  local archive_file="$1"
+  local description="$2"
+  local entry
+
+  [[ -s "$archive_file" ]] || die "downloaded ${description} archive is empty"
+  unzip -tq "$archive_file" >/dev/null ||
+    die "downloaded ${description} archive is invalid"
+
+  while IFS= read -r entry; do
+    if [[ "$entry" == /* || "$entry" == ../* || "$entry" == */.. || "$entry" == */../* ]]; then
+      die "downloaded ${description} archive contains an unsafe path: ${entry}"
+    fi
+  done < <(unzip -Z1 "$archive_file")
+}
+
+validate_gnome_extension_archive() {
+  local archive_file="$1"
+  local expected_uuid="$2"
+  local actual_uuid
+
+  actual_uuid="$(unzip -p "$archive_file" metadata.json 2>/dev/null | jq -r '.uuid // empty')" ||
+    die "GNOME extension archive does not contain valid metadata"
+  [[ "$actual_uuid" == "$expected_uuid" ]] ||
+    die "unexpected GNOME extension UUID: ${actual_uuid:-missing}; expected ${expected_uuid}"
+}
+
+verify_github_asset_digest() {
+  local asset_file="$1"
+  local published_digest="$2"
+  local description="$3"
+  local actual_digest
+  local expected_digest
+
+  if [[ ! "$published_digest" =~ ^sha256:([[:xdigit:]]{64})$ ]]; then
+    warn "GitHub did not provide a SHA-256 digest for ${description}; relying on format validation"
+    return
+  fi
+
+  expected_digest="${BASH_REMATCH[1],,}"
+  actual_digest="$(sha256sum "$asset_file")"
+  actual_digest="${actual_digest%% *}"
+  [[ "$actual_digest" == "$expected_digest" ]] ||
+    die "SHA-256 verification failed for ${description}"
+}
+
+install_target_config_file() {
+  local source_file="$1"
+  local destination_file="$2"
+  local description="$3"
+  local backup_file="${destination_file}.packertron.bak"
+  local destination_dir
+  local destination_group=""
+  local destination_mode=""
+  local destination_owner=""
+  local staged_file
+
+  [[ -f "$source_file" ]] || die "expected ${description} configuration is missing"
+  [[ ! -L "$destination_file" ]] ||
+    die "refusing to replace symlinked ${description} configuration: ${destination_file}"
+
+  destination_dir="$(dirname -- "$destination_file")"
+  install -d -m 0755 -o "$TARGET_USER" -g "$TARGET_GROUP" "$destination_dir"
+
+  if [[ -f "$destination_file" ]]; then
+    destination_owner="$(stat -Lc '%U' "$destination_file")"
+    destination_group="$(stat -Lc '%G' "$destination_file")"
+    destination_mode="$(stat -Lc '%a' "$destination_file")"
+
+    if cmp -s -- "$source_file" "$destination_file" &&
+      [[ "$destination_owner" == "$TARGET_USER" &&
+        "$destination_group" == "$TARGET_GROUP" &&
+        "$destination_mode" == "644" ]]; then
+      info "${description} already configured, skipping"
+      return
+    fi
+
+    if ! cmp -s -- "$source_file" "$destination_file" &&
+      [[ ! -e "$backup_file" ]]; then
+      install \
+        -o "$TARGET_USER" \
+        -g "$TARGET_GROUP" \
+        -m 0644 \
+        "$destination_file" \
+        "$backup_file"
+      info "preserved previous ${description} configuration: ${backup_file}"
+    fi
+  fi
+
+  staged_file="$(mktemp "${destination_dir}/.packertron-config.XXXXXX")"
+  if ! install \
+    -o "$TARGET_USER" \
+    -g "$TARGET_GROUP" \
+    -m 0644 \
+    "$source_file" \
+    "$staged_file"; then
+    rm -f -- "$staged_file"
+    die "failed staging ${description} configuration"
+  fi
+
+  if ! mv -f -- "$staged_file" "$destination_file"; then
+    rm -f -- "$staged_file"
+    die "failed activating ${description} configuration"
+  fi
+
+  cmp -s -- "$source_file" "$destination_file" ||
+    die "${description} configuration could not be verified"
+  verify_target_ownership "$destination_file" "${description} configuration"
+  [[ "$(stat -Lc '%a' "$destination_file")" == "644" ]] ||
+    die "unexpected ${description} configuration permissions"
+
+  ok "${description} configured"
+}
+
 validate_openpgp_key() {
   local description="$2"
   local expected_fingerprint="${3:-}"
@@ -704,13 +818,71 @@ GNOME_SETTINGS
   ok "GNOME preferences applied and verified"
 }
 
+install_gnome_extension_from_zip() (
+  set -Eeuo pipefail
+
+  local command_name
+  local display_name="$1"
+  local uuid="$2"
+  local download_url="$3"
+  local installed_uuid=""
+  local metadata_file="${TARGET_HOME}/.local/share/gnome-shell/extensions/${uuid}/metadata.json"
+  local temporary_dir
+
+  command -v jq >/dev/null 2>&1 ||
+    die "jq is required to inspect ${display_name}"
+
+  if [[ -f "$metadata_file" ]] &&
+    installed_uuid="$(jq -r '.uuid // empty' "$metadata_file" 2>/dev/null)" &&
+    [[ "$installed_uuid" == "$uuid" ]]; then
+    verify_target_ownership "$metadata_file" "${display_name} extension metadata"
+    info "${display_name} extension already installed and verified, skipping"
+    return
+  elif [[ -f "$metadata_file" ]]; then
+    warn "${display_name} extension metadata is incomplete; repairing installation"
+  fi
+
+  for command_name in curl gnome-extensions unzip; do
+    command -v "$command_name" >/dev/null 2>&1 ||
+      die "${command_name} is required to install ${display_name}"
+  done
+
+  temporary_dir="$(mktemp -d)"
+  trap 'rm -rf -- "$temporary_dir"' EXIT
+  chmod 0755 "$temporary_dir"
+
+  info "downloading ${display_name} extension"
+  fetch_file "$download_url" "$temporary_dir/extension.zip" ||
+    die "failed downloading ${display_name} extension"
+  validate_zip_archive "$temporary_dir/extension.zip" "${display_name} extension"
+  validate_gnome_extension_archive "$temporary_dir/extension.zip" "$uuid"
+  chmod 0644 "$temporary_dir/extension.zip"
+
+  run_quiet_command \
+    "${display_name} extension installer" \
+    run_as_target_user \
+    gnome-extensions install --force "$temporary_dir/extension.zip" ||
+    die "${display_name} extension installation failed"
+
+  [[ -f "$metadata_file" ]] ||
+    die "${display_name} extension installation could not be verified"
+  installed_uuid="$(jq -r '.uuid // empty' "$metadata_file" 2>/dev/null)" ||
+    die "${display_name} extension installed invalid metadata"
+  [[ "$installed_uuid" == "$uuid" ]] ||
+    die "${display_name} extension installed unexpected metadata"
+  verify_target_ownership "$metadata_file" "${display_name} extension metadata"
+
+  ok "${display_name} extension installed for ${TARGET_USER}"
+)
+
 install_hide_universal_access_extension() (
-  set -euo pipefail
+  set -Eeuo pipefail
 
   local account="$1"
-  local uuid="hide-universal-access@akiirui.github.io"
   local download_url=""
-  local home metadata_file
+
+  [[ "$account" == "$TARGET_USER" ]] ||
+    die "Hide Universal Access must be installed for the resolved target user"
 
   case "$VERSION_ID" in
     26.*)
@@ -725,59 +897,20 @@ install_hide_universal_access_extension() (
       ;;
   esac
 
-  command -v curl >/dev/null 2>&1 ||
-    die "curl is required to install Hide Universal Access"
-
-  command -v gnome-extensions >/dev/null 2>&1 ||
-    die "gnome-extensions is required to install Hide Universal Access"
-
-  home="$(user_home "$account")"
-  [[ -n "$home" ]] ||
-    die "could not determine home directory for ${account}"
-
-  metadata_file="$home/.local/share/gnome-shell/extensions/$uuid/metadata.json"
-
-  if [[ -f "$metadata_file" ]]; then
-    info "Hide Universal Access extension already installed, skipping"
-    return
-  fi
-
-  info "downloading Hide Universal Access extension"
-
-  sudo -u "$account" -H bash -s -- "$download_url" <<'USER_INSTALL'
-set -euo pipefail
-
-download_url="$1"
-tmp_file="$(mktemp --suffix=.shell-extension.zip)"
-
-cleanup() {
-  rm -f -- "$tmp_file"
-}
-trap cleanup EXIT
-
-curl -fsSL \
-  --retry 3 \
-  --retry-all-errors \
-  --connect-timeout 15 \
-  "$download_url" \
-  -o "$tmp_file"
-
-gnome-extensions install --force "$tmp_file"
-USER_INSTALL
-
-  [[ -f "$metadata_file" ]] ||
-    die "Hide Universal Access extension installation failed"
-
-  ok "Hide Universal Access extension installed for ${account}"
+  install_gnome_extension_from_zip \
+    "Hide Universal Access" \
+    "hide-universal-access@akiirui.github.io" \
+    "$download_url"
 )
 
 install_system_monitor_panel_extension() (
-  set -euo pipefail
+  set -Eeuo pipefail
 
   local account="$1"
-  local uuid="system-monitor-panel@naimur"
   local download_url="https://extensions.gnome.org/review/download/72725.shell-extension.zip"
-  local home metadata_file
+
+  [[ "$account" == "$TARGET_USER" ]] ||
+    die "System Monitor Panel must be installed for the resolved target user"
 
   case "$VERSION_ID" in
     26.*) ;;
@@ -791,44 +924,10 @@ install_system_monitor_panel_extension() (
       ;;
   esac
 
-  command -v curl >/dev/null 2>&1 ||
-    die "curl is required to install System Monitor Panel"
-
-  command -v gnome-extensions >/dev/null 2>&1 ||
-    die "gnome-extensions is required to install System Monitor Panel"
-
-  home="$(user_home "$account")"
-  [[ -n "$home" ]] ||
-    die "could not determine home directory for ${account}"
-
-  metadata_file="$home/.local/share/gnome-shell/extensions/$uuid/metadata.json"
-
-  if [[ -f "$metadata_file" ]]; then
-    info "System Monitor Panel extension already installed, skipping"
-    return
-  fi
-
-  info "downloading System Monitor Panel extension"
-
-  sudo -u "$account" -H bash -s -- "$download_url" <<'USER_INSTALL'
-set -euo pipefail
-
-download_url="$1"
-tmp_file="$(mktemp --suffix=.shell-extension.zip)"
-
-cleanup() {
-  rm -f -- "$tmp_file"
-}
-trap cleanup EXIT
-
-curl -fsSL "$download_url" -o "$tmp_file"
-gnome-extensions install --force "$tmp_file"
-USER_INSTALL
-
-  [[ -f "$metadata_file" ]] ||
-    die "System Monitor Panel extension installation failed"
-
-  ok "System Monitor Panel extension installed for ${account}"
+  install_gnome_extension_from_zip \
+    "System Monitor Panel" \
+    "system-monitor-panel@naimur" \
+    "$download_url"
 )
 
 enable_battery_health_preservation() {
@@ -1203,20 +1302,17 @@ configure_desktop_wallpaper() (
   ok "GNOME wallpaper file ready: ${destination_file}"
 )
 
-configure_terminator() {
-  if sudo -u "$USER_NAME" -H bash -lc '
-    [[ -f "$HOME/.config/terminator/config" ]] && \
-    grep -q "font = JetBrainsMono Nerd Font Mono 16" "$HOME/.config/terminator/config" && \
-    grep -q "scrollback_infinite = True" "$HOME/.config/terminator/config"
-  '; then
-    info "Terminator already configured, skipping"
-    return
-  fi
+configure_terminator() (
+  set -Eeuo pipefail
 
-  sudo -u "$USER_NAME" -H bash -lc '
-    set -euo pipefail
-    mkdir -p "$HOME/.config/terminator"
-    cat > "$HOME/.config/terminator/config" << '"'"'EOF'"'"'
+  local expected_config
+  local temporary_dir
+
+  temporary_dir="$(mktemp -d)"
+  trap 'rm -rf -- "$temporary_dir"' EXIT
+  expected_config="$temporary_dir/config"
+
+  cat >"$expected_config" <<'EOF'
 [global_config]
   window_state = maximise
 [keybindings]
@@ -1238,21 +1334,22 @@ configure_terminator() {
       parent = window0
 [plugins]
 EOF
-  '
-  ok "Terminator configured"
-}
+
+  install_target_config_file \
+    "$expected_config" \
+    "$TARGET_HOME/.config/terminator/config" \
+    "Terminator"
+)
 
 configure_terminator_as_default() {
   local account="$1"
-  local home
-  local group
+  local status
   local terminator_bin
-  local desktop_file="/usr/share/applications/terminator.desktop"
+  local desktop_file="${TERMINATOR_DESKTOP_FILE:-/usr/share/applications/terminator.desktop}"
   local desktop_id="terminator.desktop"
 
-  home="$(user_home "$account")"
-  [[ -n "$home" ]] || die "could not determine home directory for ${account}"
-  group="$(id -gn "$account")"
+  [[ "$account" == "$TARGET_USER" ]] ||
+    die "default terminal must be configured for the resolved target user"
 
   terminator_bin="$(command -v terminator 2>/dev/null || true)"
   if [[ -z "$terminator_bin" ]]; then
@@ -1269,6 +1366,11 @@ configure_terminator_as_default() {
         return
       fi
 
+      if [[ "$(readlink -f /etc/alternatives/x-terminal-emulator 2>/dev/null || true)" == "$terminator_bin" ]]; then
+        info "Terminator already configured as system default terminal, skipping"
+        return
+      fi
+
       update-alternatives --set x-terminal-emulator "$terminator_bin"
       ok "Terminator configured as system default terminal on Ubuntu ${VERSION_ID}"
       ;;
@@ -1280,9 +1382,9 @@ configure_terminator_as_default() {
         return
       fi
 
-      install -d -m 0755 -o "$account" -g "$group" "$home/.config"
+      install -d -m 0755 -o "$TARGET_USER" -g "$TARGET_GROUP" "$TARGET_HOME/.config"
 
-      sudo -u "$account" -H bash -s -- "$desktop_id" <<'EOF'
+      if run_as_target_user bash -s -- "$desktop_id" <<'EOF'; then
 set -euo pipefail
 
 desktop_id="$1"
@@ -1299,16 +1401,26 @@ trap cleanup EXIT
   printf '%s\n' "$desktop_id"
 
   if [[ -f "$config_file" ]]; then
-    grep -Fxv -- "$desktop_id" "$config_file" || true
+    awk -v desktop_id="$desktop_id" '$0 != desktop_id' "$config_file"
   fi
 } > "$tmp_file"
 
 chmod 0644 "$tmp_file"
+if [[ -f "$config_file" ]] && cmp -s -- "$tmp_file" "$config_file"; then
+  exit 0
+fi
+
 mv -f "$tmp_file" "$config_file"
 trap - EXIT
+exit 10
 EOF
-
-      ok "Terminator configured as default terminal for ${account} on Ubuntu ${VERSION_ID}"
+        info "Terminator already configured as default terminal for ${account}, skipping"
+      else
+        status=$?
+        [[ "$status" -eq 10 ]] ||
+          die "failed configuring Terminator as default terminal for ${account}"
+        ok "Terminator configured as default terminal for ${account} on Ubuntu ${VERSION_ID}"
+      fi
       ;;
 
     *)
@@ -1356,19 +1468,21 @@ install_flameshot() (
   set -euo pipefail
 
   local api_url="https://api.github.com/repos/flameshot-org/flameshot/releases/latest"
+  local cmd
   local release_json tag latest_version installed_version
-  local architecture platform asset_url asset_name
-  local tmp_dir deb_file checksum_file
+  local architecture platform asset_url asset_name asset_digest
+  local tmp_dir deb_file checksum_file package_architecture package_name package_version
+  local -a checksum_files deb_files
   local -a platform_candidates
 
-  for cmd in curl jq unzip sha256sum dpkg-query apt-get; do
+  for cmd in curl jq unzip sha256sum dpkg dpkg-query dpkg-deb apt-get; do
     command -v "$cmd" >/dev/null 2>&1 ||
       die "${cmd} is required to install Flameshot"
   done
 
   architecture="$(dpkg --print-architecture)"
   case "$architecture" in
-    amd64|arm64) ;;
+    amd64 | arm64) ;;
     *)
       warn "unsupported Flameshot architecture: ${architecture}"
       return
@@ -1390,10 +1504,16 @@ install_flameshot() (
       ;;
   esac
 
+  tmp_dir="$(mktemp -d)"
+  trap 'rm -rf -- "$tmp_dir"' EXIT
+
   info "checking latest Flameshot GitHub release"
 
-  release_json="$(curl -fsSL "$api_url")"
-  tag="$(jq -r '.tag_name // empty' <<<"$release_json")"
+  fetch_file "$api_url" "$tmp_dir/release.json" ||
+    die "failed downloading Flameshot release metadata"
+  release_json="$(<"$tmp_dir/release.json")"
+  tag="$(jq -r '.tag_name // empty' <<<"$release_json")" ||
+    die "Flameshot release metadata is invalid"
   [[ -n "$tag" ]] || die "could not determine latest Flameshot release"
 
   latest_version="${tag#v}"
@@ -1416,7 +1536,7 @@ install_flameshot() (
           | select(.name | endswith($suffix))
         ][0].browser_download_url // empty' \
         <<<"$release_json"
-    )"
+    )" || die "Flameshot release metadata is invalid"
 
     [[ -n "$asset_url" ]] && break
   done
@@ -1425,35 +1545,53 @@ install_flameshot() (
     die "no compatible Flameshot artifact for Ubuntu ${VERSION_ID}/${architecture}"
 
   asset_name="${asset_url##*/}"
-  tmp_dir="$(mktemp -d)"
-  trap 'rm -rf -- "$tmp_dir"' EXIT
+  asset_digest="$(
+    jq -r --arg name "$asset_name" '
+      [.assets[] | select(.name == $name)][0].digest // empty
+    ' <<<"$release_json"
+  )" || die "Flameshot release metadata is invalid"
 
   info "downloading Flameshot ${tag} (${platform}/${architecture})"
-  curl -fL "$asset_url" -o "$tmp_dir/$asset_name"
+  fetch_file "$asset_url" "$tmp_dir/$asset_name" ||
+    die "failed downloading Flameshot ${tag}"
+  verify_github_asset_digest "$tmp_dir/$asset_name" "$asset_digest" "Flameshot ${tag} archive"
+  validate_zip_archive "$tmp_dir/$asset_name" "Flameshot ${tag}"
 
+  mkdir "$tmp_dir/extracted"
   unzip -q "$tmp_dir/$asset_name" -d "$tmp_dir/extracted"
 
-  deb_file="$(
-    find "$tmp_dir/extracted" -maxdepth 2 -type f \
-      -name 'flameshot*.deb' -print -quit
-  )"
+  mapfile -t deb_files < <(
+    find "$tmp_dir/extracted" -maxdepth 2 -type f -name 'flameshot*.deb' -print
+  )
+  mapfile -t checksum_files < <(
+    find "$tmp_dir/extracted" -maxdepth 2 -type f -name 'flameshot*.deb.sha256sum' -print
+  )
 
-  checksum_file="$(
-    find "$tmp_dir/extracted" -maxdepth 2 -type f \
-      -name 'flameshot*.deb.sha256sum' -print -quit
-  )"
-
-  [[ -n "$deb_file" ]] ||
-    die "Flameshot archive does not contain a Debian package"
-
-  [[ -n "$checksum_file" ]] ||
-    die "Flameshot archive does not contain the Debian package checksum"
+  ((${#deb_files[@]} == 1)) ||
+    die "Flameshot archive must contain exactly one Debian package"
+  ((${#checksum_files[@]} == 1)) ||
+    die "Flameshot archive must contain exactly one Debian package checksum"
+  deb_file="${deb_files[0]}"
+  checksum_file="${checksum_files[0]}"
 
   info "verifying Flameshot package checksum"
   (
     cd "$(dirname "$deb_file")"
     sha256sum --check "$(basename "$checksum_file")"
   )
+
+  dpkg-deb --info "$deb_file" >/dev/null ||
+    die "Flameshot Debian package is invalid"
+  package_name="$(dpkg-deb -f "$deb_file" Package)"
+  package_architecture="$(dpkg-deb -f "$deb_file" Architecture)"
+  package_version="$(dpkg-deb -f "$deb_file" Version)"
+
+  [[ "$package_name" == "flameshot" ]] ||
+    die "unexpected Flameshot package name: ${package_name}"
+  [[ "$package_architecture" == "$architecture" || "$package_architecture" == "all" ]] ||
+    die "unexpected Flameshot package architecture: ${package_architecture}"
+  dpkg --compare-versions "$package_version" ge "$latest_version" ||
+    die "unexpected Flameshot package version: ${package_version}"
 
   info "installing Flameshot ${tag}"
   run_apt_get install -y "$deb_file"
@@ -1468,9 +1606,13 @@ install_flameshot() (
   ok "Flameshot ${installed_version} installed from the official GitHub release"
 )
 
-configure_flameshot() {
+configure_flameshot() (
+  set -Eeuo pipefail
+
+  local expected_config
   local pictures_dir="${TARGET_HOME}/Pictures"
   local flameshot_dir="${TARGET_HOME}/Pictures/flameshot"
+  local temporary_dir
 
   install -d \
     -m 0755 \
@@ -1479,21 +1621,11 @@ configure_flameshot() {
     "$pictures_dir" \
     "$flameshot_dir"
 
-  if sudo -u "$USER_NAME" -H bash -lc '
-    [[ -f "$HOME/.config/flameshot/flameshot.ini" ]] && \
-    grep -q "^startupLaunch=true$" "$HOME/.config/flameshot/flameshot.ini" && \
-    grep -q "^savePathFixed=true$" "$HOME/.config/flameshot/flameshot.ini"
-  '; then
-    info "Flameshot already configured, skipping"
-    return
-  fi
+  temporary_dir="$(mktemp -d)"
+  trap 'rm -rf -- "$temporary_dir"' EXIT
+  expected_config="$temporary_dir/flameshot.ini"
 
-  sudo -u "$TARGET_USER" -H bash -s -- "$flameshot_dir" <<'USER_CONFIG'
-set -euo pipefail
-
-flameshot_dir="$1"
-mkdir -p "$HOME/.config/flameshot"
-cat > "$HOME/.config/flameshot/flameshot.ini" <<EOF
+  cat >"$expected_config" <<EOF
 [General]
 contrastOpacity=188
 copyOnDoubleClick=true
@@ -1509,44 +1641,52 @@ showStartupLaunchMessage=false
 squareMagnifier=true
 startupLaunch=true
 EOF
-USER_CONFIG
 
-  ok "Flameshot configured"
-}
+  install_target_config_file \
+    "$expected_config" \
+    "$TARGET_HOME/.config/flameshot/flameshot.ini" \
+    "Flameshot"
+)
 
 install_obsidian() (
   set -euo pipefail
 
   local api_url="https://api.github.com/repos/obsidianmd/obsidian-releases/releases/latest"
+  local cmd
   local release_json tag latest_version
-  local architecture asset_url asset_name asset_digest
+  local architecture asset_url asset_name asset_digest package_architecture package_version
   local installed_version tmp_dir deb_file package_name
+  local snap_installed=false
 
-  for cmd in curl jq dpkg dpkg-query dpkg-deb apt-get; do
+  for cmd in curl jq sha256sum dpkg dpkg-query dpkg-deb apt-get; do
     command -v "$cmd" >/dev/null 2>&1 ||
       die "${cmd} is required to install Obsidian"
   done
 
   architecture="$(dpkg --print-architecture)"
   case "$architecture" in
-    amd64|arm64) ;;
+    amd64 | arm64) ;;
     *)
       warn "unsupported Obsidian architecture: ${architecture}"
       return
       ;;
   esac
 
-  # Remove the Snap version to avoid duplicate launchers.
   if command -v snap >/dev/null 2>&1 &&
     snap list obsidian >/dev/null 2>&1; then
-    info "removing Obsidian snap"
-    snap remove obsidian
+    snap_installed=true
   fi
+
+  tmp_dir="$(mktemp -d)"
+  trap 'rm -rf -- "$tmp_dir"' EXIT
 
   info "checking latest Obsidian GitHub release"
 
-  release_json="$(curl -fsSL --retry 3 "$api_url")"
-  tag="$(jq -r '.tag_name // empty' <<<"$release_json")"
+  fetch_file "$api_url" "$tmp_dir/release.json" ||
+    die "failed downloading Obsidian release metadata"
+  release_json="$(<"$tmp_dir/release.json")"
+  tag="$(jq -r '.tag_name // empty' <<<"$release_json")" ||
+    die "Obsidian release metadata is invalid"
   [[ -n "$tag" ]] ||
     die "could not determine the latest Obsidian release"
 
@@ -1558,19 +1698,23 @@ install_obsidian() (
 
   if [[ -n "$installed_version" ]] &&
     dpkg --compare-versions "$installed_version" ge "$latest_version"; then
+    if [[ "$snap_installed" == true ]]; then
+      info "removing duplicate Obsidian snap"
+      snap remove obsidian || die "failed removing duplicate Obsidian snap"
+    fi
     info "Obsidian ${installed_version} already installed, skipping"
     return
   fi
 
-asset_url="$(
-  jq -r --arg arch "$architecture" '
-    first(
-      .assets[]
-      | select(.name | endswith("_" + $arch + ".deb"))
-      | .browser_download_url
-    ) // empty
-  ' <<<"$release_json"
-)"
+  asset_url="$(
+    jq -r --arg arch "$architecture" '
+      first(
+        .assets[]
+        | select(.name | endswith("_" + $arch + ".deb"))
+        | .browser_download_url
+      ) // empty
+    ' <<<"$release_json"
+  )" || die "Obsidian release metadata is invalid"
 
   [[ -n "$asset_url" ]] ||
     die "no Obsidian Debian package found for ${architecture}"
@@ -1581,31 +1725,29 @@ asset_url="$(
     jq -r --arg name "$asset_name" '
       [.assets[] | select(.name == $name)][0].digest // empty
     ' <<<"$release_json"
-  )"
-
-  tmp_dir="$(mktemp -d)"
-  trap 'rm -rf -- "$tmp_dir"' EXIT
+  )" || die "Obsidian release metadata is invalid"
 
   deb_file="$tmp_dir/$asset_name"
 
   info "downloading Obsidian ${tag} for ${architecture}"
-  curl -fL --retry 3 "$asset_url" -o "$deb_file"
+  fetch_file "$asset_url" "$deb_file" ||
+    die "failed downloading Obsidian ${tag}"
+  [[ -s "$deb_file" ]] || die "downloaded Obsidian package is empty"
 
-  # Verify the GitHub-provided SHA-256 digest when available.
-  if [[ "$asset_digest" == sha256:* ]]; then
-    printf '%s  %s\n' \
-      "${asset_digest#sha256:}" \
-      "$deb_file" |
-      sha256sum --check -
-  else
-    warn "GitHub API did not provide an asset digest; continuing after package validation"
-  fi
+  verify_github_asset_digest "$deb_file" "$asset_digest" "Obsidian ${tag} package"
 
-  dpkg-deb --info "$deb_file" >/dev/null
+  dpkg-deb --info "$deb_file" >/dev/null ||
+    die "downloaded Obsidian Debian package is invalid"
 
   package_name="$(dpkg-deb -f "$deb_file" Package)"
+  package_architecture="$(dpkg-deb -f "$deb_file" Architecture)"
+  package_version="$(dpkg-deb -f "$deb_file" Version)"
   [[ "$package_name" == "obsidian" ]] ||
     die "unexpected Debian package name: ${package_name}"
+  [[ "$package_architecture" == "$architecture" || "$package_architecture" == "all" ]] ||
+    die "unexpected Obsidian package architecture: ${package_architecture}"
+  dpkg --compare-versions "$package_version" ge "$latest_version" ||
+    die "unexpected Obsidian package version: ${package_version}"
 
   info "installing Obsidian ${tag}"
   run_apt_get install -y "$deb_file"
@@ -1616,6 +1758,11 @@ asset_url="$(
 
   [[ -n "$installed_version" ]] ||
     die "Obsidian installation could not be verified"
+
+  if [[ "$snap_installed" == true ]]; then
+    info "removing duplicate Obsidian snap"
+    snap remove obsidian || die "failed removing duplicate Obsidian snap"
+  fi
 
   ok "Obsidian ${installed_version} installed from the official GitHub release"
 )
@@ -1761,15 +1908,50 @@ install_starship() (
   ok "Starship installed"
 )
 
-install_jetbrainsmono_nerd_font_for_user() {
+install_jetbrainsmono_nerd_font_for_user() (
+  set -Eeuo pipefail
+
   local account="$1"
+  local account_group
+  local account_uid
+  local api_url="https://api.github.com/repos/ryanoasis/nerd-fonts/releases/latest"
+  local asset_digest
+  local asset_url
+  local command_name
   local home
   local matched_family
+  local release_json
+  local temporary_dir
+  local -a account_command
+
+  for command_name in curl fc-cache fc-match jq sha256sum unzip; do
+    command -v "$command_name" >/dev/null 2>&1 ||
+      die "${command_name} is required to install JetBrainsMono Nerd Font"
+  done
+
   home="$(user_home "$account")"
   [[ -n "$home" ]] || die "could not determine home directory for ${account}"
+  account_uid="$(id -u "$account")"
+  account_group="$(id -gn "$account")"
+
+  if [[ "$account" == "$TARGET_USER" ]]; then
+    account_command=(run_as_target_user)
+  else
+    account_command=(
+      sudo -u "$account" -g "$account_group" -H env
+      HOME="$home"
+      USER="$account"
+      LOGNAME="$account"
+      TARGET_USER="$account"
+      TARGET_HOME="$home"
+      TARGET_UID="$account_uid"
+      TARGET_GROUP="$account_group"
+    )
+  fi
 
   matched_family="$(
-    sudo -u "$account" -H fc-match --format='%{family}\n' 'JetBrainsMono Nerd Font' 2>/dev/null
+    "${account_command[@]}" \
+      fc-match --format='%{family}\n' 'JetBrainsMono Nerd Font' 2>/dev/null
   )" || die "could not inspect fonts for ${account}"
 
   if [[ "$matched_family" == *"JetBrainsMono Nerd Font"* ]]; then
@@ -1777,25 +1959,60 @@ install_jetbrainsmono_nerd_font_for_user() {
     return
   fi
 
-  sudo -u "$account" -H bash -c '
-    set -euo pipefail
-    font_dir="$HOME/.local/share/fonts"
-    archive="$(mktemp --suffix=.zip)"
-    trap '\''rm -f -- "$archive"'\'' EXIT
-    mkdir -p "$font_dir"
-    curl --fail --show-error --silent --location --output "$archive" https://github.com/ryanoasis/nerd-fonts/releases/latest/download/JetBrainsMono.zip
-    unzip -tq "$archive" >/dev/null
-    unzip -q -o "$archive" -d "$font_dir"
-    fc-cache -f "$font_dir"
-  '
+  temporary_dir="$(mktemp -d)"
+  trap 'rm -rf -- "$temporary_dir"' EXIT
+  chmod 0755 "$temporary_dir"
+
+  info "checking latest JetBrainsMono Nerd Font release"
+  fetch_file "$api_url" "$temporary_dir/release.json" ||
+    die "failed downloading JetBrainsMono Nerd Font release metadata"
+  release_json="$(<"$temporary_dir/release.json")"
+  asset_url="$(
+    jq -r '
+      [.assets[] | select(.name == "JetBrainsMono.zip")][0].browser_download_url // empty
+    ' <<<"$release_json"
+  )" || die "JetBrainsMono Nerd Font release metadata is invalid"
+  asset_digest="$(
+    jq -r '
+      [.assets[] | select(.name == "JetBrainsMono.zip")][0].digest // empty
+    ' <<<"$release_json"
+  )" || die "JetBrainsMono Nerd Font release metadata is invalid"
+  [[ -n "$asset_url" ]] ||
+    die "JetBrainsMono Nerd Font archive is missing from the latest release"
+
+  info "downloading JetBrainsMono Nerd Font for ${account}"
+  fetch_file "$asset_url" "$temporary_dir/JetBrainsMono.zip" ||
+    die "failed downloading JetBrainsMono Nerd Font"
+  verify_github_asset_digest \
+    "$temporary_dir/JetBrainsMono.zip" \
+    "$asset_digest" \
+    "JetBrainsMono Nerd Font archive"
+  validate_zip_archive "$temporary_dir/JetBrainsMono.zip" "JetBrainsMono Nerd Font"
+  chmod 0644 "$temporary_dir/JetBrainsMono.zip"
+
+  if ! run_quiet_command \
+    "JetBrainsMono Nerd Font installer for ${account}" \
+    "${account_command[@]}" \
+    bash -s -- "$temporary_dir/JetBrainsMono.zip" <<'USER_INSTALL'; then
+set -Eeuo pipefail
+
+archive="$1"
+font_dir="$HOME/.local/share/fonts"
+mkdir -p "$font_dir"
+unzip -q -o "$archive" -d "$font_dir"
+fc-cache -f "$font_dir"
+USER_INSTALL
+    die "JetBrainsMono Nerd Font installation failed for ${account}"
+  fi
 
   matched_family="$(
-    sudo -u "$account" -H fc-match --format='%{family}\n' 'JetBrainsMono Nerd Font' 2>/dev/null
+    "${account_command[@]}" \
+      fc-match --format='%{family}\n' 'JetBrainsMono Nerd Font' 2>/dev/null
   )" || die "could not verify fonts for ${account}"
   [[ "$matched_family" == *"JetBrainsMono Nerd Font"* ]] ||
     die "JetBrainsMono Nerd Font installation could not be verified for ${account}"
   ok "JetBrainsMono Nerd Font installed for ${account}"
-}
+)
 
 ensure_bat_symlink_for_user() {
   local account="$1"
