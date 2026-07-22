@@ -50,10 +50,71 @@ setup() {
   [[ "$output" == *'<command-name>'*'<argument>'* ]]
 }
 
+@test "GNOME helper uses the target user's existing D-Bus session" {
+  TARGET_UID="1234"
+
+  gnome_user_bus_available() {
+    return 0
+  }
+  run_as_target_user() {
+    printf '<%s>\n' "$@"
+  }
+
+  run run_as_gnome_user command-name argument
+
+  [[ "$status" -eq 0 ]]
+  [[ "$output" == *'<XDG_RUNTIME_DIR=/run/user/1234>'* ]]
+  [[ "$output" == *'<DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1234/bus>'* ]]
+  [[ "$output" == *'<command-name>'*'<argument>'* ]]
+  [[ "$output" != *'<dbus-run-session>'* ]]
+}
+
+@test "GNOME helper uses one temporary D-Bus session during automation" {
+  TARGET_UID="1234"
+
+  gnome_user_bus_available() {
+    return 1
+  }
+  run_as_target_user() {
+    printf '<%s>\n' "$@"
+  }
+
+  run run_as_gnome_user command-name argument
+
+  [[ "$status" -eq 0 ]]
+  [[ "$output" == *'<dbus-run-session>'*'<-->'*'<command-name>'*'<argument>'* ]]
+  [[ "$output" != *'<DBUS_SESSION_BUS_ADDRESS='* ]]
+}
+
+@test "wallpaper preparation uses the script-local asset without repository synchronization" {
+  local source_file="$BATS_TEST_DIRNAME/../ubuntu-wallpaper.png"
+
+  TARGET_USER="$(id -un)"
+  TARGET_HOME="$BATS_TEST_TMPDIR/home"
+  TARGET_UID="$(id -u)"
+  TARGET_GROUP="$(id -gn)"
+
+  mkdir -p "$TARGET_HOME"
+
+  git() {
+    printf 'unexpected wallpaper repository synchronization\n' >&2
+    return 99
+  }
+
+  run configure_desktop_wallpaper
+
+  [[ "$status" -eq 0 ]]
+  [[ "$output" == *"GNOME wallpaper file ready"* ]]
+  [[ "$output" != *"unexpected wallpaper repository synchronization"* ]]
+  cmp -s "$source_file" "$TARGET_HOME/.config/background"
+}
+
 @test "GNOME preferences persist dock position and enable installed user extensions" {
   local fake_bin="$BATS_TEST_TMPDIR/bin"
   local settings_dir="$BATS_TEST_TMPDIR/settings"
   local command_log="$BATS_TEST_TMPDIR/gsettings.log"
+
+  TARGET_HOME="$BATS_TEST_TMPDIR"
 
   mkdir -p \
     "$fake_bin" \
@@ -74,6 +135,7 @@ case "$command" in
   list-schemas)
     printf '%s\n' \
       org.gnome.desktop.interface \
+      org.gnome.desktop.background \
       org.gnome.shell.extensions.dash-to-dock \
       org.gnome.desktop.notifications \
       org.gnome.desktop.screensaver \
@@ -89,7 +151,8 @@ case "$command" in
   list-keys)
     printf '%s\n' \
       color-scheme document-font-name font-name gtk-theme monospace-font-name \
-      show-battery-percentage text-scaling-factor click-action dash-max-icon-size \
+      show-battery-percentage text-scaling-factor picture-uri picture-uri-dark picture-options \
+      click-action dash-max-icon-size \
       dock-position extend-height show-trash show-in-lock-screen lock-delay \
       lock-enabled ubuntu-lock-on-suspend idle-delay enabled night-light-enabled \
       night-light-schedule-automatic night-light-schedule-from night-light-schedule-to \
@@ -137,6 +200,7 @@ FAKE_GSETTINGS
 
   [[ "$status" -eq 0 ]]
   grep -Fq $'org.gnome.shell.extensions.dash-to-dock\tdock-position\t\x27BOTTOM\x27' "$command_log"
+  grep -Fq $'org.gnome.desktop.background\tpicture-uri\t\x27file://' "$command_log"
   grep -Fq 'hide-universal-access@akiirui.github.io' \
     "$settings_dir/org.gnome.shell.enabled-extensions"
 }

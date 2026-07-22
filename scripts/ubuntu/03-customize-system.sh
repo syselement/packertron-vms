@@ -44,6 +44,7 @@ readonly -a APT_BOOTSTRAP_PACKAGES=(
 
 readonly -a COMMON_PACKAGES=(
   aptitude
+  arp-scan
   bash-completion
   bat
   bats
@@ -412,9 +413,7 @@ write_file_if_changed() {
 
 # Get the user's D-Bus session bus socket.
 gnome_user_bus_available() {
-  local uid
-  uid="$(id -u "$USER_NAME")"
-  [[ -S "/run/user/${uid}/bus" ]]
+  [[ -S "/run/user/${TARGET_UID}/bus" ]]
 }
 
 # Run a command as the desktop user on their real per-user D-Bus when one
@@ -423,17 +422,15 @@ gnome_user_bus_available() {
 # already-running dconf service. For SSH/Vagrant provisioning before graphical
 # login, fall back to a temporary session bus so GSettings can still persist.
 run_as_gnome_user() {
-  local uid runtime_dir
-  uid="$(id -u "$USER_NAME")"
-  runtime_dir="/run/user/${uid}"
+  local runtime_dir="/run/user/${TARGET_UID}"
 
-  if [[ -S "${runtime_dir}/bus" ]]; then
-    sudo -u "$USER_NAME" -H env \
+  if gnome_user_bus_available; then
+    run_as_target_user env \
       XDG_RUNTIME_DIR="$runtime_dir" \
       DBUS_SESSION_BUS_ADDRESS="unix:path=${runtime_dir}/bus" \
       "$@"
   else
-    sudo -u "$USER_NAME" -H dbus-run-session -- "$@"
+    run_as_target_user dbus-run-session -- "$@"
   fi
 }
 
@@ -447,10 +444,11 @@ apply_gnome_preferences() {
   fi
   info "applying GNOME preferences via ${bus_mode}"
 
-  if ! run_as_gnome_user bash <<'GNOME_SETTINGS'
+  if ! run_as_gnome_user bash -s -- "file://${TARGET_HOME}/.config/background" <<'GNOME_SETTINGS'
 set -uo pipefail
 
 failures=0
+wallpaper_uri="$1"
 
 schema_exists() {
   # Process substitution avoids a pipefail/SIGPIPE false negative caused by
@@ -592,6 +590,11 @@ set_gsetting org.gnome.desktop.interface gtk-theme "'Yaru-yellow-dark'"
 set_gsetting org.gnome.desktop.interface monospace-font-name "'JetBrainsMono Nerd Font Mono 11'"
 set_gsetting org.gnome.desktop.interface show-battery-percentage "true"
 set_gsetting org.gnome.desktop.interface text-scaling-factor "1.1"
+
+# Wallpaper
+set_gsetting org.gnome.desktop.background picture-uri "'${wallpaper_uri}'"
+set_gsetting org.gnome.desktop.background picture-uri-dark "'${wallpaper_uri}'"
+set_gsetting org.gnome.desktop.background picture-options "'zoom'"
 
 # Ubuntu Dock
 set_gsetting org.gnome.shell.extensions.dash-to-dock click-action "'minimize'"
@@ -1174,113 +1177,30 @@ configure_flathub() (
 configure_desktop_wallpaper() (
   set -euo pipefail
 
-  local repo_url="https://github.com/syselement/packertron-vms.git"
-  local repo_dir="/opt/packertron-vms"
-  local source_file="${repo_dir}/scripts/ubuntu/ubuntu-wallpaper.png"
-  local home
-  local group
-  local uid
-  local runtime_dir
+  local source_file="${SCRIPT_DIR}/ubuntu-wallpaper.png"
   local destination_file
-  local wallpaper_uri
 
-  home="$(user_home "$USER_NAME")"
-  [[ -n "$home" && -d "$home" ]] ||
-    die "could not determine home directory for ${USER_NAME}"
-
-  group="$(id -gn "$USER_NAME")"
-  uid="$(id -u "$USER_NAME")"
-  runtime_dir="/run/user/${uid}"
-
-  destination_file="$home/.config/background"
-  wallpaper_uri="file://${destination_file}"
-
-  command -v git >/dev/null 2>&1 ||
-    die "git is required to synchronize ${repo_dir}"
-
-  install -d -m 0755 "$(dirname "$repo_dir")"
-
-  if [[ ! -e "$repo_dir" ]]; then
-    info "cloning Packertron repository"
-
-    git clone --quiet \
-      --branch main \
-      --single-branch \
-      --depth 1 \
-      "$repo_url" \
-      "$repo_dir"
-
-    ok "Packertron repository cloned"
-  elif [[ -d "$repo_dir/.git" ]]; then
-    info "synchronizing Packertron repository"
-
-    git -C "$repo_dir" pull --quiet --ff-only
-
-    ok "Packertron repository synchronized"
-  else
-    die "${repo_dir} exists but is not a Git repository"
-  fi
+  [[ -d "$TARGET_HOME" ]] || die "target home directory is unavailable: ${TARGET_HOME}"
+  destination_file="$TARGET_HOME/.config/background"
 
   [[ -f "$source_file" ]] ||
     die "wallpaper not found: ${source_file}"
 
   install -d \
-    -o "$USER_NAME" \
-    -g "$group" \
+    -o "$TARGET_USER" \
+    -g "$TARGET_GROUP" \
     -m 0755 \
-    "$home/.config"
+    "$TARGET_HOME/.config"
 
   install \
-    -o "$USER_NAME" \
-    -g "$group" \
+    -C \
+    -o "$TARGET_USER" \
+    -g "$TARGET_GROUP" \
     -m 0644 \
     "$source_file" \
     "$destination_file"
 
-  run_gsettings() {
-    if [[ -S "$runtime_dir/bus" ]]; then
-      sudo -u "$USER_NAME" \
-        env \
-          HOME="$home" \
-          XDG_RUNTIME_DIR="$runtime_dir" \
-          DBUS_SESSION_BUS_ADDRESS="unix:path=${runtime_dir}/bus" \
-        gsettings "$@"
-    else
-      sudo -u "$USER_NAME" -H \
-        dbus-run-session -- gsettings "$@"
-    fi
-  }
-
-  info "configuring GNOME wallpaper"
-
-  run_gsettings set \
-    org.gnome.desktop.background \
-    picture-uri \
-    "$wallpaper_uri"
-
-  run_gsettings set \
-    org.gnome.desktop.background \
-    picture-uri-dark \
-    "$wallpaper_uri"
-
-  run_gsettings set \
-    org.gnome.desktop.background \
-    picture-options \
-    "zoom"
-
-  [[ "$(run_gsettings get org.gnome.desktop.background picture-uri)" \
-      == "'${wallpaper_uri}'" ]] ||
-    die "failed to configure light wallpaper"
-
-  [[ "$(run_gsettings get org.gnome.desktop.background picture-uri-dark)" \
-      == "'${wallpaper_uri}'" ]] ||
-    die "failed to configure dark wallpaper"
-
-  [[ "$(run_gsettings get org.gnome.desktop.background picture-options)" \
-      == "'zoom'" ]] ||
-    die "failed to configure wallpaper display mode"
-
-  ok "GNOME wallpaper configured: ${destination_file}"
+  ok "GNOME wallpaper file ready: ${destination_file}"
 )
 
 configure_terminator() {
