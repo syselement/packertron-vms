@@ -1001,6 +1001,7 @@ EOF
     if [[ "$1" == *"/releases/latest" ]]; then
       cat >"$2" <<'EOF'
 {
+  "tag_name": "1.2.3",
   "assets": [
     {
       "name": "rustdesk-1.2.3-x86_64.deb",
@@ -1022,6 +1023,9 @@ EOF
   verify_github_asset_digest() {
     return 0
   }
+  dpkg-query() {
+    return 1
+  }
   install_debian_package() {
     printf '%s|%s|%s\n' "$1" "$2" "$3" >"$install_record"
   }
@@ -1034,6 +1038,35 @@ EOF
 
   [[ "$status" -eq 0 ]]
   [[ "$(<"$install_record")" == *"/package.deb|rustdesk|RustDesk" ]]
+}
+
+@test "current GitHub DEB release skips the asset download" {
+  dpkg-query() {
+    printf '1.2.3-1\n'
+  }
+  fetch_file() {
+    if [[ "$1" == *"/releases/latest" ]]; then
+      printf '{"tag_name":"v1.2.3","assets":[]}\n' >"$2"
+      return
+    fi
+    printf 'unexpected GitHub asset download\n' >&2
+    return 99
+  }
+  install_debian_package() {
+    printf 'unexpected package installation\n' >&2
+    return 99
+  }
+
+  run install_latest_github_debian_package \
+    "example/project" \
+    "-amd64.deb" \
+    "example-package" \
+    "Example"
+
+  [[ "$status" -eq 0 ]]
+  [[ "$output" == *"already matches latest release 1.2.3, skipping download"* ]]
+  [[ "$output" != *"unexpected GitHub asset download"* ]]
+  [[ "$output" != *"unexpected package installation"* ]]
 }
 
 @test "installed target-user Termix Flatpak skips release download" {
@@ -1118,6 +1151,9 @@ EOF
   fetch_file() {
     printf '<p>Version: 9.8.2_1</p>\n' >"$2"
   }
+  dpkg-query() {
+    return 1
+  }
   install_downloaded_debian_package() {
     printf '%s|%s|%s\n' "$1" "$2" "$3" >"$install_record"
   }
@@ -1126,6 +1162,26 @@ EOF
 
   [[ "$status" -eq 0 ]]
   [[ "$(<"$install_record")" == "https://download.nomachine.com/download/9.8/Linux/nomachine_9.8.2_1_amd64.deb|nomachine|NoMachine" ]]
+}
+
+@test "current NoMachine release skips the DEB download" {
+  ARCH="amd64"
+  fetch_file() {
+    printf '<p>Version: 9.8.2_1</p>\n' >"$2"
+  }
+  dpkg-query() {
+    printf '9.8.2-1\n'
+  }
+  install_downloaded_debian_package() {
+    printf 'unexpected NoMachine package download\n' >&2
+    return 99
+  }
+
+  run install_nomachine
+
+  [[ "$status" -eq 0 ]]
+  [[ "$output" == *"already matches latest release 9.8.2-1, skipping download"* ]]
+  [[ "$output" != *"unexpected NoMachine package download"* ]]
 }
 
 @test "current Typora Themeable release skips archive download" {

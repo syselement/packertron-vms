@@ -2,8 +2,11 @@
 #
 # Customize Ubuntu Desktop or Server
 #
-# Run:
-# git clone https://github.com/syselement/packertron-vms.git && cd packertron-vms/scripts/ubuntu && sudo ./03-customize-system.sh
+# Manual run without reboot from a fresh clone (one line):
+# git clone https://github.com/syselement/packertron-vms.git && cd packertron-vms/scripts/ubuntu && sudo env REBOOT_AT_END=false ./03-customize-system.sh
+#
+# Manual rerun without reboot from the repository root:
+# cd scripts/ubuntu && sudo env REBOOT_AT_END=false ./03-customize-system.sh
 #
 # Notes:
 # - Run as root.
@@ -447,15 +450,31 @@ install_latest_github_debian_package() (
   local asset_suffix="$2"
   local package_name="$3"
   local description="$4"
+  local installed_version release_tag release_version
   local temporary_dir
 
   temporary_dir="$(mktemp -d)"
   trap 'rm -rf -- "$temporary_dir"' EXIT
 
   info "checking latest ${description} GitHub release"
-  info "downloading ${description} package"
-  fetch_latest_github_asset \
+  fetch_latest_github_release_metadata \
     "$repository" \
+    "$temporary_dir/release.json" \
+    "$description"
+  release_tag="$(jq -r '.tag_name // empty' "$temporary_dir/release.json")"
+  release_version="${release_tag#v}"
+  [[ "$release_version" =~ ^[0-9]+(\.[0-9]+)+$ ]] ||
+    die "unexpected ${description} release tag: ${release_tag:-missing}"
+
+  installed_version="$(dpkg-query -W -f='${Version}' "$package_name" 2>/dev/null || true)"
+  if [[ -n "$installed_version" ]] &&
+    dpkg --compare-versions "$installed_version" ge "$release_version"; then
+    info "${description} ${installed_version} already matches latest release ${release_version}, skipping download"
+    return
+  fi
+
+  info "downloading ${description} package"
+  fetch_github_asset_from_metadata \
     "suffix" \
     "$asset_suffix" \
     "$temporary_dir/package.deb" \
@@ -1649,7 +1668,7 @@ install_nomachine() (
   set -Eeuo pipefail
 
   local download_page="https://download.nomachine.com/download/?id=1&platform=linux"
-  local download_url page_content release_series release_version
+  local download_url installed_version package_version page_content release_series release_version
   local temporary_dir
 
   if [[ "$ARCH" != "amd64" ]]; then
@@ -1674,6 +1693,14 @@ install_nomachine() (
     release_series="${BASH_REMATCH[1]}"
   else
     die "unexpected NoMachine release version: ${release_version}"
+  fi
+
+  package_version="${release_version/_/-}"
+  installed_version="$(dpkg-query -W -f='${Version}' nomachine 2>/dev/null || true)"
+  if [[ -n "$installed_version" ]] &&
+    dpkg --compare-versions "$installed_version" ge "$package_version"; then
+    info "NoMachine ${installed_version} already matches latest release ${package_version}, skipping download"
+    return
   fi
 
   download_url="https://download.nomachine.com/download/${release_series}/Linux/nomachine_${release_version}_amd64.deb"
