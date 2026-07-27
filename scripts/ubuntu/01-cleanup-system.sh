@@ -26,10 +26,10 @@ truncate -s 0 /etc/machine-id /var/lib/dbus/machine-id || true
 echo "[cleanup] remove temp files and history"
 rm -rf /tmp/* /var/tmp/* || true
 
-if command -v cloud-init &> /dev/null; then
-  echo "[cleanup] cloud-init clean"
-  cloud-init clean --logs || true
-  rm -rf /var/lib/cloud/* || true
+if command -v cloud-init &>/dev/null; then
+    echo "[cleanup] cloud-init clean"
+    cloud-init clean --logs || true
+    rm -rf /var/lib/cloud/* || true
 fi
 
 echo "[cleanup] done"

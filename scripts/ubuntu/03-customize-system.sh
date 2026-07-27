@@ -20,7 +20,7 @@ set -euo pipefail
 export DEBIAN_FRONTEND=noninteractive
 
 SCRIPT_DIR="$(
-  cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd
+    cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd
 )"
 
 # shellcheck source=lib/ubuntu-context.sh
@@ -41,99 +41,99 @@ HOMEBREW_PREFIX="${PACKERTRON_HOMEBREW_PREFIX:-/home/linuxbrew/.linuxbrew}"
 HOMEBREW_INSTALL_URL="${HOMEBREW_INSTALL_URL:-https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh}"
 
 readonly -a APT_BOOTSTRAP_PACKAGES=(
-  ca-certificates
-  curl
-  gnupg
-  lsb-release
+    ca-certificates
+    curl
+    gnupg
+    lsb-release
 )
 
 readonly -a COMMON_PACKAGES=(
-  7zip
-  7zip-rar
-  aptitude
-  arp-scan
-  bash-completion
-  bat
-  bats
-  btop
-  build-essential
-  cockpit
-  docker-ctop
-  duf
-  eza
-  fastfetch
-  fd-find
-  fontconfig
-  gdu
-  git
-  gping
-  htop
-  iftop
-  imagemagick
-  ipcalc
-  iperf3
-  jq
-  lm-sensors
-  nano
-  net-tools
-  nload
-  nmap
-  npm
-  openjdk-21-jre-headless
-  pipx
-  plocate
-  s-tui
-  shellcheck
-  shfmt
-  speedtest-cli
-  sshpass
-  stress
-  sysstat
-  tailscale
-  tmux
-  tor
-  tree
-  ugrep
-  unzip
-  vim
-  wget
-  wireguard
-  zsh
+    7zip
+    7zip-rar
+    aptitude
+    arp-scan
+    bash-completion
+    bat
+    bats
+    btop
+    build-essential
+    cockpit
+    docker-ctop
+    duf
+    eza
+    fastfetch
+    fd-find
+    fontconfig
+    gdu
+    git
+    gping
+    htop
+    iftop
+    imagemagick
+    ipcalc
+    iperf3
+    jq
+    lm-sensors
+    nano
+    net-tools
+    nload
+    nmap
+    npm
+    openjdk-21-jre-headless
+    pipx
+    plocate
+    s-tui
+    shellcheck
+    shfmt
+    speedtest-cli
+    sshpass
+    stress
+    sysstat
+    tailscale
+    tmux
+    tor
+    tree
+    ugrep
+    unzip
+    vim
+    wget
+    wireguard
+    zsh
 )
 
 readonly -a DESKTOP_PACKAGES=(
-  brave-browser
-  dbeaver-ce
-  filezilla
-  flatpak
-  fonts-noto-color-emoji
-  gnome-shell-extension-manager
-  gnome-shell-extensions
-  gnome-system-monitor
-  gnome-tweaks
-  meld
-  mullvad-vpn
-  qbittorrent
-  sublime-text
-  terminator
-  typora
-  vlc
-  xclip
+    brave-browser
+    dbeaver-ce
+    filezilla
+    flatpak
+    fonts-noto-color-emoji
+    gnome-shell-extension-manager
+    gnome-shell-extensions
+    gnome-system-monitor
+    gnome-tweaks
+    meld
+    mullvad-vpn
+    qbittorrent
+    sublime-text
+    terminator
+    typora
+    vlc
+    xclip
 )
 
 readonly -a FLATPAK_PACKAGES=(
-  com.bitwarden.desktop
-  io.ente.auth
-  io.github.sigmasd.pingmonitor
-  org.cryptomator.Cryptomator
-  org.gnome.Boxes
+    com.bitwarden.desktop
+    io.ente.auth
+    io.github.sigmasd.pingmonitor
+    org.cryptomator.Cryptomator
+    org.gnome.Boxes
 )
 
 require_root() {
-  if [[ "${EUID}" -ne 0 ]]; then
-    echo "[${SCRIPT_NAME}] ERROR must run as root (use: sudo bash $0)" >&2
-    exit 1
-  fi
+    if [[ "${EUID}" -ne 0 ]]; then
+        echo "[${SCRIPT_NAME}] ERROR must run as root (use: sudo bash $0)" >&2
+        exit 1
+    fi
 }
 
 USER_NAME=""
@@ -148,607 +148,610 @@ t_red=""
 t_reset=""
 
 initialize_runtime() {
-  require_root
+    require_root
 
-  # Console keeps ANSI colors, while the log file stores plain text.
-  if [[ -t 1 ]]; then
-    t_bold=$'\e[1m'
-    t_dim=$'\e[2m'
-    t_green=$'\e[32m'
-    t_yellow=$'\e[33m'
-    t_red=$'\e[31m'
-    t_reset=$'\e[0m'
-  fi
-  exec > >(tee >(sed -u -r 's/\x1B\[[0-9;]*[[:alpha:]]//g' >"$LOG_FILE")) 2>&1
+    # Console keeps ANSI colors, while the log file stores plain text.
+    if [[ -t 1 ]]; then
+        t_bold=$'\e[1m'
+        t_dim=$'\e[2m'
+        t_green=$'\e[32m'
+        t_yellow=$'\e[33m'
+        t_red=$'\e[31m'
+        t_reset=$'\e[0m'
+    fi
+    exec > >(tee >(sed -u -r 's/\x1B\[[0-9;]*[[:alpha:]]//g' >"$LOG_FILE")) 2>&1
 
-  initialize_ubuntu_context
-  USER_NAME="$TARGET_USER"
-  VERSION_ID="$UBUNTU_VERSION_ID"
-  CODENAME="$UBUNTU_CODENAME"
-  ARCH="$(dpkg --print-architecture)"
+    initialize_ubuntu_context
+    USER_NAME="$TARGET_USER"
+    VERSION_ID="$UBUNTU_VERSION_ID"
+    CODENAME="$UBUNTU_CODENAME"
+    ARCH="$(dpkg --print-architecture)"
 }
 
 _ts() { date +'%F %T'; }
 log() {
-  local msg="$*"
-  local ts
-  ts="$(_ts)"
-  printf '%s %s %b\n' "[$ts]" "$LOG_PREFIX" "$msg"
+    local msg="$*"
+    local ts
+    ts="$(_ts)"
+    printf '%s %s %b\n' "[$ts]" "$LOG_PREFIX" "$msg"
 }
-info()  { log "${t_dim}INFO${t_reset}  $*"; }
-ok()    { log "${t_green}${t_bold}OK${t_reset}    $*"; }
-warn()  { log "${t_yellow}${t_bold}WARN${t_reset}  $*"; }
+info() { log "${t_dim}INFO${t_reset}  $*"; }
+ok() { log "${t_green}${t_bold}OK${t_reset}    $*"; }
+warn() { log "${t_yellow}${t_bold}WARN${t_reset}  $*"; }
 error() { log "${t_red}${t_bold}ERROR${t_reset} $*"; }
-die()   { error "$*"; exit 1; }
+die() {
+    error "$*"
+    exit 1
+}
 
 # --- Helpers ---
 user_home() {
-  local account="$1"
-  getent passwd "$account" | cut -d: -f6
+    local account="$1"
+    getent passwd "$account" | cut -d: -f6
 }
 
 run_as_target_user() {
-  [[ -n "${TARGET_USER:-}" ]] || die "target user is not initialized"
-  [[ -n "${TARGET_HOME:-}" && "$TARGET_HOME" == /* ]] ||
-    die "target home is not initialized"
-  [[ "${TARGET_UID:-}" =~ ^[0-9]+$ ]] || die "target UID is not initialized"
-  [[ -n "${TARGET_GROUP:-}" ]] || die "target group is not initialized"
-  (($# > 0)) || die "run_as_target_user requires a command"
+    [[ -n "${TARGET_USER:-}" ]] || die "target user is not initialized"
+    [[ -n "${TARGET_HOME:-}" && "$TARGET_HOME" == /* ]] ||
+        die "target home is not initialized"
+    [[ "${TARGET_UID:-}" =~ ^[0-9]+$ ]] || die "target UID is not initialized"
+    [[ -n "${TARGET_GROUP:-}" ]] || die "target group is not initialized"
+    (($# > 0)) || die "run_as_target_user requires a command"
 
-  sudo -u "$TARGET_USER" -g "$TARGET_GROUP" -H env \
-    HOME="$TARGET_HOME" \
-    USER="$TARGET_USER" \
-    LOGNAME="$TARGET_USER" \
-    TARGET_USER="$TARGET_USER" \
-    TARGET_HOME="$TARGET_HOME" \
-    TARGET_UID="$TARGET_UID" \
-    TARGET_GROUP="$TARGET_GROUP" \
-    "$@"
+    sudo -u "$TARGET_USER" -g "$TARGET_GROUP" -H env \
+        HOME="$TARGET_HOME" \
+        USER="$TARGET_USER" \
+        LOGNAME="$TARGET_USER" \
+        TARGET_USER="$TARGET_USER" \
+        TARGET_HOME="$TARGET_HOME" \
+        TARGET_UID="$TARGET_UID" \
+        TARGET_GROUP="$TARGET_GROUP" \
+        "$@"
 }
 
 verify_target_ownership() {
-  local description="$2"
-  local path="$1"
-  local owner owner_group
+    local description="$2"
+    local path="$1"
+    local owner owner_group
 
-  [[ -e "$path" ]] || die "${description} is missing: ${path}"
-  owner="$(stat -Lc '%U' "$path")"
-  owner_group="$(stat -Lc '%G' "$path")"
-  [[ "$owner" == "$TARGET_USER" && "$owner_group" == "$TARGET_GROUP" ]] ||
-    die "unexpected ${description} ownership: ${owner}:${owner_group}; expected ${TARGET_USER}:${TARGET_GROUP}"
+    [[ -e "$path" ]] || die "${description} is missing: ${path}"
+    owner="$(stat -Lc '%U' "$path")"
+    owner_group="$(stat -Lc '%G' "$path")"
+    [[ "$owner" == "$TARGET_USER" && "$owner_group" == "$TARGET_GROUP" ]] ||
+        die "unexpected ${description} ownership: ${owner}:${owner_group}; expected ${TARGET_USER}:${TARGET_GROUP}"
 }
 
 run_apt_get() {
-  DEBIAN_FRONTEND=noninteractive apt-get \
-    -o DPkg::Lock::Timeout=300 \
-    "$@"
+    DEBIAN_FRONTEND=noninteractive apt-get \
+        -o DPkg::Lock::Timeout=300 \
+        "$@"
 }
 
 run_quiet_command() (
-  local description="$1"
-  local line
-  local output_file
-  local status
-  shift
+    local description="$1"
+    local line
+    local output_file
+    local status
+    shift
 
-  output_file="$(mktemp)"
-  trap 'rm -f -- "$output_file"' EXIT
+    output_file="$(mktemp)"
+    trap 'rm -f -- "$output_file"' EXIT
 
-  if "$@" >"$output_file" 2>&1; then
-    return 0
-  else
-    status=$?
-  fi
+    if "$@" >"$output_file" 2>&1; then
+        return 0
+    else
+        status=$?
+    fi
 
-  while IFS= read -r line; do
-    error "${description}: ${line}"
-  done <"$output_file"
-  return "$status"
+    while IFS= read -r line; do
+        error "${description}: ${line}"
+    done <"$output_file"
+    return "$status"
 )
 
 fetch_file() {
-  local destination_file="$2"
-  local url="$1"
+    local destination_file="$2"
+    local url="$1"
 
-  curl \
-    --fail \
-    --show-error \
-    --silent \
-    --location \
-    --connect-timeout 10 \
-    --retry 2 \
-    --retry-delay 2 \
-    --output "$destination_file" \
-    "$url"
+    curl \
+        --fail \
+        --show-error \
+        --silent \
+        --location \
+        --connect-timeout 10 \
+        --retry 2 \
+        --retry-delay 2 \
+        --output "$destination_file" \
+        "$url"
 }
 
 validate_zip_archive() {
-  local archive_file="$1"
-  local description="$2"
-  local entry
+    local archive_file="$1"
+    local description="$2"
+    local entry
 
-  [[ -s "$archive_file" ]] || die "downloaded ${description} archive is empty"
-  unzip -tq "$archive_file" >/dev/null ||
-    die "downloaded ${description} archive is invalid"
+    [[ -s "$archive_file" ]] || die "downloaded ${description} archive is empty"
+    unzip -tq "$archive_file" >/dev/null ||
+        die "downloaded ${description} archive is invalid"
 
-  while IFS= read -r entry; do
-    if [[ "$entry" == /* || "$entry" == ../* || "$entry" == */.. || "$entry" == */../* ]]; then
-      die "downloaded ${description} archive contains an unsafe path: ${entry}"
-    fi
-  done < <(unzip -Z1 "$archive_file")
+    while IFS= read -r entry; do
+        if [[ "$entry" == /* || "$entry" == ../* || "$entry" == */.. || "$entry" == */../* ]]; then
+            die "downloaded ${description} archive contains an unsafe path: ${entry}"
+        fi
+    done < <(unzip -Z1 "$archive_file")
 }
 
 validate_gnome_extension_archive() {
-  local archive_file="$1"
-  local expected_uuid="$2"
-  local actual_uuid
+    local archive_file="$1"
+    local expected_uuid="$2"
+    local actual_uuid
 
-  actual_uuid="$(unzip -p "$archive_file" metadata.json 2>/dev/null | jq -r '.uuid // empty')" ||
-    die "GNOME extension archive does not contain valid metadata"
-  [[ "$actual_uuid" == "$expected_uuid" ]] ||
-    die "unexpected GNOME extension UUID: ${actual_uuid:-missing}; expected ${expected_uuid}"
+    actual_uuid="$(unzip -p "$archive_file" metadata.json 2>/dev/null | jq -r '.uuid // empty')" ||
+        die "GNOME extension archive does not contain valid metadata"
+    [[ "$actual_uuid" == "$expected_uuid" ]] ||
+        die "unexpected GNOME extension UUID: ${actual_uuid:-missing}; expected ${expected_uuid}"
 }
 
 verify_github_asset_digest() {
-  local asset_file="$1"
-  local published_digest="$2"
-  local description="$3"
-  local actual_digest
-  local expected_digest
+    local asset_file="$1"
+    local published_digest="$2"
+    local description="$3"
+    local actual_digest
+    local expected_digest
 
-  if [[ ! "$published_digest" =~ ^sha256:([[:xdigit:]]{64})$ ]]; then
-    warn "GitHub did not provide a SHA-256 digest for ${description}; relying on format validation"
-    return
-  fi
+    if [[ ! "$published_digest" =~ ^sha256:([[:xdigit:]]{64})$ ]]; then
+        warn "GitHub did not provide a SHA-256 digest for ${description}; relying on format validation"
+        return
+    fi
 
-  expected_digest="${BASH_REMATCH[1],,}"
-  actual_digest="$(sha256sum "$asset_file")"
-  actual_digest="${actual_digest%% *}"
-  [[ "$actual_digest" == "$expected_digest" ]] ||
-    die "SHA-256 verification failed for ${description}"
+    expected_digest="${BASH_REMATCH[1],,}"
+    actual_digest="$(sha256sum "$asset_file")"
+    actual_digest="${actual_digest%% *}"
+    [[ "$actual_digest" == "$expected_digest" ]] ||
+        die "SHA-256 verification failed for ${description}"
 }
 
 fetch_latest_github_release_metadata() {
-  local repository="$1"
-  local metadata_file="$2"
-  local description="$3"
+    local repository="$1"
+    local metadata_file="$2"
+    local description="$3"
 
-  fetch_file "https://api.github.com/repos/${repository}/releases/latest" "$metadata_file" ||
-    die "failed downloading ${description} release metadata"
+    fetch_file "https://api.github.com/repos/${repository}/releases/latest" "$metadata_file" ||
+        die "failed downloading ${description} release metadata"
 }
 
 fetch_github_asset_from_metadata() {
-  local match_type="$1"
-  local asset_pattern="$2"
-  local destination_file="$3"
-  local metadata_file="$4"
-  local description="$5"
-  local asset_count asset_digest asset_url jq_filter
+    local match_type="$1"
+    local asset_pattern="$2"
+    local destination_file="$3"
+    local metadata_file="$4"
+    local description="$5"
+    local asset_count asset_digest asset_url jq_filter
 
-  # shellcheck disable=SC2016 # $pattern is expanded by jq.
-  case "$match_type" in
-    exact) jq_filter='.name == $pattern' ;;
-    suffix) jq_filter='.name | endswith($pattern)' ;;
-    *) die "unsupported GitHub asset match type: ${match_type}" ;;
-  esac
+    # shellcheck disable=SC2016 # $pattern is expanded by jq.
+    case "$match_type" in
+        exact) jq_filter='.name == $pattern' ;;
+        suffix) jq_filter='.name | endswith($pattern)' ;;
+        *) die "unsupported GitHub asset match type: ${match_type}" ;;
+    esac
 
-  asset_count="$(
-    jq --arg pattern "$asset_pattern" \
-      "[.assets[] | select(${jq_filter})] | length" \
-      "$metadata_file"
-  )"
-  [[ "$asset_count" == "1" ]] ||
-    die "expected one ${description} release asset matching ${asset_pattern}, found ${asset_count}"
+    asset_count="$(
+        jq --arg pattern "$asset_pattern" \
+            "[.assets[] | select(${jq_filter})] | length" \
+            "$metadata_file"
+    )"
+    [[ "$asset_count" == "1" ]] ||
+        die "expected one ${description} release asset matching ${asset_pattern}, found ${asset_count}"
 
-  asset_url="$(
-    jq -r --arg pattern "$asset_pattern" \
-      ".assets[] | select(${jq_filter}) | .browser_download_url" \
-      "$metadata_file"
-  )"
-  asset_digest="$(
-    jq -r --arg pattern "$asset_pattern" \
-      ".assets[] | select(${jq_filter}) | .digest // empty" \
-      "$metadata_file"
-  )"
-  [[ "$asset_url" == https://github.com/* ]] ||
-    die "unexpected ${description} release asset URL"
+    asset_url="$(
+        jq -r --arg pattern "$asset_pattern" \
+            ".assets[] | select(${jq_filter}) | .browser_download_url" \
+            "$metadata_file"
+    )"
+    asset_digest="$(
+        jq -r --arg pattern "$asset_pattern" \
+            ".assets[] | select(${jq_filter}) | .digest // empty" \
+            "$metadata_file"
+    )"
+    [[ "$asset_url" == https://github.com/* ]] ||
+        die "unexpected ${description} release asset URL"
 
-  fetch_file "$asset_url" "$destination_file" ||
-    die "failed downloading ${description}"
-  verify_github_asset_digest "$destination_file" "$asset_digest" "$description"
+    fetch_file "$asset_url" "$destination_file" ||
+        die "failed downloading ${description}"
+    verify_github_asset_digest "$destination_file" "$asset_digest" "$description"
 }
 
 fetch_latest_github_asset() {
-  local repository="$1"
-  local match_type="$2"
-  local asset_pattern="$3"
-  local destination_file="$4"
-  local metadata_file="$5"
-  local description="$6"
+    local repository="$1"
+    local match_type="$2"
+    local asset_pattern="$3"
+    local destination_file="$4"
+    local metadata_file="$5"
+    local description="$6"
 
-  fetch_latest_github_release_metadata "$repository" "$metadata_file" "$description"
-  fetch_github_asset_from_metadata \
-    "$match_type" \
-    "$asset_pattern" \
-    "$destination_file" \
-    "$metadata_file" \
-    "$description"
+    fetch_latest_github_release_metadata "$repository" "$metadata_file" "$description"
+    fetch_github_asset_from_metadata \
+        "$match_type" \
+        "$asset_pattern" \
+        "$destination_file" \
+        "$metadata_file" \
+        "$description"
 }
 
 validate_debian_package() {
-  local deb_file="$1"
-  local expected_package="$2"
-  local description="$3"
-  local package_architecture package_name package_version
+    local deb_file="$1"
+    local expected_package="$2"
+    local description="$3"
+    local package_architecture package_name package_version
 
-  [[ -s "$deb_file" ]] || die "downloaded ${description} package is empty"
-  dpkg-deb --info "$deb_file" >/dev/null 2>&1 ||
-    die "downloaded ${description} package is invalid"
+    [[ -s "$deb_file" ]] || die "downloaded ${description} package is empty"
+    dpkg-deb --info "$deb_file" >/dev/null 2>&1 ||
+        die "downloaded ${description} package is invalid"
 
-  package_name="$(dpkg-deb -f "$deb_file" Package)"
-  package_architecture="$(dpkg-deb -f "$deb_file" Architecture)"
-  package_version="$(dpkg-deb -f "$deb_file" Version)"
+    package_name="$(dpkg-deb -f "$deb_file" Package)"
+    package_architecture="$(dpkg-deb -f "$deb_file" Architecture)"
+    package_version="$(dpkg-deb -f "$deb_file" Version)"
 
-  [[ "$package_name" == "$expected_package" ]] ||
-    die "unexpected ${description} package name: ${package_name}; expected ${expected_package}"
-  [[ "$package_architecture" == "$ARCH" || "$package_architecture" == "all" ]] ||
-    die "unexpected ${description} package architecture: ${package_architecture}; expected ${ARCH}"
-  [[ -n "$package_version" ]] ||
-    die "downloaded ${description} package does not declare a version"
+    [[ "$package_name" == "$expected_package" ]] ||
+        die "unexpected ${description} package name: ${package_name}; expected ${expected_package}"
+    [[ "$package_architecture" == "$ARCH" || "$package_architecture" == "all" ]] ||
+        die "unexpected ${description} package architecture: ${package_architecture}; expected ${ARCH}"
+    [[ -n "$package_version" ]] ||
+        die "downloaded ${description} package does not declare a version"
 }
 
 install_debian_package() {
-  local deb_file="$1"
-  local package_name="$2"
-  local description="$3"
-  local installed_version package_version
+    local deb_file="$1"
+    local package_name="$2"
+    local description="$3"
+    local installed_version package_version
 
-  validate_debian_package "$deb_file" "$package_name" "$description"
-  package_version="$(dpkg-deb -f "$deb_file" Version)"
-  installed_version="$(dpkg-query -W -f='${Version}' "$package_name" 2>/dev/null || true)"
+    validate_debian_package "$deb_file" "$package_name" "$description"
+    package_version="$(dpkg-deb -f "$deb_file" Version)"
+    installed_version="$(dpkg-query -W -f='${Version}' "$package_name" 2>/dev/null || true)"
 
-  if [[ -n "$installed_version" ]] &&
-    dpkg --compare-versions "$installed_version" ge "$package_version"; then
-    info "${description} ${installed_version} already installed, skipping"
-    return
-  fi
+    if [[ -n "$installed_version" ]] &&
+        dpkg --compare-versions "$installed_version" ge "$package_version"; then
+        info "${description} ${installed_version} already installed, skipping"
+        return
+    fi
 
-  info "installing ${description} ${package_version}"
-  run_quiet_command "${description} installation failed" \
-    run_apt_get install -y -qq "$deb_file" ||
-    die "failed installing ${description} ${package_version}"
+    info "installing ${description} ${package_version}"
+    run_quiet_command "${description} installation failed" \
+        run_apt_get install -y -qq "$deb_file" ||
+        die "failed installing ${description} ${package_version}"
 
-  installed_version="$(dpkg-query -W -f='${Version}' "$package_name" 2>/dev/null || true)"
-  if [[ -z "$installed_version" ]] ||
-    ! dpkg --compare-versions "$installed_version" ge "$package_version"; then
-    die "${description} installation could not be verified"
-  fi
-  ok "${description} ${installed_version} installed"
+    installed_version="$(dpkg-query -W -f='${Version}' "$package_name" 2>/dev/null || true)"
+    if [[ -z "$installed_version" ]] ||
+        ! dpkg --compare-versions "$installed_version" ge "$package_version"; then
+        die "${description} installation could not be verified"
+    fi
+    ok "${description} ${installed_version} installed"
 }
 
 install_downloaded_debian_package() (
-  set -Eeuo pipefail
+    set -Eeuo pipefail
 
-  local url="$1"
-  local package_name="$2"
-  local description="$3"
-  local temporary_dir
+    local url="$1"
+    local package_name="$2"
+    local description="$3"
+    local temporary_dir
 
-  temporary_dir="$(mktemp -d)"
-  trap 'rm -rf -- "$temporary_dir"' EXIT
+    temporary_dir="$(mktemp -d)"
+    trap 'rm -rf -- "$temporary_dir"' EXIT
 
-  info "downloading ${description}"
-  fetch_file "$url" "$temporary_dir/package.deb" ||
-    die "failed downloading ${description}"
-  install_debian_package "$temporary_dir/package.deb" "$package_name" "$description"
+    info "downloading ${description}"
+    fetch_file "$url" "$temporary_dir/package.deb" ||
+        die "failed downloading ${description}"
+    install_debian_package "$temporary_dir/package.deb" "$package_name" "$description"
 )
 
 install_latest_github_debian_package() (
-  set -Eeuo pipefail
+    set -Eeuo pipefail
 
-  local repository="$1"
-  local asset_suffix="$2"
-  local package_name="$3"
-  local description="$4"
-  local installed_version release_tag release_version
-  local temporary_dir
+    local repository="$1"
+    local asset_suffix="$2"
+    local package_name="$3"
+    local description="$4"
+    local installed_version release_tag release_version
+    local temporary_dir
 
-  temporary_dir="$(mktemp -d)"
-  trap 'rm -rf -- "$temporary_dir"' EXIT
+    temporary_dir="$(mktemp -d)"
+    trap 'rm -rf -- "$temporary_dir"' EXIT
 
-  info "checking latest ${description} GitHub release"
-  fetch_latest_github_release_metadata \
-    "$repository" \
-    "$temporary_dir/release.json" \
-    "$description"
-  release_tag="$(jq -r '.tag_name // empty' "$temporary_dir/release.json")"
-  release_version="${release_tag#v}"
-  [[ "$release_version" =~ ^[0-9]+(\.[0-9]+)+$ ]] ||
-    die "unexpected ${description} release tag: ${release_tag:-missing}"
+    info "checking latest ${description} GitHub release"
+    fetch_latest_github_release_metadata \
+        "$repository" \
+        "$temporary_dir/release.json" \
+        "$description"
+    release_tag="$(jq -r '.tag_name // empty' "$temporary_dir/release.json")"
+    release_version="${release_tag#v}"
+    [[ "$release_version" =~ ^[0-9]+(\.[0-9]+)+$ ]] ||
+        die "unexpected ${description} release tag: ${release_tag:-missing}"
 
-  installed_version="$(dpkg-query -W -f='${Version}' "$package_name" 2>/dev/null || true)"
-  if [[ -n "$installed_version" ]] &&
-    dpkg --compare-versions "$installed_version" ge "$release_version"; then
-    info "${description} ${installed_version} already matches latest release ${release_version}, skipping download"
-    return
-  fi
+    installed_version="$(dpkg-query -W -f='${Version}' "$package_name" 2>/dev/null || true)"
+    if [[ -n "$installed_version" ]] &&
+        dpkg --compare-versions "$installed_version" ge "$release_version"; then
+        info "${description} ${installed_version} already matches latest release ${release_version}, skipping download"
+        return
+    fi
 
-  info "downloading ${description} package"
-  fetch_github_asset_from_metadata \
-    "suffix" \
-    "$asset_suffix" \
-    "$temporary_dir/package.deb" \
-    "$temporary_dir/release.json" \
-    "${description} package"
-  install_debian_package "$temporary_dir/package.deb" "$package_name" "$description"
+    info "downloading ${description} package"
+    fetch_github_asset_from_metadata \
+        "suffix" \
+        "$asset_suffix" \
+        "$temporary_dir/package.deb" \
+        "$temporary_dir/release.json" \
+        "${description} package"
+    install_debian_package "$temporary_dir/package.deb" "$package_name" "$description"
 )
 
 install_target_config_file() {
-  local source_file="$1"
-  local destination_file="$2"
-  local description="$3"
-  local backup_file="${destination_file}.packertron.bak"
-  local destination_dir
-  local destination_group=""
-  local destination_mode=""
-  local destination_owner=""
-  local staged_file
+    local source_file="$1"
+    local destination_file="$2"
+    local description="$3"
+    local backup_file="${destination_file}.packertron.bak"
+    local destination_dir
+    local destination_group=""
+    local destination_mode=""
+    local destination_owner=""
+    local staged_file
 
-  [[ -f "$source_file" ]] || die "expected ${description} configuration is missing"
-  [[ ! -L "$destination_file" ]] ||
-    die "refusing to replace symlinked ${description} configuration: ${destination_file}"
+    [[ -f "$source_file" ]] || die "expected ${description} configuration is missing"
+    [[ ! -L "$destination_file" ]] ||
+        die "refusing to replace symlinked ${description} configuration: ${destination_file}"
 
-  destination_dir="$(dirname -- "$destination_file")"
-  install -d -m 0755 -o "$TARGET_USER" -g "$TARGET_GROUP" "$destination_dir"
+    destination_dir="$(dirname -- "$destination_file")"
+    install -d -m 0755 -o "$TARGET_USER" -g "$TARGET_GROUP" "$destination_dir"
 
-  if [[ -f "$destination_file" ]]; then
-    destination_owner="$(stat -Lc '%U' "$destination_file")"
-    destination_group="$(stat -Lc '%G' "$destination_file")"
-    destination_mode="$(stat -Lc '%a' "$destination_file")"
+    if [[ -f "$destination_file" ]]; then
+        destination_owner="$(stat -Lc '%U' "$destination_file")"
+        destination_group="$(stat -Lc '%G' "$destination_file")"
+        destination_mode="$(stat -Lc '%a' "$destination_file")"
 
-    if cmp -s -- "$source_file" "$destination_file" &&
-      [[ "$destination_owner" == "$TARGET_USER" &&
-        "$destination_group" == "$TARGET_GROUP" &&
-        "$destination_mode" == "644" ]]; then
-      info "${description} already configured, skipping"
-      return
+        if cmp -s -- "$source_file" "$destination_file" &&
+            [[ "$destination_owner" == "$TARGET_USER" &&
+                "$destination_group" == "$TARGET_GROUP" &&
+                "$destination_mode" == "644" ]]; then
+            info "${description} already configured, skipping"
+            return
+        fi
+
+        if ! cmp -s -- "$source_file" "$destination_file" &&
+            [[ ! -e "$backup_file" ]]; then
+            install \
+                -o "$TARGET_USER" \
+                -g "$TARGET_GROUP" \
+                -m 0644 \
+                "$destination_file" \
+                "$backup_file"
+            info "preserved previous ${description} configuration: ${backup_file}"
+        fi
     fi
 
-    if ! cmp -s -- "$source_file" "$destination_file" &&
-      [[ ! -e "$backup_file" ]]; then
-      install \
+    staged_file="$(mktemp "${destination_dir}/.packertron-config.XXXXXX")"
+    if ! install \
         -o "$TARGET_USER" \
         -g "$TARGET_GROUP" \
         -m 0644 \
-        "$destination_file" \
-        "$backup_file"
-      info "preserved previous ${description} configuration: ${backup_file}"
+        "$source_file" \
+        "$staged_file"; then
+        rm -f -- "$staged_file"
+        die "failed staging ${description} configuration"
     fi
-  fi
 
-  staged_file="$(mktemp "${destination_dir}/.packertron-config.XXXXXX")"
-  if ! install \
-    -o "$TARGET_USER" \
-    -g "$TARGET_GROUP" \
-    -m 0644 \
-    "$source_file" \
-    "$staged_file"; then
-    rm -f -- "$staged_file"
-    die "failed staging ${description} configuration"
-  fi
+    if ! mv -f -- "$staged_file" "$destination_file"; then
+        rm -f -- "$staged_file"
+        die "failed activating ${description} configuration"
+    fi
 
-  if ! mv -f -- "$staged_file" "$destination_file"; then
-    rm -f -- "$staged_file"
-    die "failed activating ${description} configuration"
-  fi
+    cmp -s -- "$source_file" "$destination_file" ||
+        die "${description} configuration could not be verified"
+    verify_target_ownership "$destination_file" "${description} configuration"
+    [[ "$(stat -Lc '%a' "$destination_file")" == "644" ]] ||
+        die "unexpected ${description} configuration permissions"
 
-  cmp -s -- "$source_file" "$destination_file" ||
-    die "${description} configuration could not be verified"
-  verify_target_ownership "$destination_file" "${description} configuration"
-  [[ "$(stat -Lc '%a' "$destination_file")" == "644" ]] ||
-    die "unexpected ${description} configuration permissions"
-
-  ok "${description} configured"
+    ok "${description} configured"
 }
 
 validate_openpgp_key() {
-  local description="$2"
-  local expected_fingerprint="${3:-}"
-  local fingerprint
-  local key_file="$1"
+    local description="$2"
+    local expected_fingerprint="${3:-}"
+    local fingerprint
+    local key_file="$1"
 
-  if ! fingerprint="$(
-    gpg --batch --show-keys --with-colons "$key_file" 2>/dev/null |
-      awk -F: '$1 == "fpr" { print toupper($10); exit }'
-  )" || [[ -z "$fingerprint" ]]; then
-    die "invalid ${description} signing key"
-  fi
+    if ! fingerprint="$(
+        gpg --batch --show-keys --with-colons "$key_file" 2>/dev/null |
+            awk -F: '$1 == "fpr" { print toupper($10); exit }'
+    )" || [[ -z "$fingerprint" ]]; then
+        die "invalid ${description} signing key"
+    fi
 
-  expected_fingerprint="${expected_fingerprint//[[:space:]]/}"
-  expected_fingerprint="${expected_fingerprint^^}"
-  if [[ -n "$expected_fingerprint" && "$fingerprint" != "$expected_fingerprint" ]]; then
-    die "unexpected ${description} signing-key fingerprint: ${fingerprint}"
-  fi
+    expected_fingerprint="${expected_fingerprint//[[:space:]]/}"
+    expected_fingerprint="${expected_fingerprint^^}"
+    if [[ -n "$expected_fingerprint" && "$fingerprint" != "$expected_fingerprint" ]]; then
+        die "unexpected ${description} signing-key fingerprint: ${fingerprint}"
+    fi
 }
 
 dearmor_openpgp_key() {
-  local description="$3"
-  local destination_file="$2"
-  local source_file="$1"
+    local description="$3"
+    local destination_file="$2"
+    local source_file="$1"
 
-  gpg \
-    --batch \
-    --yes \
-    --dearmor \
-    --output "$destination_file" \
-    "$source_file" || die "failed processing ${description} signing key"
+    gpg \
+        --batch \
+        --yes \
+        --dearmor \
+        --output "$destination_file" \
+        "$source_file" || die "failed processing ${description} signing key"
 }
 
 validate_repository_source() {
-  local expected_key_file="$3"
-  local expected_uri="$2"
-  local source_file="$1"
+    local expected_key_file="$3"
+    local expected_uri="$2"
+    local source_file="$1"
 
-  grep -Fq -- "$expected_uri" "$source_file" ||
-    die "repository definition does not contain expected URI: ${expected_uri}"
-  grep -Fq -- "$expected_key_file" "$source_file" ||
-    die "repository definition does not reference expected signing key: ${expected_key_file}"
+    grep -Fq -- "$expected_uri" "$source_file" ||
+        die "repository definition does not contain expected URI: ${expected_uri}"
+    grep -Fq -- "$expected_key_file" "$source_file" ||
+        die "repository definition does not reference expected signing key: ${expected_key_file}"
 }
 
 apply_repository_setup() {
-  local setup_function="$1"
-  local status
+    local setup_function="$1"
+    local status
 
-  if "$setup_function"; then
-    return 0
-  else
-    status=$?
-  fi
+    if "$setup_function"; then
+        return 0
+    else
+        status=$?
+    fi
 
-  if ((status == 10)); then
-    APT_SOURCES_CHANGED=true
-    return 0
-  fi
+    if ((status == 10)); then
+        APT_SOURCES_CHANGED=true
+        return 0
+    fi
 
-  return "$status"
+    return "$status"
 }
 
 install_package_array() {
-  local description="$1"
-  shift
-  local package
-  local -a missing=()
-  local -a packages=("$@")
+    local description="$1"
+    shift
+    local package
+    local -a missing=()
+    local -a packages=("$@")
 
-  if (( ${#packages[@]} == 0 )); then
-    info "${description}: no packages requested, skipping"
-    return 0
-  fi
-
-  for package in "${packages[@]}"; do
-    if [[ "$(dpkg-query -W -f='${Status}' "$package" 2>/dev/null || true)" != "install ok installed" ]]; then
-      missing+=("$package")
+    if ((${#packages[@]} == 0)); then
+        info "${description}: no packages requested, skipping"
+        return 0
     fi
-  done
 
-  if (( ${#missing[@]} == 0 )); then
-    info "${description}: all packages already installed"
-    return 0
-  fi
+    for package in "${packages[@]}"; do
+        if [[ "$(dpkg-query -W -f='${Status}' "$package" 2>/dev/null || true)" != "install ok installed" ]]; then
+            missing+=("$package")
+        fi
+    done
 
-  info "installing ${#missing[@]} missing ${description} packages: ${missing[*]}"
-  if ! run_apt_get install -y -qq "${missing[@]}"; then
-    die "failed installing ${description} packages: ${missing[*]}"
-  fi
-  ok "${description} package installation completed"
+    if ((${#missing[@]} == 0)); then
+        info "${description}: all packages already installed"
+        return 0
+    fi
+
+    info "installing ${#missing[@]} missing ${description} packages: ${missing[*]}"
+    if ! run_apt_get install -y -qq "${missing[@]}"; then
+        die "failed installing ${description} packages: ${missing[*]}"
+    fi
+    ok "${description} package installation completed"
 }
 
 configure_cockpit_socket() {
-  local changed=false
+    local changed=false
 
-  command -v systemctl >/dev/null 2>&1 ||
-    die "systemctl is required to configure Cockpit"
-  systemctl cat cockpit.socket >/dev/null 2>&1 ||
-    die "Cockpit socket unit is not available after package installation"
+    command -v systemctl >/dev/null 2>&1 ||
+        die "systemctl is required to configure Cockpit"
+    systemctl cat cockpit.socket >/dev/null 2>&1 ||
+        die "Cockpit socket unit is not available after package installation"
 
-  if ! systemctl is-enabled --quiet cockpit.socket; then
-    systemctl enable cockpit.socket >/dev/null ||
-      die "failed enabling Cockpit socket"
-    changed=true
-  fi
+    if ! systemctl is-enabled --quiet cockpit.socket; then
+        systemctl enable cockpit.socket >/dev/null ||
+            die "failed enabling Cockpit socket"
+        changed=true
+    fi
 
-  if [[ ! -d "$SYSTEMD_RUNTIME_DIR" ]]; then
-    warn "systemd is not running; Cockpit socket activation is deferred until boot"
-    return
-  fi
+    if [[ ! -d "$SYSTEMD_RUNTIME_DIR" ]]; then
+        warn "systemd is not running; Cockpit socket activation is deferred until boot"
+        return
+    fi
 
-  if ! systemctl is-active --quiet cockpit.socket; then
-    systemctl start cockpit.socket ||
-      die "failed starting Cockpit socket"
-    changed=true
-  fi
+    if ! systemctl is-active --quiet cockpit.socket; then
+        systemctl start cockpit.socket ||
+            die "failed starting Cockpit socket"
+        changed=true
+    fi
 
-  if [[ "$changed" == true ]]; then
-    ok "Cockpit socket enabled and active"
-  else
-    info "Cockpit socket already enabled and active"
-  fi
+    if [[ "$changed" == true ]]; then
+        ok "Cockpit socket enabled and active"
+    else
+        info "Cockpit socket already enabled and active"
+    fi
 }
 
 install_flatpak_package_array() {
-  local description="$1"
-  shift
+    local description="$1"
+    shift
 
-  local packages=("$@")
-  local missing=()
-  local app
+    local packages=("$@")
+    local missing=()
+    local app
 
-  if [[ "$UBUNTU_VARIANT" != "desktop" ]]; then
-    info "${description}: desktop-only, skipping"
-    return
-  fi
-
-  command -v flatpak >/dev/null 2>&1 || die "flatpak is required to install ${description}"
-
-  flatpak remotes --system --columns=name | grep -qx flathub || die "system-wide Flathub remote is not configured"
-
-  if (( ${#packages[@]} == 0 )); then
-    info "${description}: no packages requested, skipping"
-    return
-  fi
-
-  for app in "${packages[@]}"; do
-    if flatpak info --system "$app" >/dev/null 2>&1; then
-      info "${app} already installed"
-    else
-      missing+=("$app")
+    if [[ "$UBUNTU_VARIANT" != "desktop" ]]; then
+        info "${description}: desktop-only, skipping"
+        return
     fi
-  done
 
-  if (( ${#missing[@]} == 0 )); then
-    info "${description}: all packages already installed"
-    return
-  fi
+    command -v flatpak >/dev/null 2>&1 || die "flatpak is required to install ${description}"
 
-  info "installing ${#missing[@]} ${description} packages"
-  flatpak install --system --noninteractive -y flathub "${missing[@]}"
+    flatpak remotes --system --columns=name | grep -qx flathub || die "system-wide Flathub remote is not configured"
 
-  for app in "${missing[@]}"; do
-    flatpak info --system "$app" >/dev/null 2>&1 || die "Flatpak installation could not be verified: ${app}"
-  done
+    if ((${#packages[@]} == 0)); then
+        info "${description}: no packages requested, skipping"
+        return
+    fi
 
-  ok "${description} package installation completed"
+    for app in "${packages[@]}"; do
+        if flatpak info --system "$app" >/dev/null 2>&1; then
+            info "${app} already installed"
+        else
+            missing+=("$app")
+        fi
+    done
+
+    if ((${#missing[@]} == 0)); then
+        info "${description}: all packages already installed"
+        return
+    fi
+
+    info "installing ${#missing[@]} ${description} packages"
+    flatpak install --system --noninteractive -y flathub "${missing[@]}"
+
+    for app in "${missing[@]}"; do
+        flatpak info --system "$app" >/dev/null 2>&1 || die "Flatpak installation could not be verified: ${app}"
+    done
+
+    ok "${description} package installation completed"
 }
 
 write_file_if_changed() {
-  local source_file="$1"
-  local destination_file="$2"
-  local destination_directory
-  local temporary_file
+    local source_file="$1"
+    local destination_file="$2"
+    local destination_directory
+    local temporary_file
 
-  if [[ -f "$destination_file" ]] && cmp -s "$source_file" "$destination_file"; then
-    return 1
-  fi
+    if [[ -f "$destination_file" ]] && cmp -s "$source_file" "$destination_file"; then
+        return 1
+    fi
 
-  destination_directory="$(dirname -- "$destination_file")"
-  install -d -m 0755 "$destination_directory"
-  temporary_file="$(mktemp "${destination_file}.tmp.XXXXXX")"
+    destination_directory="$(dirname -- "$destination_file")"
+    install -d -m 0755 "$destination_directory"
+    temporary_file="$(mktemp "${destination_file}.tmp.XXXXXX")"
 
-  if ! install -m 0644 "$source_file" "$temporary_file"; then
-    rm -f -- "$temporary_file"
-    die "failed staging ${destination_file}"
-  fi
-  if ! mv -f -- "$temporary_file" "$destination_file"; then
-    rm -f -- "$temporary_file"
-    die "failed installing ${destination_file}"
-  fi
+    if ! install -m 0644 "$source_file" "$temporary_file"; then
+        rm -f -- "$temporary_file"
+        die "failed staging ${destination_file}"
+    fi
+    if ! mv -f -- "$temporary_file" "$destination_file"; then
+        rm -f -- "$temporary_file"
+        die "failed installing ${destination_file}"
+    fi
 
-  return 0
+    return 0
 }
 
 # Get the user's D-Bus session bus socket.
 gnome_user_bus_available() {
-  [[ -S "/run/user/${TARGET_UID}/bus" ]]
+    [[ -S "/run/user/${TARGET_UID}/bus" ]]
 }
 
 # Run a command as the desktop user on their real per-user D-Bus when one
@@ -757,29 +760,29 @@ gnome_user_bus_available() {
 # already-running dconf service. For SSH/Vagrant provisioning before graphical
 # login, fall back to a temporary session bus so GSettings can still persist.
 run_as_gnome_user() {
-  local runtime_dir="/run/user/${TARGET_UID}"
+    local runtime_dir="/run/user/${TARGET_UID}"
 
-  if gnome_user_bus_available; then
-    run_as_target_user env \
-      XDG_RUNTIME_DIR="$runtime_dir" \
-      DBUS_SESSION_BUS_ADDRESS="unix:path=${runtime_dir}/bus" \
-      "$@"
-  else
-    run_as_target_user dbus-run-session -- "$@"
-  fi
+    if gnome_user_bus_available; then
+        run_as_target_user env \
+            XDG_RUNTIME_DIR="$runtime_dir" \
+            DBUS_SESSION_BUS_ADDRESS="unix:path=${runtime_dir}/bus" \
+            "$@"
+    else
+        run_as_target_user dbus-run-session -- "$@"
+    fi
 }
 
 apply_gnome_preferences() {
-  local bus_mode
+    local bus_mode
 
-  if gnome_user_bus_available; then
-    bus_mode="existing per-user D-Bus"
-  else
-    bus_mode="temporary D-Bus fallback"
-  fi
-  info "applying GNOME preferences via ${bus_mode}"
+    if gnome_user_bus_available; then
+        bus_mode="existing per-user D-Bus"
+    else
+        bus_mode="temporary D-Bus fallback"
+    fi
+    info "applying GNOME preferences via ${bus_mode}"
 
-  if ! run_as_gnome_user bash -s -- "file://${TARGET_HOME}/.config/background" <<'GNOME_SETTINGS'
+    if ! run_as_gnome_user bash -s -- "file://${TARGET_HOME}/.config/background" <<'GNOME_SETTINGS'; then
 set -uo pipefail
 
 failures=0
@@ -1031,800 +1034,799 @@ gsettings get org.gnome.shell favorite-apps >/dev/null
 
 (( failures == 0 ))
 GNOME_SETTINGS
-  then
-    warn "one or more GNOME preferences failed; inspect the log above"
-    return 1
-  fi
+        warn "one or more GNOME preferences failed; inspect the log above"
+        return 1
+    fi
 
-  ok "GNOME preferences applied and verified"
+    ok "GNOME preferences applied and verified"
 }
 
 install_gnome_extension_from_zip() (
-  set -Eeuo pipefail
+    set -Eeuo pipefail
 
-  local command_name
-  local display_name="$1"
-  local uuid="$2"
-  local download_url="$3"
-  local installed_uuid=""
-  local metadata_file="${TARGET_HOME}/.local/share/gnome-shell/extensions/${uuid}/metadata.json"
-  local temporary_dir
+    local command_name
+    local display_name="$1"
+    local uuid="$2"
+    local download_url="$3"
+    local installed_uuid=""
+    local metadata_file="${TARGET_HOME}/.local/share/gnome-shell/extensions/${uuid}/metadata.json"
+    local temporary_dir
 
-  command -v jq >/dev/null 2>&1 ||
-    die "jq is required to inspect ${display_name}"
+    command -v jq >/dev/null 2>&1 ||
+        die "jq is required to inspect ${display_name}"
 
-  if [[ -f "$metadata_file" ]] &&
-    installed_uuid="$(jq -r '.uuid // empty' "$metadata_file" 2>/dev/null)" &&
-    [[ "$installed_uuid" == "$uuid" ]]; then
+    if [[ -f "$metadata_file" ]] &&
+        installed_uuid="$(jq -r '.uuid // empty' "$metadata_file" 2>/dev/null)" &&
+        [[ "$installed_uuid" == "$uuid" ]]; then
+        verify_target_ownership "$metadata_file" "${display_name} extension metadata"
+        info "${display_name} extension already installed and verified, skipping"
+        return
+    elif [[ -f "$metadata_file" ]]; then
+        warn "${display_name} extension metadata is incomplete; repairing installation"
+    fi
+
+    for command_name in curl gnome-extensions unzip; do
+        command -v "$command_name" >/dev/null 2>&1 ||
+            die "${command_name} is required to install ${display_name}"
+    done
+
+    temporary_dir="$(mktemp -d)"
+    trap 'rm -rf -- "$temporary_dir"' EXIT
+    chmod 0755 "$temporary_dir"
+
+    info "downloading ${display_name} extension"
+    fetch_file "$download_url" "$temporary_dir/extension.zip" ||
+        die "failed downloading ${display_name} extension"
+    validate_zip_archive "$temporary_dir/extension.zip" "${display_name} extension"
+    validate_gnome_extension_archive "$temporary_dir/extension.zip" "$uuid"
+    chmod 0644 "$temporary_dir/extension.zip"
+
+    run_quiet_command \
+        "${display_name} extension installer" \
+        run_as_target_user \
+        gnome-extensions install --force "$temporary_dir/extension.zip" ||
+        die "${display_name} extension installation failed"
+
+    [[ -f "$metadata_file" ]] ||
+        die "${display_name} extension installation could not be verified"
+    installed_uuid="$(jq -r '.uuid // empty' "$metadata_file" 2>/dev/null)" ||
+        die "${display_name} extension installed invalid metadata"
+    [[ "$installed_uuid" == "$uuid" ]] ||
+        die "${display_name} extension installed unexpected metadata"
     verify_target_ownership "$metadata_file" "${display_name} extension metadata"
-    info "${display_name} extension already installed and verified, skipping"
-    return
-  elif [[ -f "$metadata_file" ]]; then
-    warn "${display_name} extension metadata is incomplete; repairing installation"
-  fi
 
-  for command_name in curl gnome-extensions unzip; do
-    command -v "$command_name" >/dev/null 2>&1 ||
-      die "${command_name} is required to install ${display_name}"
-  done
-
-  temporary_dir="$(mktemp -d)"
-  trap 'rm -rf -- "$temporary_dir"' EXIT
-  chmod 0755 "$temporary_dir"
-
-  info "downloading ${display_name} extension"
-  fetch_file "$download_url" "$temporary_dir/extension.zip" ||
-    die "failed downloading ${display_name} extension"
-  validate_zip_archive "$temporary_dir/extension.zip" "${display_name} extension"
-  validate_gnome_extension_archive "$temporary_dir/extension.zip" "$uuid"
-  chmod 0644 "$temporary_dir/extension.zip"
-
-  run_quiet_command \
-    "${display_name} extension installer" \
-    run_as_target_user \
-    gnome-extensions install --force "$temporary_dir/extension.zip" ||
-    die "${display_name} extension installation failed"
-
-  [[ -f "$metadata_file" ]] ||
-    die "${display_name} extension installation could not be verified"
-  installed_uuid="$(jq -r '.uuid // empty' "$metadata_file" 2>/dev/null)" ||
-    die "${display_name} extension installed invalid metadata"
-  [[ "$installed_uuid" == "$uuid" ]] ||
-    die "${display_name} extension installed unexpected metadata"
-  verify_target_ownership "$metadata_file" "${display_name} extension metadata"
-
-  ok "${display_name} extension installed for ${TARGET_USER}"
+    ok "${display_name} extension installed for ${TARGET_USER}"
 )
 
 install_hide_universal_access_extension() (
-  set -Eeuo pipefail
+    set -Eeuo pipefail
 
-  local account="$1"
-  local download_url=""
+    local account="$1"
+    local download_url=""
 
-  [[ "$account" == "$TARGET_USER" ]] ||
-    die "Hide Universal Access must be installed for the resolved target user"
+    [[ "$account" == "$TARGET_USER" ]] ||
+        die "Hide Universal Access must be installed for the resolved target user"
 
-  case "$VERSION_ID" in
-    26.*)
-      download_url="https://extensions.gnome.org/review/download/69554.shell-extension.zip"
-      ;;
-    24.*)
-      download_url="https://extensions.gnome.org/review/download/52417.shell-extension.zip"
-      ;;
-    *)
-      warn "Hide Universal Access installation not configured for Ubuntu ${VERSION_ID}"
-      return
-      ;;
-  esac
+    case "$VERSION_ID" in
+        26.*)
+            download_url="https://extensions.gnome.org/review/download/69554.shell-extension.zip"
+            ;;
+        24.*)
+            download_url="https://extensions.gnome.org/review/download/52417.shell-extension.zip"
+            ;;
+        *)
+            warn "Hide Universal Access installation not configured for Ubuntu ${VERSION_ID}"
+            return
+            ;;
+    esac
 
-  install_gnome_extension_from_zip \
-    "Hide Universal Access" \
-    "hide-universal-access@akiirui.github.io" \
-    "$download_url"
+    install_gnome_extension_from_zip \
+        "Hide Universal Access" \
+        "hide-universal-access@akiirui.github.io" \
+        "$download_url"
 )
 
 install_system_monitor_panel_extension() (
-  set -Eeuo pipefail
+    set -Eeuo pipefail
 
-  local account="$1"
-  local download_url="https://extensions.gnome.org/review/download/72725.shell-extension.zip"
+    local account="$1"
+    local download_url="https://extensions.gnome.org/review/download/72725.shell-extension.zip"
 
-  [[ "$account" == "$TARGET_USER" ]] ||
-    die "System Monitor Panel must be installed for the resolved target user"
+    [[ "$account" == "$TARGET_USER" ]] ||
+        die "System Monitor Panel must be installed for the resolved target user"
 
-  case "$VERSION_ID" in
-    26.*) ;;
-    24.*)
-      info "System Monitor Panel requires GNOME 48 or newer; skipping on Ubuntu ${VERSION_ID}"
-      return
-      ;;
-    *)
-      warn "System Monitor Panel installation not configured for Ubuntu ${VERSION_ID}"
-      return
-      ;;
-  esac
+    case "$VERSION_ID" in
+        26.*) ;;
+        24.*)
+            info "System Monitor Panel requires GNOME 48 or newer; skipping on Ubuntu ${VERSION_ID}"
+            return
+            ;;
+        *)
+            warn "System Monitor Panel installation not configured for Ubuntu ${VERSION_ID}"
+            return
+            ;;
+    esac
 
-  install_gnome_extension_from_zip \
-    "System Monitor Panel" \
-    "system-monitor-panel@naimur" \
-    "$download_url"
+    install_gnome_extension_from_zip \
+        "System Monitor Panel" \
+        "system-monitor-panel@naimur" \
+        "$download_url"
 )
 
 enable_battery_health_preservation() {
-  local device supported enabled
-  local found_battery=false
-  local enabled_count=0
+    local device supported enabled
+    local found_battery=false
+    local enabled_count=0
 
-  if ! command -v upower >/dev/null 2>&1; then
-    warn "upower not found; cannot enable battery health preservation"
-    return
-  fi
-
-  if ! command -v busctl >/dev/null 2>&1; then
-    warn "busctl not found; cannot enable battery health preservation"
-    return
-  fi
-
-  while IFS= read -r device; do
-    [[ "$device" == */battery_* ]] || continue
-    found_battery=true
-
-    supported="$(
-      busctl --system get-property \
-        org.freedesktop.UPower \
-        "$device" \
-        org.freedesktop.UPower.Device \
-        ChargeThresholdSupported 2>/dev/null || true
-    )"
-
-    if [[ "$supported" != "b true" ]]; then
-      info "battery charge thresholds unsupported for ${device##*/}; skipping"
-      continue
+    if ! command -v upower >/dev/null 2>&1; then
+        warn "upower not found; cannot enable battery health preservation"
+        return
     fi
 
-    if ! busctl --system call \
-      org.freedesktop.UPower \
-      "$device" \
-      org.freedesktop.UPower.Device \
-      EnableChargeThreshold b true >/dev/null; then
-      warn "failed to enable battery health preservation for ${device##*/}"
-      continue
+    if ! command -v busctl >/dev/null 2>&1; then
+        warn "busctl not found; cannot enable battery health preservation"
+        return
     fi
 
-    enabled="$(
-      busctl --system get-property \
-        org.freedesktop.UPower \
-        "$device" \
-        org.freedesktop.UPower.Device \
-        ChargeThresholdEnabled 2>/dev/null || true
-    )"
+    while IFS= read -r device; do
+        [[ "$device" == */battery_* ]] || continue
+        found_battery=true
 
-    if [[ "$enabled" == "b true" ]]; then
-      ok "battery health preservation enabled for ${device##*/}"
-      enabled_count=$((enabled_count + 1))
-    else
-      warn "battery health preservation could not be verified for ${device##*/}"
+        supported="$(
+            busctl --system get-property \
+                org.freedesktop.UPower \
+                "$device" \
+                org.freedesktop.UPower.Device \
+                ChargeThresholdSupported 2>/dev/null || true
+        )"
+
+        if [[ "$supported" != "b true" ]]; then
+            info "battery charge thresholds unsupported for ${device##*/}; skipping"
+            continue
+        fi
+
+        if ! busctl --system call \
+            org.freedesktop.UPower \
+            "$device" \
+            org.freedesktop.UPower.Device \
+            EnableChargeThreshold b true >/dev/null; then
+            warn "failed to enable battery health preservation for ${device##*/}"
+            continue
+        fi
+
+        enabled="$(
+            busctl --system get-property \
+                org.freedesktop.UPower \
+                "$device" \
+                org.freedesktop.UPower.Device \
+                ChargeThresholdEnabled 2>/dev/null || true
+        )"
+
+        if [[ "$enabled" == "b true" ]]; then
+            ok "battery health preservation enabled for ${device##*/}"
+            enabled_count=$((enabled_count + 1))
+        else
+            warn "battery health preservation could not be verified for ${device##*/}"
+        fi
+    done < <(upower -e 2>/dev/null || true)
+
+    if [[ "$found_battery" == false ]]; then
+        info "no system battery detected; skipping battery health preservation"
+    elif ((enabled_count == 0)); then
+        info "no battery supports UPower charge thresholds"
     fi
-  done < <(upower -e 2>/dev/null || true)
-
-  if [[ "$found_battery" == false ]]; then
-    info "no system battery detected; skipping battery health preservation"
-  elif (( enabled_count == 0 )); then
-    info "no battery supports UPower charge thresholds"
-  fi
 }
 
 # --- Repository setup ---
 ensure_fastfetch_ppa() {
-  local ppa="ppa:zhangsongcui3371/fastfetch"
+    local ppa="ppa:zhangsongcui3371/fastfetch"
 
-  case "$VERSION_ID" in
-    24.*)
-      if grep -Rqs "zhangsongcui3371/fastfetch" /etc/apt/sources.list /etc/apt/sources.list.d 2>/dev/null; then
-        info "fastfetch PPA already present"
-        return
-      fi
+    case "$VERSION_ID" in
+        24.*)
+            if grep -Rqs "zhangsongcui3371/fastfetch" /etc/apt/sources.list /etc/apt/sources.list.d 2>/dev/null; then
+                info "fastfetch PPA already present"
+                return
+            fi
 
-      if ! command -v add-apt-repository >/dev/null 2>&1; then
-        die "add-apt-repository is required for the fastfetch PPA on Ubuntu ${VERSION_ID}"
-      fi
+            if ! command -v add-apt-repository >/dev/null 2>&1; then
+                die "add-apt-repository is required for the fastfetch PPA on Ubuntu ${VERSION_ID}"
+            fi
 
-      if add-apt-repository --yes --no-update "$ppa" >/dev/null 2>&1; then
-        APT_SOURCES_CHANGED=true
-        ok "added fastfetch PPA for Ubuntu ${VERSION_ID}"
-      else
-        warn "failed to add fastfetch PPA; fastfetch may not be available"
-      fi
-      ;;
-    26.*)
-      info "Ubuntu ${VERSION_ID} provides fastfetch; skipping fastfetch PPA"
-      ;;
-    *)
-      warn "Ubuntu ${VERSION_ID} is not explicitly handled for the fastfetch PPA; using configured repositories"
-      ;;
-  esac
+            if add-apt-repository --yes --no-update "$ppa" >/dev/null 2>&1; then
+                APT_SOURCES_CHANGED=true
+                ok "added fastfetch PPA for Ubuntu ${VERSION_ID}"
+            else
+                warn "failed to add fastfetch PPA; fastfetch may not be available"
+            fi
+            ;;
+        26.*)
+            info "Ubuntu ${VERSION_ID} provides fastfetch; skipping fastfetch PPA"
+            ;;
+        *)
+            warn "Ubuntu ${VERSION_ID} is not explicitly handled for the fastfetch PPA; using configured repositories"
+            ;;
+    esac
 }
 
 install_docker_ctop_repository() (
-  set -Eeuo pipefail
+    set -Eeuo pipefail
 
-  local changed=false
-  local key_file="${SYSTEM_KEYRING_DIR}/azlux-archive-keyring.gpg"
-  local source_file="${APT_SOURCES_DIR}/azlux.sources"
-  local temporary_dir
-  temporary_dir="$(mktemp -d)"
-  trap 'rm -rf -- "$temporary_dir"' EXIT
+    local changed=false
+    local key_file="${SYSTEM_KEYRING_DIR}/azlux-archive-keyring.gpg"
+    local source_file="${APT_SOURCES_DIR}/azlux.sources"
+    local temporary_dir
+    temporary_dir="$(mktemp -d)"
+    trap 'rm -rf -- "$temporary_dir"' EXIT
 
-  fetch_file "https://azlux.fr/repo.gpg" "$temporary_dir/azlux.asc" ||
-    die "failed downloading the AZLux repository signing key"
-  dearmor_openpgp_key "$temporary_dir/azlux.asc" "$temporary_dir/azlux.gpg" "AZLux"
-  validate_openpgp_key \
-    "$temporary_dir/azlux.gpg" \
-    "AZLux" \
-    "98B824A5FA7D3A10FDB225B7CA548A0A0312D8E6"
+    fetch_file "https://azlux.fr/repo.gpg" "$temporary_dir/azlux.asc" ||
+        die "failed downloading the AZLux repository signing key"
+    dearmor_openpgp_key "$temporary_dir/azlux.asc" "$temporary_dir/azlux.gpg" "AZLux"
+    validate_openpgp_key \
+        "$temporary_dir/azlux.gpg" \
+        "AZLux" \
+        "98B824A5FA7D3A10FDB225B7CA548A0A0312D8E6"
 
-  cat >"$temporary_dir/azlux.sources" <<EOF
+    cat >"$temporary_dir/azlux.sources" <<EOF
 Types: deb
 URIs: https://packages.azlux.fr/debian/
 Suites: stable
 Components: main
 Signed-By: ${key_file}
 EOF
-  validate_repository_source \
-    "$temporary_dir/azlux.sources" \
-    "https://packages.azlux.fr/debian/" \
-    "$key_file"
+    validate_repository_source \
+        "$temporary_dir/azlux.sources" \
+        "https://packages.azlux.fr/debian/" \
+        "$key_file"
 
-  if write_file_if_changed "$temporary_dir/azlux.gpg" "$key_file"; then
-    changed=true
-    ok "installed AZLux repository signing key"
-  else
-    info "AZLux repository signing key already current"
-  fi
-  if write_file_if_changed "$temporary_dir/azlux.sources" "$source_file"; then
-    changed=true
-    ok "configured AZLux repository"
-  else
-    info "AZLux repository already configured"
-  fi
+    if write_file_if_changed "$temporary_dir/azlux.gpg" "$key_file"; then
+        changed=true
+        ok "installed AZLux repository signing key"
+    else
+        info "AZLux repository signing key already current"
+    fi
+    if write_file_if_changed "$temporary_dir/azlux.sources" "$source_file"; then
+        changed=true
+        ok "configured AZLux repository"
+    else
+        info "AZLux repository already configured"
+    fi
 
-  [[ "$changed" == false ]] || return 10
+    [[ "$changed" == false ]] || return 10
 )
 
 ensure_tailscale_repository() (
-  set -Eeuo pipefail
+    set -Eeuo pipefail
 
-  local changed=false
-  local key_file="${SYSTEM_KEYRING_DIR}/tailscale-archive-keyring.gpg"
-  local repository_url="https://pkgs.tailscale.com/stable/ubuntu"
-  local source_file="${APT_SOURCES_DIR}/tailscale.list"
-  local temporary_dir
+    local changed=false
+    local key_file="${SYSTEM_KEYRING_DIR}/tailscale-archive-keyring.gpg"
+    local repository_url="https://pkgs.tailscale.com/stable/ubuntu"
+    local source_file="${APT_SOURCES_DIR}/tailscale.list"
+    local temporary_dir
 
-  case "$CODENAME" in
-    noble | resolute) ;;
-    *)
-      die "Tailscale repository is not configured for Ubuntu codename ${CODENAME}"
-      ;;
-  esac
+    case "$CODENAME" in
+        noble | resolute) ;;
+        *)
+            die "Tailscale repository is not configured for Ubuntu codename ${CODENAME}"
+            ;;
+    esac
 
-  temporary_dir="$(mktemp -d)"
-  trap 'rm -rf -- "$temporary_dir"' EXIT
+    temporary_dir="$(mktemp -d)"
+    trap 'rm -rf -- "$temporary_dir"' EXIT
 
-  fetch_file \
-    "${repository_url}/${CODENAME}.noarmor.gpg" \
-    "$temporary_dir/tailscale-archive-keyring.gpg" ||
-    die "failed downloading the Tailscale signing key"
-  validate_openpgp_key "$temporary_dir/tailscale-archive-keyring.gpg" "Tailscale"
+    fetch_file \
+        "${repository_url}/${CODENAME}.noarmor.gpg" \
+        "$temporary_dir/tailscale-archive-keyring.gpg" ||
+        die "failed downloading the Tailscale signing key"
+    validate_openpgp_key "$temporary_dir/tailscale-archive-keyring.gpg" "Tailscale"
 
-  cat >"$temporary_dir/tailscale.list" <<EOF
+    cat >"$temporary_dir/tailscale.list" <<EOF
 deb [signed-by=${key_file}] ${repository_url} ${CODENAME} main
 EOF
-  validate_repository_source \
-    "$temporary_dir/tailscale.list" \
-    "$repository_url" \
-    "$key_file"
+    validate_repository_source \
+        "$temporary_dir/tailscale.list" \
+        "$repository_url" \
+        "$key_file"
 
-  if write_file_if_changed "$temporary_dir/tailscale-archive-keyring.gpg" "$key_file"; then
-    changed=true
-    ok "installed Tailscale repository signing key"
-  else
-    info "Tailscale repository signing key already current"
-  fi
-  if write_file_if_changed "$temporary_dir/tailscale.list" "$source_file"; then
-    changed=true
-    ok "configured Tailscale repository"
-  else
-    info "Tailscale repository already configured"
-  fi
+    if write_file_if_changed "$temporary_dir/tailscale-archive-keyring.gpg" "$key_file"; then
+        changed=true
+        ok "installed Tailscale repository signing key"
+    else
+        info "Tailscale repository signing key already current"
+    fi
+    if write_file_if_changed "$temporary_dir/tailscale.list" "$source_file"; then
+        changed=true
+        ok "configured Tailscale repository"
+    else
+        info "Tailscale repository already configured"
+    fi
 
-  [[ "$changed" == false ]] || return 10
+    [[ "$changed" == false ]] || return 10
 )
 
 ensure_sublime_text_repository() (
-  set -Eeuo pipefail
+    set -Eeuo pipefail
 
-  local changed=false
-  local key_file="${SYSTEM_KEYRING_DIR}/sublimehq-pub.asc"
-  local source_file="${APT_SOURCES_DIR}/sublime-text.sources"
-  local temporary_dir
-  temporary_dir="$(mktemp -d)"
-  trap 'rm -rf -- "$temporary_dir"' EXIT
+    local changed=false
+    local key_file="${SYSTEM_KEYRING_DIR}/sublimehq-pub.asc"
+    local source_file="${APT_SOURCES_DIR}/sublime-text.sources"
+    local temporary_dir
+    temporary_dir="$(mktemp -d)"
+    trap 'rm -rf -- "$temporary_dir"' EXIT
 
-  fetch_file \
-    "https://download.sublimetext.com/sublimehq-pub.gpg" \
-    "$temporary_dir/sublimehq-pub.asc" || die "failed downloading the Sublime Text signing key"
-  validate_openpgp_key "$temporary_dir/sublimehq-pub.asc" "Sublime Text"
+    fetch_file \
+        "https://download.sublimetext.com/sublimehq-pub.gpg" \
+        "$temporary_dir/sublimehq-pub.asc" || die "failed downloading the Sublime Text signing key"
+    validate_openpgp_key "$temporary_dir/sublimehq-pub.asc" "Sublime Text"
 
-  cat >"$temporary_dir/sublime-text.sources" <<EOF
+    cat >"$temporary_dir/sublime-text.sources" <<EOF
 Types: deb
 URIs: https://download.sublimetext.com/
 Suites: apt/stable/
 Signed-By: ${key_file}
 EOF
-  validate_repository_source \
-    "$temporary_dir/sublime-text.sources" \
-    "https://download.sublimetext.com/" \
-    "$key_file"
+    validate_repository_source \
+        "$temporary_dir/sublime-text.sources" \
+        "https://download.sublimetext.com/" \
+        "$key_file"
 
-  if write_file_if_changed "$temporary_dir/sublimehq-pub.asc" "$key_file"; then
-    changed=true
-    ok "installed Sublime Text repository signing key"
-  else
-    info "Sublime Text repository signing key already current"
-  fi
-  if write_file_if_changed "$temporary_dir/sublime-text.sources" "$source_file"; then
-    changed=true
-    ok "configured Sublime Text repository"
-  else
-    info "Sublime Text repository already configured"
-  fi
+    if write_file_if_changed "$temporary_dir/sublimehq-pub.asc" "$key_file"; then
+        changed=true
+        ok "installed Sublime Text repository signing key"
+    else
+        info "Sublime Text repository signing key already current"
+    fi
+    if write_file_if_changed "$temporary_dir/sublime-text.sources" "$source_file"; then
+        changed=true
+        ok "configured Sublime Text repository"
+    else
+        info "Sublime Text repository already configured"
+    fi
 
-  [[ "$changed" == false ]] || return 10
+    [[ "$changed" == false ]] || return 10
 )
 
 ensure_brave_browser_repository() (
-  set -Eeuo pipefail
+    set -Eeuo pipefail
 
-  local changed=false
-  local key_file="${SYSTEM_KEYRING_DIR}/brave-browser-archive-keyring.gpg"
-  local source_file="${APT_SOURCES_DIR}/brave-browser-release.sources"
-  local temporary_dir
-  local legacy_file
-  local -a legacy_files=()
-  temporary_dir="$(mktemp -d)"
-  trap 'rm -rf -- "$temporary_dir"' EXIT
+    local changed=false
+    local key_file="${SYSTEM_KEYRING_DIR}/brave-browser-archive-keyring.gpg"
+    local source_file="${APT_SOURCES_DIR}/brave-browser-release.sources"
+    local temporary_dir
+    local legacy_file
+    local -a legacy_files=()
+    temporary_dir="$(mktemp -d)"
+    trap 'rm -rf -- "$temporary_dir"' EXIT
 
-  fetch_file \
-    "https://brave-browser-apt-release.s3.brave.com/brave-browser-archive-keyring.gpg" \
-    "$temporary_dir/brave-browser-archive-keyring.gpg" || die "failed downloading the Brave signing key"
-  fetch_file \
-    "https://brave-browser-apt-release.s3.brave.com/brave-browser.sources" \
-    "$temporary_dir/brave-browser-release.sources" || die "failed downloading the Brave repository definition"
-  validate_openpgp_key "$temporary_dir/brave-browser-archive-keyring.gpg" "Brave"
-  validate_repository_source \
-    "$temporary_dir/brave-browser-release.sources" \
-    "https://brave-browser-apt-release.s3.brave.com" \
-    "$key_file"
+    fetch_file \
+        "https://brave-browser-apt-release.s3.brave.com/brave-browser-archive-keyring.gpg" \
+        "$temporary_dir/brave-browser-archive-keyring.gpg" || die "failed downloading the Brave signing key"
+    fetch_file \
+        "https://brave-browser-apt-release.s3.brave.com/brave-browser.sources" \
+        "$temporary_dir/brave-browser-release.sources" || die "failed downloading the Brave repository definition"
+    validate_openpgp_key "$temporary_dir/brave-browser-archive-keyring.gpg" "Brave"
+    validate_repository_source \
+        "$temporary_dir/brave-browser-release.sources" \
+        "https://brave-browser-apt-release.s3.brave.com" \
+        "$key_file"
 
-  if write_file_if_changed "$temporary_dir/brave-browser-archive-keyring.gpg" "$key_file"; then
-    changed=true
-    ok "installed Brave repository signing key"
-  else
-    info "Brave repository signing key already current"
-  fi
-  if write_file_if_changed "$temporary_dir/brave-browser-release.sources" "$source_file"; then
-    changed=true
-    ok "configured Brave repository"
-  else
-    info "Brave repository already configured"
-  fi
+    if write_file_if_changed "$temporary_dir/brave-browser-archive-keyring.gpg" "$key_file"; then
+        changed=true
+        ok "installed Brave repository signing key"
+    else
+        info "Brave repository signing key already current"
+    fi
+    if write_file_if_changed "$temporary_dir/brave-browser-release.sources" "$source_file"; then
+        changed=true
+        ok "configured Brave repository"
+    else
+        info "Brave repository already configured"
+    fi
 
-  shopt -s nullglob
-  legacy_files=("${APT_SOURCES_DIR}"/brave-browser-*.list)
-  shopt -u nullglob
-  for legacy_file in "${legacy_files[@]}"; do
-    rm -f -- "$legacy_file"
-    changed=true
-    info "removed legacy Brave repository file: ${legacy_file}"
-  done
+    shopt -s nullglob
+    legacy_files=("${APT_SOURCES_DIR}"/brave-browser-*.list)
+    shopt -u nullglob
+    for legacy_file in "${legacy_files[@]}"; do
+        rm -f -- "$legacy_file"
+        changed=true
+        info "removed legacy Brave repository file: ${legacy_file}"
+    done
 
-  [[ "$changed" == false ]] || return 10
+    [[ "$changed" == false ]] || return 10
 )
 
 ensure_dbeaver_repository() (
-  set -Eeuo pipefail
+    set -Eeuo pipefail
 
-  local changed=false
-  local key_file="${SYSTEM_KEYRING_DIR}/dbeaver.gpg.key"
-  local source_file="${APT_SOURCES_DIR}/dbeaver.list"
-  local temporary_dir
-  temporary_dir="$(mktemp -d)"
-  trap 'rm -rf -- "$temporary_dir"' EXIT
+    local changed=false
+    local key_file="${SYSTEM_KEYRING_DIR}/dbeaver.gpg.key"
+    local source_file="${APT_SOURCES_DIR}/dbeaver.list"
+    local temporary_dir
+    temporary_dir="$(mktemp -d)"
+    trap 'rm -rf -- "$temporary_dir"' EXIT
 
-  fetch_file \
-    "https://dbeaver.io/debs/dbeaver.gpg.key" \
-    "$temporary_dir/dbeaver.asc" || die "failed downloading the DBeaver signing key"
-  dearmor_openpgp_key "$temporary_dir/dbeaver.asc" "$temporary_dir/dbeaver.gpg" "DBeaver"
-  validate_openpgp_key "$temporary_dir/dbeaver.gpg" "DBeaver"
+    fetch_file \
+        "https://dbeaver.io/debs/dbeaver.gpg.key" \
+        "$temporary_dir/dbeaver.asc" || die "failed downloading the DBeaver signing key"
+    dearmor_openpgp_key "$temporary_dir/dbeaver.asc" "$temporary_dir/dbeaver.gpg" "DBeaver"
+    validate_openpgp_key "$temporary_dir/dbeaver.gpg" "DBeaver"
 
-  cat >"$temporary_dir/dbeaver.list" <<EOF
+    cat >"$temporary_dir/dbeaver.list" <<EOF
 deb [signed-by=${key_file}] https://dbeaver.io/debs/dbeaver-ce /
 EOF
-  validate_repository_source \
-    "$temporary_dir/dbeaver.list" \
-    "https://dbeaver.io/debs/dbeaver-ce" \
-    "$key_file"
+    validate_repository_source \
+        "$temporary_dir/dbeaver.list" \
+        "https://dbeaver.io/debs/dbeaver-ce" \
+        "$key_file"
 
-  if write_file_if_changed "$temporary_dir/dbeaver.gpg" "$key_file"; then
-    changed=true
-    ok "installed DBeaver repository signing key"
-  else
-    info "DBeaver repository signing key already current"
-  fi
-  if write_file_if_changed "$temporary_dir/dbeaver.list" "$source_file"; then
-    changed=true
-    ok "configured DBeaver repository"
-  else
-    info "DBeaver repository already configured"
-  fi
+    if write_file_if_changed "$temporary_dir/dbeaver.gpg" "$key_file"; then
+        changed=true
+        ok "installed DBeaver repository signing key"
+    else
+        info "DBeaver repository signing key already current"
+    fi
+    if write_file_if_changed "$temporary_dir/dbeaver.list" "$source_file"; then
+        changed=true
+        ok "configured DBeaver repository"
+    else
+        info "DBeaver repository already configured"
+    fi
 
-  [[ "$changed" == false ]] || return 10
+    [[ "$changed" == false ]] || return 10
 )
 
 ensure_mullvad_repository() (
-  set -Eeuo pipefail
+    set -Eeuo pipefail
 
-  local architecture
-  local changed=false
-  local key_file="${SYSTEM_KEYRING_DIR}/mullvad-keyring.asc"
-  local source_file="${APT_SOURCES_DIR}/mullvad.list"
-  local temporary_dir
-  temporary_dir="$(mktemp -d)"
-  trap 'rm -rf -- "$temporary_dir"' EXIT
+    local architecture
+    local changed=false
+    local key_file="${SYSTEM_KEYRING_DIR}/mullvad-keyring.asc"
+    local source_file="${APT_SOURCES_DIR}/mullvad.list"
+    local temporary_dir
+    temporary_dir="$(mktemp -d)"
+    trap 'rm -rf -- "$temporary_dir"' EXIT
 
-  if [[ "$UBUNTU_VARIANT" != "desktop" ]]; then
-    info "Mullvad VPN is desktop-only; skipping"
-    return 0
-  fi
+    if [[ "$UBUNTU_VARIANT" != "desktop" ]]; then
+        info "Mullvad VPN is desktop-only; skipping"
+        return 0
+    fi
 
-  architecture="$(dpkg --print-architecture)"
-  fetch_file \
-    "https://repository.mullvad.net/deb/mullvad-keyring.asc" \
-    "$temporary_dir/mullvad-keyring.asc" || die "failed downloading the Mullvad signing key"
-  validate_openpgp_key "$temporary_dir/mullvad-keyring.asc" "Mullvad"
+    architecture="$(dpkg --print-architecture)"
+    fetch_file \
+        "https://repository.mullvad.net/deb/mullvad-keyring.asc" \
+        "$temporary_dir/mullvad-keyring.asc" || die "failed downloading the Mullvad signing key"
+    validate_openpgp_key "$temporary_dir/mullvad-keyring.asc" "Mullvad"
 
-  cat >"$temporary_dir/mullvad.list" <<EOF
+    cat >"$temporary_dir/mullvad.list" <<EOF
 deb [signed-by=${key_file} arch=${architecture}] https://repository.mullvad.net/deb/stable stable main
 EOF
-  validate_repository_source \
-    "$temporary_dir/mullvad.list" \
-    "https://repository.mullvad.net/deb/stable" \
-    "$key_file"
+    validate_repository_source \
+        "$temporary_dir/mullvad.list" \
+        "https://repository.mullvad.net/deb/stable" \
+        "$key_file"
 
-  if write_file_if_changed "$temporary_dir/mullvad-keyring.asc" "$key_file"; then
-    changed=true
-    ok "installed Mullvad repository signing key"
-  else
-    info "Mullvad repository signing key already current"
-  fi
-  if write_file_if_changed "$temporary_dir/mullvad.list" "$source_file"; then
-    changed=true
-    ok "configured Mullvad repository"
-  else
-    info "Mullvad repository already configured"
-  fi
+    if write_file_if_changed "$temporary_dir/mullvad-keyring.asc" "$key_file"; then
+        changed=true
+        ok "installed Mullvad repository signing key"
+    else
+        info "Mullvad repository signing key already current"
+    fi
+    if write_file_if_changed "$temporary_dir/mullvad.list" "$source_file"; then
+        changed=true
+        ok "configured Mullvad repository"
+    else
+        info "Mullvad repository already configured"
+    fi
 
-  [[ "$changed" == false ]] || return 10
+    [[ "$changed" == false ]] || return 10
 )
 
 ensure_typora_repository() (
-  set -Eeuo pipefail
+    set -Eeuo pipefail
 
-  local changed=false
-  local key_file="${SYSTEM_KEYRING_DIR}/typora.gpg"
-  local legacy_key_file="${APT_TRUSTED_KEY_DIR}/typora.asc"
-  local source_file="${APT_SOURCES_DIR}/typora.list"
-  local temporary_dir
+    local changed=false
+    local key_file="${SYSTEM_KEYRING_DIR}/typora.gpg"
+    local legacy_key_file="${APT_TRUSTED_KEY_DIR}/typora.asc"
+    local source_file="${APT_SOURCES_DIR}/typora.list"
+    local temporary_dir
 
-  temporary_dir="$(mktemp -d)"
-  trap 'rm -rf -- "$temporary_dir"' EXIT
+    temporary_dir="$(mktemp -d)"
+    trap 'rm -rf -- "$temporary_dir"' EXIT
 
-  fetch_file \
-    "https://downloads.typora.io/typora.gpg" \
-    "$temporary_dir/typora.gpg" ||
-    die "failed downloading the Typora signing key"
-  validate_openpgp_key "$temporary_dir/typora.gpg" "Typora"
+    fetch_file \
+        "https://downloads.typora.io/typora.gpg" \
+        "$temporary_dir/typora.gpg" ||
+        die "failed downloading the Typora signing key"
+    validate_openpgp_key "$temporary_dir/typora.gpg" "Typora"
 
-  cat >"$temporary_dir/typora.list" <<EOF
+    cat >"$temporary_dir/typora.list" <<EOF
 deb [signed-by=${key_file}] https://downloads.typora.io/linux ./
 EOF
-  validate_repository_source \
-    "$temporary_dir/typora.list" \
-    "https://downloads.typora.io/linux" \
-    "$key_file"
+    validate_repository_source \
+        "$temporary_dir/typora.list" \
+        "https://downloads.typora.io/linux" \
+        "$key_file"
 
-  if write_file_if_changed "$temporary_dir/typora.gpg" "$key_file"; then
-    changed=true
-    ok "installed Typora repository signing key"
-  else
-    info "Typora repository signing key already current"
-  fi
-  if write_file_if_changed "$temporary_dir/typora.list" "$source_file"; then
-    changed=true
-    ok "configured Typora repository"
-  else
-    info "Typora repository already configured"
-  fi
-  if [[ -e "$legacy_key_file" ]]; then
-    rm -f -- "$legacy_key_file"
-    changed=true
-    info "removed obsolete Typora repository key: ${legacy_key_file}"
-  fi
+    if write_file_if_changed "$temporary_dir/typora.gpg" "$key_file"; then
+        changed=true
+        ok "installed Typora repository signing key"
+    else
+        info "Typora repository signing key already current"
+    fi
+    if write_file_if_changed "$temporary_dir/typora.list" "$source_file"; then
+        changed=true
+        ok "configured Typora repository"
+    else
+        info "Typora repository already configured"
+    fi
+    if [[ -e "$legacy_key_file" ]]; then
+        rm -f -- "$legacy_key_file"
+        changed=true
+        info "removed obsolete Typora repository key: ${legacy_key_file}"
+    fi
 
-  [[ "$changed" == false ]] || return 10
+    [[ "$changed" == false ]] || return 10
 )
 
 configure_flathub() (
-  set -euo pipefail
+    set -euo pipefail
 
-  local remote_url="https://dl.flathub.org/repo/flathub.flatpakrepo"
+    local remote_url="https://dl.flathub.org/repo/flathub.flatpakrepo"
 
-  if [[ "$UBUNTU_VARIANT" != "desktop" ]]; then
-    info "Flathub is desktop-only; skipping"
-    return
-  fi
+    if [[ "$UBUNTU_VARIANT" != "desktop" ]]; then
+        info "Flathub is desktop-only; skipping"
+        return
+    fi
 
-  command -v flatpak >/dev/null 2>&1 || die "flatpak is required to configure Flathub"
+    command -v flatpak >/dev/null 2>&1 || die "flatpak is required to configure Flathub"
 
-  info "configuring the system-wide Flathub remote"
+    info "configuring the system-wide Flathub remote"
 
-  flatpak remote-add --system --if-not-exists flathub "$remote_url"
-  flatpak remote-modify --system --enable flathub
+    flatpak remote-add --system --if-not-exists flathub "$remote_url"
+    flatpak remote-modify --system --enable flathub
 
-  flatpak remotes --system --columns=name | grep -qx flathub ||
-    die "Flathub remote configuration could not be verified"
+    flatpak remotes --system --columns=name | grep -qx flathub ||
+        die "Flathub remote configuration could not be verified"
 
-  ok "Flathub system remote configured"
+    ok "Flathub system remote configured"
 )
 
 # --- Desktop tools ---
 
 install_termix() (
-  set -Eeuo pipefail
+    set -Eeuo pipefail
 
-  local app_id="com.karmaa.termix"
-  local temporary_dir
+    local app_id="com.karmaa.termix"
+    local temporary_dir
 
-  if [[ "$ARCH" != "amd64" ]]; then
-    warn "Termix Flatpak bundle is only configured for amd64; skipping on ${ARCH}"
-    return
-  fi
-  command -v flatpak >/dev/null 2>&1 ||
-    die "flatpak is required to install Termix"
+    if [[ "$ARCH" != "amd64" ]]; then
+        warn "Termix Flatpak bundle is only configured for amd64; skipping on ${ARCH}"
+        return
+    fi
+    command -v flatpak >/dev/null 2>&1 ||
+        die "flatpak is required to install Termix"
 
-  if run_as_target_user flatpak info --user "$app_id" >/dev/null 2>&1; then
-    info "Termix Flatpak already installed for ${TARGET_USER}, skipping"
-    return
-  fi
+    if run_as_target_user flatpak info --user "$app_id" >/dev/null 2>&1; then
+        info "Termix Flatpak already installed for ${TARGET_USER}, skipping"
+        return
+    fi
 
-  temporary_dir="$(mktemp -d)"
-  trap 'rm -rf -- "$temporary_dir"' EXIT
+    temporary_dir="$(mktemp -d)"
+    trap 'rm -rf -- "$temporary_dir"' EXIT
 
-  info "checking latest Termix GitHub release"
-  info "downloading Termix Flatpak bundle"
-  fetch_latest_github_asset \
-    "Termix-SSH/Termix" \
-    "exact" \
-    "termix_linux_flatpak.flatpak" \
-    "$temporary_dir/termix.flatpak" \
-    "$temporary_dir/release.json" \
-    "Termix Flatpak bundle"
+    info "checking latest Termix GitHub release"
+    info "downloading Termix Flatpak bundle"
+    fetch_latest_github_asset \
+        "Termix-SSH/Termix" \
+        "exact" \
+        "termix_linux_flatpak.flatpak" \
+        "$temporary_dir/termix.flatpak" \
+        "$temporary_dir/release.json" \
+        "Termix Flatpak bundle"
 
-  chmod 0755 "$temporary_dir"
-  chmod 0644 "$temporary_dir/termix.flatpak"
-  info "installing Termix Flatpak for ${TARGET_USER}"
-  run_quiet_command "Termix Flatpak installation failed" \
-    run_as_target_user flatpak install --user --noninteractive -y \
-    "$temporary_dir/termix.flatpak" ||
-    die "failed installing Termix Flatpak"
-  run_as_target_user flatpak info --user "$app_id" >/dev/null 2>&1 ||
-    die "Termix Flatpak installation could not be verified"
-  ok "Termix Flatpak installed for ${TARGET_USER}"
+    chmod 0755 "$temporary_dir"
+    chmod 0644 "$temporary_dir/termix.flatpak"
+    info "installing Termix Flatpak for ${TARGET_USER}"
+    run_quiet_command "Termix Flatpak installation failed" \
+        run_as_target_user flatpak install --user --noninteractive -y \
+        "$temporary_dir/termix.flatpak" ||
+        die "failed installing Termix Flatpak"
+    run_as_target_user flatpak info --user "$app_id" >/dev/null 2>&1 ||
+        die "Termix Flatpak installation could not be verified"
+    ok "Termix Flatpak installed for ${TARGET_USER}"
 )
 
 install_termius() {
-  if [[ "$ARCH" != "amd64" ]]; then
-    warn "Termius DEB is only configured for amd64; skipping on ${ARCH}"
-    return
-  fi
+    if [[ "$ARCH" != "amd64" ]]; then
+        warn "Termius DEB is only configured for amd64; skipping on ${ARCH}"
+        return
+    fi
 
-  install_downloaded_debian_package \
-    "https://download.termius.com/linux/Termius.deb" \
-    "termius-app" \
-    "Termius"
+    install_downloaded_debian_package \
+        "https://download.termius.com/linux/Termius.deb" \
+        "termius-app" \
+        "Termius"
 }
 
 install_rustdesk() {
-  local asset_suffix
+    local asset_suffix
 
-  case "$ARCH" in
-    amd64) asset_suffix="-x86_64.deb" ;;
-    arm64) asset_suffix="-aarch64.deb" ;;
-    *)
-      warn "RustDesk release installation is not configured for ${ARCH}; skipping"
-      return
-      ;;
-  esac
+    case "$ARCH" in
+        amd64) asset_suffix="-x86_64.deb" ;;
+        arm64) asset_suffix="-aarch64.deb" ;;
+        *)
+            warn "RustDesk release installation is not configured for ${ARCH}; skipping"
+            return
+            ;;
+    esac
 
-  install_latest_github_debian_package \
-    "rustdesk/rustdesk" \
-    "$asset_suffix" \
-    "rustdesk" \
-    "RustDesk"
+    install_latest_github_debian_package \
+        "rustdesk/rustdesk" \
+        "$asset_suffix" \
+        "rustdesk" \
+        "RustDesk"
 }
 
 install_nomachine() (
-  set -Eeuo pipefail
+    set -Eeuo pipefail
 
-  local download_page="https://download.nomachine.com/download/?id=1&platform=linux"
-  local download_url installed_version package_version page_content release_series release_version
-  local temporary_dir
+    local download_page="https://download.nomachine.com/download/?id=1&platform=linux"
+    local download_url installed_version package_version page_content release_series release_version
+    local temporary_dir
 
-  if [[ "$ARCH" != "amd64" ]]; then
-    warn "NoMachine Linux DEB (amd64) is not compatible with ${ARCH}; skipping"
-    return
-  fi
+    if [[ "$ARCH" != "amd64" ]]; then
+        warn "NoMachine Linux DEB (amd64) is not compatible with ${ARCH}; skipping"
+        return
+    fi
 
-  temporary_dir="$(mktemp -d)"
-  trap 'rm -rf -- "$temporary_dir"' EXIT
+    temporary_dir="$(mktemp -d)"
+    trap 'rm -rf -- "$temporary_dir"' EXIT
 
-  info "checking latest NoMachine Linux DEB release"
-  fetch_file "$download_page" "$temporary_dir/download-page.html" ||
-    die "failed downloading the NoMachine release page"
-  page_content="$(<"$temporary_dir/download-page.html")"
+    info "checking latest NoMachine Linux DEB release"
+    fetch_file "$download_page" "$temporary_dir/download-page.html" ||
+        die "failed downloading the NoMachine release page"
+    page_content="$(<"$temporary_dir/download-page.html")"
 
-  if [[ "$page_content" =~ ([0-9]+\.[0-9]+\.[0-9]+_[0-9]+) ]]; then
-    release_version="${BASH_REMATCH[1]}"
-  else
-    die "could not determine the latest NoMachine Linux DEB version"
-  fi
-  if [[ "$release_version" =~ ^([0-9]+\.[0-9]+)\. ]]; then
-    release_series="${BASH_REMATCH[1]}"
-  else
-    die "unexpected NoMachine release version: ${release_version}"
-  fi
+    if [[ "$page_content" =~ ([0-9]+\.[0-9]+\.[0-9]+_[0-9]+) ]]; then
+        release_version="${BASH_REMATCH[1]}"
+    else
+        die "could not determine the latest NoMachine Linux DEB version"
+    fi
+    if [[ "$release_version" =~ ^([0-9]+\.[0-9]+)\. ]]; then
+        release_series="${BASH_REMATCH[1]}"
+    else
+        die "unexpected NoMachine release version: ${release_version}"
+    fi
 
-  package_version="${release_version/_/-}"
-  installed_version="$(dpkg-query -W -f='${Version}' nomachine 2>/dev/null || true)"
-  if [[ -n "$installed_version" ]] &&
-    dpkg --compare-versions "$installed_version" ge "$package_version"; then
-    info "NoMachine ${installed_version} already matches latest release ${package_version}, skipping download"
-    return
-  fi
+    package_version="${release_version/_/-}"
+    installed_version="$(dpkg-query -W -f='${Version}' nomachine 2>/dev/null || true)"
+    if [[ -n "$installed_version" ]] &&
+        dpkg --compare-versions "$installed_version" ge "$package_version"; then
+        info "NoMachine ${installed_version} already matches latest release ${package_version}, skipping download"
+        return
+    fi
 
-  download_url="https://download.nomachine.com/download/${release_series}/Linux/nomachine_${release_version}_amd64.deb"
-  install_downloaded_debian_package "$download_url" "nomachine" "NoMachine"
+    download_url="https://download.nomachine.com/download/${release_series}/Linux/nomachine_${release_version}_amd64.deb"
+    install_downloaded_debian_package "$download_url" "nomachine" "NoMachine"
 )
 
 install_pandoc() {
-  local asset_suffix
+    local asset_suffix
 
-  case "$ARCH" in
-    amd64 | arm64) asset_suffix="-1-${ARCH}.deb" ;;
-    *)
-      warn "Pandoc release installation is not configured for ${ARCH}; skipping"
-      return
-      ;;
-  esac
+    case "$ARCH" in
+        amd64 | arm64) asset_suffix="-1-${ARCH}.deb" ;;
+        *)
+            warn "Pandoc release installation is not configured for ${ARCH}; skipping"
+            return
+            ;;
+    esac
 
-  install_latest_github_debian_package \
-    "jgm/pandoc" \
-    "$asset_suffix" \
-    "pandoc" \
-    "Pandoc"
+    install_latest_github_debian_package \
+        "jgm/pandoc" \
+        "$asset_suffix" \
+        "pandoc" \
+        "Pandoc"
 }
 
 install_typora_themeable() (
-  set -Eeuo pipefail
+    set -Eeuo pipefail
 
-  local installed_version release_version
-  local marker_file="${TARGET_HOME}/.config/Typora/themes/.packertron-themeable-version"
-  local theme_directory="${TARGET_HOME}/.config/Typora/themes"
-  local temporary_dir
+    local installed_version release_version
+    local marker_file="${TARGET_HOME}/.config/Typora/themes/.packertron-themeable-version"
+    local theme_directory="${TARGET_HOME}/.config/Typora/themes"
+    local temporary_dir
 
-  temporary_dir="$(mktemp -d)"
-  trap 'rm -rf -- "$temporary_dir"' EXIT
+    temporary_dir="$(mktemp -d)"
+    trap 'rm -rf -- "$temporary_dir"' EXIT
 
-  info "checking latest Typora Themeable release"
-  fetch_latest_github_release_metadata \
-    "jhildenbiddle/typora-themeable" \
-    "$temporary_dir/release.json" \
-    "Typora Themeable"
-  release_version="$(jq -r '.tag_name // empty' "$temporary_dir/release.json")"
-  [[ -n "$release_version" ]] ||
-    die "Typora Themeable release metadata does not contain a version"
+    info "checking latest Typora Themeable release"
+    fetch_latest_github_release_metadata \
+        "jhildenbiddle/typora-themeable" \
+        "$temporary_dir/release.json" \
+        "Typora Themeable"
+    release_version="$(jq -r '.tag_name // empty' "$temporary_dir/release.json")"
+    [[ -n "$release_version" ]] ||
+        die "Typora Themeable release metadata does not contain a version"
 
-  installed_version=""
-  [[ ! -f "$marker_file" ]] || installed_version="$(<"$marker_file")"
-  if [[ "$installed_version" == "$release_version" &&
-    -f "$theme_directory/themeable.css" ]]; then
-    info "Typora Themeable ${release_version} already installed, skipping"
-    return
-  fi
+    installed_version=""
+    [[ ! -f "$marker_file" ]] || installed_version="$(<"$marker_file")"
+    if [[ "$installed_version" == "$release_version" &&
+        -f "$theme_directory/themeable.css" ]]; then
+        info "Typora Themeable ${release_version} already installed, skipping"
+        return
+    fi
 
-  info "downloading Typora Themeable ${release_version}"
-  fetch_github_asset_from_metadata \
-    "exact" \
-    "typora-themeable.zip" \
-    "$temporary_dir/typora-themeable.zip" \
-    "$temporary_dir/release.json" \
-    "Typora Themeable archive"
-  info "installing Typora Themeable ${release_version}"
-  validate_zip_archive "$temporary_dir/typora-themeable.zip" "Typora Themeable"
+    info "downloading Typora Themeable ${release_version}"
+    fetch_github_asset_from_metadata \
+        "exact" \
+        "typora-themeable.zip" \
+        "$temporary_dir/typora-themeable.zip" \
+        "$temporary_dir/release.json" \
+        "Typora Themeable archive"
+    info "installing Typora Themeable ${release_version}"
+    validate_zip_archive "$temporary_dir/typora-themeable.zip" "Typora Themeable"
 
-  install -d -m 0755 -o "$TARGET_USER" -g "$TARGET_GROUP" "$theme_directory"
-  chmod 0755 "$temporary_dir"
-  chmod 0644 "$temporary_dir/typora-themeable.zip"
-  run_quiet_command "Typora Themeable extraction failed" \
-    run_as_target_user unzip -q -o \
-    "$temporary_dir/typora-themeable.zip" \
-    -d "$theme_directory" ||
-    die "failed installing Typora Themeable"
-  [[ -f "$theme_directory/themeable.css" ]] ||
-    die "Typora Themeable installation could not be verified"
+    install -d -m 0755 -o "$TARGET_USER" -g "$TARGET_GROUP" "$theme_directory"
+    chmod 0755 "$temporary_dir"
+    chmod 0644 "$temporary_dir/typora-themeable.zip"
+    run_quiet_command "Typora Themeable extraction failed" \
+        run_as_target_user unzip -q -o \
+        "$temporary_dir/typora-themeable.zip" \
+        -d "$theme_directory" ||
+        die "failed installing Typora Themeable"
+    [[ -f "$theme_directory/themeable.css" ]] ||
+        die "Typora Themeable installation could not be verified"
 
-  printf '%s\n' "$release_version" >"$temporary_dir/theme-version"
-  install \
-    -o "$TARGET_USER" \
-    -g "$TARGET_GROUP" \
-    -m 0644 \
-    "$temporary_dir/theme-version" \
-    "$marker_file"
-  verify_target_ownership "$marker_file" "Typora Themeable version marker"
-  ok "Typora Themeable ${release_version} installed for ${TARGET_USER}"
+    printf '%s\n' "$release_version" >"$temporary_dir/theme-version"
+    install \
+        -o "$TARGET_USER" \
+        -g "$TARGET_GROUP" \
+        -m 0644 \
+        "$temporary_dir/theme-version" \
+        "$marker_file"
+    verify_target_ownership "$marker_file" "Typora Themeable version marker"
+    ok "Typora Themeable ${release_version} installed for ${TARGET_USER}"
 )
 
 configure_desktop_wallpaper() (
-  set -euo pipefail
+    set -euo pipefail
 
-  local source_file="${SCRIPT_DIR}/ubuntu-wallpaper.png"
-  local destination_file
+    local source_file="${SCRIPT_DIR}/ubuntu-wallpaper.png"
+    local destination_file
 
-  [[ -d "$TARGET_HOME" ]] || die "target home directory is unavailable: ${TARGET_HOME}"
-  destination_file="$TARGET_HOME/.config/background"
+    [[ -d "$TARGET_HOME" ]] || die "target home directory is unavailable: ${TARGET_HOME}"
+    destination_file="$TARGET_HOME/.config/background"
 
-  [[ -f "$source_file" ]] ||
-    die "wallpaper not found: ${source_file}"
+    [[ -f "$source_file" ]] ||
+        die "wallpaper not found: ${source_file}"
 
-  install -d \
-    -o "$TARGET_USER" \
-    -g "$TARGET_GROUP" \
-    -m 0755 \
-    "$TARGET_HOME/.config"
+    install -d \
+        -o "$TARGET_USER" \
+        -g "$TARGET_GROUP" \
+        -m 0755 \
+        "$TARGET_HOME/.config"
 
-  install \
-    -C \
-    -o "$TARGET_USER" \
-    -g "$TARGET_GROUP" \
-    -m 0644 \
-    "$source_file" \
-    "$destination_file"
+    install \
+        -C \
+        -o "$TARGET_USER" \
+        -g "$TARGET_GROUP" \
+        -m 0644 \
+        "$source_file" \
+        "$destination_file"
 
-  ok "GNOME wallpaper file ready: ${destination_file}"
+    ok "GNOME wallpaper file ready: ${destination_file}"
 )
 
 configure_terminator() (
-  set -Eeuo pipefail
+    set -Eeuo pipefail
 
-  local expected_config
-  local temporary_dir
+    local expected_config
+    local temporary_dir
 
-  temporary_dir="$(mktemp -d)"
-  trap 'rm -rf -- "$temporary_dir"' EXIT
-  expected_config="$temporary_dir/config"
+    temporary_dir="$(mktemp -d)"
+    trap 'rm -rf -- "$temporary_dir"' EXIT
+    expected_config="$temporary_dir/config"
 
-  cat >"$expected_config" <<'EOF'
+    cat >"$expected_config" <<'EOF'
 [global_config]
   window_state = maximise
 [keybindings]
@@ -1847,56 +1849,56 @@ configure_terminator() (
 [plugins]
 EOF
 
-  install_target_config_file \
-    "$expected_config" \
-    "$TARGET_HOME/.config/terminator/config" \
-    "Terminator"
+    install_target_config_file \
+        "$expected_config" \
+        "$TARGET_HOME/.config/terminator/config" \
+        "Terminator"
 )
 
 configure_terminator_as_default() {
-  local account="$1"
-  local status
-  local terminator_bin
-  local desktop_file="${TERMINATOR_DESKTOP_FILE:-/usr/share/applications/terminator.desktop}"
-  local desktop_id="terminator.desktop"
+    local account="$1"
+    local status
+    local terminator_bin
+    local desktop_file="${TERMINATOR_DESKTOP_FILE:-/usr/share/applications/terminator.desktop}"
+    local desktop_id="terminator.desktop"
 
-  [[ "$account" == "$TARGET_USER" ]] ||
-    die "default terminal must be configured for the resolved target user"
+    [[ "$account" == "$TARGET_USER" ]] ||
+        die "default terminal must be configured for the resolved target user"
 
-  terminator_bin="$(command -v terminator 2>/dev/null || true)"
-  if [[ -z "$terminator_bin" ]]; then
-    warn "Terminator is not installed; cannot configure default terminal"
-    return
-  fi
-
-  case "$VERSION_ID" in
-    24.*)
-      # Ubuntu 24.04: legacy system-wide alternatives mechanism.
-      if ! grep -Fx -- "$terminator_bin" \
-        < <(update-alternatives --list x-terminal-emulator 2>/dev/null); then
-        warn "Terminator is not registered as an x-terminal-emulator alternative"
+    terminator_bin="$(command -v terminator 2>/dev/null || true)"
+    if [[ -z "$terminator_bin" ]]; then
+        warn "Terminator is not installed; cannot configure default terminal"
         return
-      fi
+    fi
 
-      if [[ "$(readlink -f /etc/alternatives/x-terminal-emulator 2>/dev/null || true)" == "$terminator_bin" ]]; then
-        info "Terminator already configured as system default terminal, skipping"
-        return
-      fi
+    case "$VERSION_ID" in
+        24.*)
+            # Ubuntu 24.04: legacy system-wide alternatives mechanism.
+            if ! grep -Fx -- "$terminator_bin" \
+                < <(update-alternatives --list x-terminal-emulator 2>/dev/null); then
+                warn "Terminator is not registered as an x-terminal-emulator alternative"
+                return
+            fi
 
-      update-alternatives --set x-terminal-emulator "$terminator_bin"
-      ok "Terminator configured as system default terminal on Ubuntu ${VERSION_ID}"
-      ;;
+            if [[ "$(readlink -f /etc/alternatives/x-terminal-emulator 2>/dev/null || true)" == "$terminator_bin" ]]; then
+                info "Terminator already configured as system default terminal, skipping"
+                return
+            fi
 
-    26.*)
-      # Ubuntu 26.04: per-user xdg-terminal-exec configuration.
-      if [[ ! -f "$desktop_file" ]]; then
-        warn "Terminator desktop file not found: ${desktop_file}"
-        return
-      fi
+            update-alternatives --set x-terminal-emulator "$terminator_bin"
+            ok "Terminator configured as system default terminal on Ubuntu ${VERSION_ID}"
+            ;;
 
-      install -d -m 0755 -o "$TARGET_USER" -g "$TARGET_GROUP" "$TARGET_HOME/.config"
+        26.*)
+            # Ubuntu 26.04: per-user xdg-terminal-exec configuration.
+            if [[ ! -f "$desktop_file" ]]; then
+                warn "Terminator desktop file not found: ${desktop_file}"
+                return
+            fi
 
-      if run_as_target_user bash -s -- "$desktop_id" <<'EOF'; then
+            install -d -m 0755 -o "$TARGET_USER" -g "$TARGET_GROUP" "$TARGET_HOME/.config"
+
+            if run_as_target_user bash -s -- "$desktop_id" <<'EOF'; then
 set -euo pipefail
 
 desktop_id="$1"
@@ -1926,218 +1928,218 @@ mv -f "$tmp_file" "$config_file"
 trap - EXIT
 exit 10
 EOF
-        info "Terminator already configured as default terminal for ${account}, skipping"
-      else
-        status=$?
-        [[ "$status" -eq 10 ]] ||
-          die "failed configuring Terminator as default terminal for ${account}"
-        ok "Terminator configured as default terminal for ${account} on Ubuntu ${VERSION_ID}"
-      fi
-      ;;
+                info "Terminator already configured as default terminal for ${account}, skipping"
+            else
+                status=$?
+                [[ "$status" -eq 10 ]] ||
+                    die "failed configuring Terminator as default terminal for ${account}"
+                ok "Terminator configured as default terminal for ${account} on Ubuntu ${VERSION_ID}"
+            fi
+            ;;
 
-    *)
-      warn "default terminal configuration not implemented for Ubuntu ${VERSION_ID}"
-      ;;
-  esac
+        *)
+            warn "default terminal configuration not implemented for Ubuntu ${VERSION_ID}"
+            ;;
+    esac
 }
 
 install_snap_package() {
-  local snap_name="$1"
-  local display_name="$2"
+    local snap_name="$1"
+    local display_name="$2"
 
-  if ! command -v snap >/dev/null 2>&1; then
-    warn "snap command not found; cannot install ${display_name}"
-    return 0
-  fi
+    if ! command -v snap >/dev/null 2>&1; then
+        warn "snap command not found; cannot install ${display_name}"
+        return 0
+    fi
 
-  if snap list "$snap_name" >/dev/null 2>&1; then
-    info "${display_name} snap already installed, skipping"
-    return 0
-  fi
+    if snap list "$snap_name" >/dev/null 2>&1; then
+        info "${display_name} snap already installed, skipping"
+        return 0
+    fi
 
-  if ! snap install "$snap_name"; then
-    die "failed installing ${display_name} snap (${snap_name})"
-  fi
-  ok "${display_name} snap installed"
+    if ! snap install "$snap_name"; then
+        die "failed installing ${display_name} snap (${snap_name})"
+    fi
+    ok "${display_name} snap installed"
 }
 
 connect_snap_interface() {
-  local connection="$1"
-  local description="$2"
+    local connection="$1"
+    local description="$2"
 
-  if ! command -v snap >/dev/null 2>&1; then
-    return 0
-  fi
+    if ! command -v snap >/dev/null 2>&1; then
+        return 0
+    fi
 
-  if snap connect "$connection" >/dev/null 2>&1; then
-    info "${description} interface connected"
-  else
-    warn "could not connect ${description} interface (${connection})"
-  fi
+    if snap connect "$connection" >/dev/null 2>&1; then
+        info "${description} interface connected"
+    else
+        warn "could not connect ${description} interface (${connection})"
+    fi
 }
 
 install_flameshot() (
-  set -euo pipefail
+    set -euo pipefail
 
-  local api_url="https://api.github.com/repos/flameshot-org/flameshot/releases/latest"
-  local cmd
-  local release_json tag latest_version installed_version
-  local architecture platform asset_url asset_name asset_digest
-  local tmp_dir deb_file checksum_file package_architecture package_name package_version
-  local -a checksum_files deb_files
-  local -a platform_candidates
+    local api_url="https://api.github.com/repos/flameshot-org/flameshot/releases/latest"
+    local cmd
+    local release_json tag latest_version installed_version
+    local architecture platform asset_url asset_name asset_digest
+    local tmp_dir deb_file checksum_file package_architecture package_name package_version
+    local -a checksum_files deb_files
+    local -a platform_candidates
 
-  for cmd in curl jq unzip sha256sum dpkg dpkg-query dpkg-deb apt-get; do
-    command -v "$cmd" >/dev/null 2>&1 ||
-      die "${cmd} is required to install Flameshot"
-  done
+    for cmd in curl jq unzip sha256sum dpkg dpkg-query dpkg-deb apt-get; do
+        command -v "$cmd" >/dev/null 2>&1 ||
+            die "${cmd} is required to install Flameshot"
+    done
 
-  architecture="$(dpkg --print-architecture)"
-  case "$architecture" in
-    amd64 | arm64) ;;
-    *)
-      warn "unsupported Flameshot architecture: ${architecture}"
-      return
-      ;;
-  esac
+    architecture="$(dpkg --print-architecture)"
+    case "$architecture" in
+        amd64 | arm64) ;;
+        *)
+            warn "unsupported Flameshot architecture: ${architecture}"
+            return
+            ;;
+    esac
 
-  case "$VERSION_ID" in
-    24.*)
-      platform_candidates=("ubuntu-24.04")
-      ;;
-    26.*)
-      # Use a native 26.04 artifact when upstream provides one;
-      # otherwise fall back to the Ubuntu 24.04 package.
-      platform_candidates=("ubuntu-26.04" "ubuntu-24.04")
-      ;;
-    *)
-      warn "Flameshot release installation not configured for Ubuntu ${VERSION_ID}"
-      return
-      ;;
-  esac
+    case "$VERSION_ID" in
+        24.*)
+            platform_candidates=("ubuntu-24.04")
+            ;;
+        26.*)
+            # Use a native 26.04 artifact when upstream provides one;
+            # otherwise fall back to the Ubuntu 24.04 package.
+            platform_candidates=("ubuntu-26.04" "ubuntu-24.04")
+            ;;
+        *)
+            warn "Flameshot release installation not configured for Ubuntu ${VERSION_ID}"
+            return
+            ;;
+    esac
 
-  tmp_dir="$(mktemp -d)"
-  trap 'rm -rf -- "$tmp_dir"' EXIT
+    tmp_dir="$(mktemp -d)"
+    trap 'rm -rf -- "$tmp_dir"' EXIT
 
-  info "checking latest Flameshot GitHub release"
+    info "checking latest Flameshot GitHub release"
 
-  fetch_file "$api_url" "$tmp_dir/release.json" ||
-    die "failed downloading Flameshot release metadata"
-  release_json="$(<"$tmp_dir/release.json")"
-  tag="$(jq -r '.tag_name // empty' <<<"$release_json")" ||
-    die "Flameshot release metadata is invalid"
-  [[ -n "$tag" ]] || die "could not determine latest Flameshot release"
+    fetch_file "$api_url" "$tmp_dir/release.json" ||
+        die "failed downloading Flameshot release metadata"
+    release_json="$(<"$tmp_dir/release.json")"
+    tag="$(jq -r '.tag_name // empty' <<<"$release_json")" ||
+        die "Flameshot release metadata is invalid"
+    [[ -n "$tag" ]] || die "could not determine latest Flameshot release"
 
-  latest_version="${tag#v}"
-  installed_version="$(
-    dpkg-query -W -f='${Version}' flameshot 2>/dev/null || true
-  )"
+    latest_version="${tag#v}"
+    installed_version="$(
+        dpkg-query -W -f='${Version}' flameshot 2>/dev/null || true
+    )"
 
-  if [[ -n "$installed_version" ]] &&
-    dpkg --compare-versions "$installed_version" ge "$latest_version"; then
-    info "Flameshot ${installed_version} already installed, skipping"
-    return
-  fi
+    if [[ -n "$installed_version" ]] &&
+        dpkg --compare-versions "$installed_version" ge "$latest_version"; then
+        info "Flameshot ${installed_version} already installed, skipping"
+        return
+    fi
 
-  asset_url=""
-  for platform in "${platform_candidates[@]}"; do
-    asset_url="$(
-      jq -r \
-        --arg suffix "artifact-${platform}-${architecture}.zip" \
-        '[.assets[]
+    asset_url=""
+    for platform in "${platform_candidates[@]}"; do
+        asset_url="$(
+            jq -r \
+                --arg suffix "artifact-${platform}-${architecture}.zip" \
+                '[.assets[]
           | select(.name | endswith($suffix))
         ][0].browser_download_url // empty' \
-        <<<"$release_json"
-    )" || die "Flameshot release metadata is invalid"
+                <<<"$release_json"
+        )" || die "Flameshot release metadata is invalid"
 
-    [[ -n "$asset_url" ]] && break
-  done
+        [[ -n "$asset_url" ]] && break
+    done
 
-  [[ -n "$asset_url" ]] ||
-    die "no compatible Flameshot artifact for Ubuntu ${VERSION_ID}/${architecture}"
+    [[ -n "$asset_url" ]] ||
+        die "no compatible Flameshot artifact for Ubuntu ${VERSION_ID}/${architecture}"
 
-  asset_name="${asset_url##*/}"
-  asset_digest="$(
-    jq -r --arg name "$asset_name" '
+    asset_name="${asset_url##*/}"
+    asset_digest="$(
+        jq -r --arg name "$asset_name" '
       [.assets[] | select(.name == $name)][0].digest // empty
     ' <<<"$release_json"
-  )" || die "Flameshot release metadata is invalid"
+    )" || die "Flameshot release metadata is invalid"
 
-  info "downloading Flameshot ${tag} (${platform}/${architecture})"
-  fetch_file "$asset_url" "$tmp_dir/$asset_name" ||
-    die "failed downloading Flameshot ${tag}"
-  verify_github_asset_digest "$tmp_dir/$asset_name" "$asset_digest" "Flameshot ${tag} archive"
-  validate_zip_archive "$tmp_dir/$asset_name" "Flameshot ${tag}"
+    info "downloading Flameshot ${tag} (${platform}/${architecture})"
+    fetch_file "$asset_url" "$tmp_dir/$asset_name" ||
+        die "failed downloading Flameshot ${tag}"
+    verify_github_asset_digest "$tmp_dir/$asset_name" "$asset_digest" "Flameshot ${tag} archive"
+    validate_zip_archive "$tmp_dir/$asset_name" "Flameshot ${tag}"
 
-  mkdir "$tmp_dir/extracted"
-  unzip -q "$tmp_dir/$asset_name" -d "$tmp_dir/extracted"
+    mkdir "$tmp_dir/extracted"
+    unzip -q "$tmp_dir/$asset_name" -d "$tmp_dir/extracted"
 
-  mapfile -t deb_files < <(
-    find "$tmp_dir/extracted" -maxdepth 2 -type f -name 'flameshot*.deb' -print
-  )
-  mapfile -t checksum_files < <(
-    find "$tmp_dir/extracted" -maxdepth 2 -type f -name 'flameshot*.deb.sha256sum' -print
-  )
+    mapfile -t deb_files < <(
+        find "$tmp_dir/extracted" -maxdepth 2 -type f -name 'flameshot*.deb' -print
+    )
+    mapfile -t checksum_files < <(
+        find "$tmp_dir/extracted" -maxdepth 2 -type f -name 'flameshot*.deb.sha256sum' -print
+    )
 
-  ((${#deb_files[@]} == 1)) ||
-    die "Flameshot archive must contain exactly one Debian package"
-  ((${#checksum_files[@]} == 1)) ||
-    die "Flameshot archive must contain exactly one Debian package checksum"
-  deb_file="${deb_files[0]}"
-  checksum_file="${checksum_files[0]}"
+    ((${#deb_files[@]} == 1)) ||
+        die "Flameshot archive must contain exactly one Debian package"
+    ((${#checksum_files[@]} == 1)) ||
+        die "Flameshot archive must contain exactly one Debian package checksum"
+    deb_file="${deb_files[0]}"
+    checksum_file="${checksum_files[0]}"
 
-  info "verifying Flameshot package checksum"
-  (
-    cd "$(dirname "$deb_file")"
-    sha256sum --check "$(basename "$checksum_file")"
-  )
+    info "verifying Flameshot package checksum"
+    (
+        cd "$(dirname "$deb_file")"
+        sha256sum --check "$(basename "$checksum_file")"
+    )
 
-  dpkg-deb --info "$deb_file" >/dev/null ||
-    die "Flameshot Debian package is invalid"
-  package_name="$(dpkg-deb -f "$deb_file" Package)"
-  package_architecture="$(dpkg-deb -f "$deb_file" Architecture)"
-  package_version="$(dpkg-deb -f "$deb_file" Version)"
+    dpkg-deb --info "$deb_file" >/dev/null ||
+        die "Flameshot Debian package is invalid"
+    package_name="$(dpkg-deb -f "$deb_file" Package)"
+    package_architecture="$(dpkg-deb -f "$deb_file" Architecture)"
+    package_version="$(dpkg-deb -f "$deb_file" Version)"
 
-  [[ "$package_name" == "flameshot" ]] ||
-    die "unexpected Flameshot package name: ${package_name}"
-  [[ "$package_architecture" == "$architecture" || "$package_architecture" == "all" ]] ||
-    die "unexpected Flameshot package architecture: ${package_architecture}"
-  dpkg --compare-versions "$package_version" ge "$latest_version" ||
-    die "unexpected Flameshot package version: ${package_version}"
+    [[ "$package_name" == "flameshot" ]] ||
+        die "unexpected Flameshot package name: ${package_name}"
+    [[ "$package_architecture" == "$architecture" || "$package_architecture" == "all" ]] ||
+        die "unexpected Flameshot package architecture: ${package_architecture}"
+    dpkg --compare-versions "$package_version" ge "$latest_version" ||
+        die "unexpected Flameshot package version: ${package_version}"
 
-  info "installing Flameshot ${tag}"
-  run_apt_get install -y "$deb_file"
+    info "installing Flameshot ${tag}"
+    run_apt_get install -y "$deb_file"
 
-  installed_version="$(
-    dpkg-query -W -f='${Version}' flameshot 2>/dev/null || true
-  )"
+    installed_version="$(
+        dpkg-query -W -f='${Version}' flameshot 2>/dev/null || true
+    )"
 
-  [[ -n "$installed_version" ]] ||
-    die "Flameshot installation could not be verified"
+    [[ -n "$installed_version" ]] ||
+        die "Flameshot installation could not be verified"
 
-  ok "Flameshot ${installed_version} installed from the official GitHub release"
+    ok "Flameshot ${installed_version} installed from the official GitHub release"
 )
 
 configure_flameshot() (
-  set -Eeuo pipefail
+    set -Eeuo pipefail
 
-  local expected_config
-  local pictures_dir="${TARGET_HOME}/Pictures"
-  local flameshot_dir="${TARGET_HOME}/Pictures/flameshot"
-  local temporary_dir
+    local expected_config
+    local pictures_dir="${TARGET_HOME}/Pictures"
+    local flameshot_dir="${TARGET_HOME}/Pictures/flameshot"
+    local temporary_dir
 
-  install -d \
-    -m 0755 \
-    -o "$TARGET_USER" \
-    -g "$TARGET_GROUP" \
-    "$pictures_dir" \
-    "$flameshot_dir"
+    install -d \
+        -m 0755 \
+        -o "$TARGET_USER" \
+        -g "$TARGET_GROUP" \
+        "$pictures_dir" \
+        "$flameshot_dir"
 
-  temporary_dir="$(mktemp -d)"
-  trap 'rm -rf -- "$temporary_dir"' EXIT
-  expected_config="$temporary_dir/flameshot.ini"
+    temporary_dir="$(mktemp -d)"
+    trap 'rm -rf -- "$temporary_dir"' EXIT
+    expected_config="$temporary_dir/flameshot.ini"
 
-  cat >"$expected_config" <<EOF
+    cat >"$expected_config" <<EOF
 [General]
 contrastOpacity=188
 copyOnDoubleClick=true
@@ -2154,358 +2156,361 @@ squareMagnifier=true
 startupLaunch=true
 EOF
 
-  install_target_config_file \
-    "$expected_config" \
-    "$TARGET_HOME/.config/flameshot/flameshot.ini" \
-    "Flameshot"
+    install_target_config_file \
+        "$expected_config" \
+        "$TARGET_HOME/.config/flameshot/flameshot.ini" \
+        "Flameshot"
 )
 
 install_obsidian() (
-  set -euo pipefail
+    set -euo pipefail
 
-  local api_url="https://api.github.com/repos/obsidianmd/obsidian-releases/releases/latest"
-  local cmd
-  local release_json tag latest_version
-  local architecture asset_url asset_name asset_digest package_architecture package_version
-  local installed_version tmp_dir deb_file package_name
-  local snap_installed=false
+    local api_url="https://api.github.com/repos/obsidianmd/obsidian-releases/releases/latest"
+    local cmd
+    local release_json tag latest_version
+    local architecture asset_url asset_name asset_digest package_architecture package_version
+    local installed_version tmp_dir deb_file package_name
+    local snap_installed=false
 
-  for cmd in curl jq sha256sum dpkg dpkg-query dpkg-deb apt-get; do
-    command -v "$cmd" >/dev/null 2>&1 ||
-      die "${cmd} is required to install Obsidian"
-  done
+    for cmd in curl jq sha256sum dpkg dpkg-query dpkg-deb apt-get; do
+        command -v "$cmd" >/dev/null 2>&1 ||
+            die "${cmd} is required to install Obsidian"
+    done
 
-  architecture="$(dpkg --print-architecture)"
-  case "$architecture" in
-    amd64 | arm64) ;;
-    *)
-      warn "unsupported Obsidian architecture: ${architecture}"
-      return
-      ;;
-  esac
+    architecture="$(dpkg --print-architecture)"
+    case "$architecture" in
+        amd64 | arm64) ;;
+        *)
+            warn "unsupported Obsidian architecture: ${architecture}"
+            return
+            ;;
+    esac
 
-  if command -v snap >/dev/null 2>&1 &&
-    snap list obsidian >/dev/null 2>&1; then
-    snap_installed=true
-  fi
-
-  tmp_dir="$(mktemp -d)"
-  trap 'rm -rf -- "$tmp_dir"' EXIT
-
-  info "checking latest Obsidian GitHub release"
-
-  fetch_file "$api_url" "$tmp_dir/release.json" ||
-    die "failed downloading Obsidian release metadata"
-  release_json="$(<"$tmp_dir/release.json")"
-  tag="$(jq -r '.tag_name // empty' <<<"$release_json")" ||
-    die "Obsidian release metadata is invalid"
-  [[ -n "$tag" ]] ||
-    die "could not determine the latest Obsidian release"
-
-  latest_version="${tag#v}"
-
-  installed_version="$(
-    dpkg-query -W -f='${Version}' obsidian 2>/dev/null || true
-  )"
-
-  if [[ -n "$installed_version" ]] &&
-    dpkg --compare-versions "$installed_version" ge "$latest_version"; then
-    if [[ "$snap_installed" == true ]]; then
-      info "removing duplicate Obsidian snap"
-      snap remove obsidian || die "failed removing duplicate Obsidian snap"
+    if command -v snap >/dev/null 2>&1 &&
+        snap list obsidian >/dev/null 2>&1; then
+        snap_installed=true
     fi
-    info "Obsidian ${installed_version} already installed, skipping"
-    return
-  fi
 
-  asset_url="$(
-    jq -r --arg arch "$architecture" '
+    tmp_dir="$(mktemp -d)"
+    trap 'rm -rf -- "$tmp_dir"' EXIT
+
+    info "checking latest Obsidian GitHub release"
+
+    fetch_file "$api_url" "$tmp_dir/release.json" ||
+        die "failed downloading Obsidian release metadata"
+    release_json="$(<"$tmp_dir/release.json")"
+    tag="$(jq -r '.tag_name // empty' <<<"$release_json")" ||
+        die "Obsidian release metadata is invalid"
+    [[ -n "$tag" ]] ||
+        die "could not determine the latest Obsidian release"
+
+    latest_version="${tag#v}"
+
+    installed_version="$(
+        dpkg-query -W -f='${Version}' obsidian 2>/dev/null || true
+    )"
+
+    if [[ -n "$installed_version" ]] &&
+        dpkg --compare-versions "$installed_version" ge "$latest_version"; then
+        if [[ "$snap_installed" == true ]]; then
+            info "removing duplicate Obsidian snap"
+            snap remove obsidian || die "failed removing duplicate Obsidian snap"
+        fi
+        info "Obsidian ${installed_version} already installed, skipping"
+        return
+    fi
+
+    asset_url="$(
+        jq -r --arg arch "$architecture" '
       first(
         .assets[]
         | select(.name | endswith("_" + $arch + ".deb"))
         | .browser_download_url
       ) // empty
     ' <<<"$release_json"
-  )" || die "Obsidian release metadata is invalid"
+    )" || die "Obsidian release metadata is invalid"
 
-  [[ -n "$asset_url" ]] ||
-    die "no Obsidian Debian package found for ${architecture}"
+    [[ -n "$asset_url" ]] ||
+        die "no Obsidian Debian package found for ${architecture}"
 
-  asset_name="${asset_url##*/}"
+    asset_name="${asset_url##*/}"
 
-  asset_digest="$(
-    jq -r --arg name "$asset_name" '
+    asset_digest="$(
+        jq -r --arg name "$asset_name" '
       [.assets[] | select(.name == $name)][0].digest // empty
     ' <<<"$release_json"
-  )" || die "Obsidian release metadata is invalid"
+    )" || die "Obsidian release metadata is invalid"
 
-  deb_file="$tmp_dir/$asset_name"
+    deb_file="$tmp_dir/$asset_name"
 
-  info "downloading Obsidian ${tag} for ${architecture}"
-  fetch_file "$asset_url" "$deb_file" ||
-    die "failed downloading Obsidian ${tag}"
-  [[ -s "$deb_file" ]] || die "downloaded Obsidian package is empty"
+    info "downloading Obsidian ${tag} for ${architecture}"
+    fetch_file "$asset_url" "$deb_file" ||
+        die "failed downloading Obsidian ${tag}"
+    [[ -s "$deb_file" ]] || die "downloaded Obsidian package is empty"
 
-  verify_github_asset_digest "$deb_file" "$asset_digest" "Obsidian ${tag} package"
+    verify_github_asset_digest "$deb_file" "$asset_digest" "Obsidian ${tag} package"
 
-  dpkg-deb --info "$deb_file" >/dev/null ||
-    die "downloaded Obsidian Debian package is invalid"
+    dpkg-deb --info "$deb_file" >/dev/null ||
+        die "downloaded Obsidian Debian package is invalid"
 
-  package_name="$(dpkg-deb -f "$deb_file" Package)"
-  package_architecture="$(dpkg-deb -f "$deb_file" Architecture)"
-  package_version="$(dpkg-deb -f "$deb_file" Version)"
-  [[ "$package_name" == "obsidian" ]] ||
-    die "unexpected Debian package name: ${package_name}"
-  [[ "$package_architecture" == "$architecture" || "$package_architecture" == "all" ]] ||
-    die "unexpected Obsidian package architecture: ${package_architecture}"
-  dpkg --compare-versions "$package_version" ge "$latest_version" ||
-    die "unexpected Obsidian package version: ${package_version}"
+    package_name="$(dpkg-deb -f "$deb_file" Package)"
+    package_architecture="$(dpkg-deb -f "$deb_file" Architecture)"
+    package_version="$(dpkg-deb -f "$deb_file" Version)"
+    [[ "$package_name" == "obsidian" ]] ||
+        die "unexpected Debian package name: ${package_name}"
+    [[ "$package_architecture" == "$architecture" || "$package_architecture" == "all" ]] ||
+        die "unexpected Obsidian package architecture: ${package_architecture}"
+    dpkg --compare-versions "$package_version" ge "$latest_version" ||
+        die "unexpected Obsidian package version: ${package_version}"
 
-  info "installing Obsidian ${tag}"
-  run_apt_get install -y "$deb_file"
+    info "installing Obsidian ${tag}"
+    run_apt_get install -y "$deb_file"
 
-  installed_version="$(
-    dpkg-query -W -f='${Version}' obsidian 2>/dev/null || true
-  )"
+    installed_version="$(
+        dpkg-query -W -f='${Version}' obsidian 2>/dev/null || true
+    )"
 
-  [[ -n "$installed_version" ]] ||
-    die "Obsidian installation could not be verified"
+    [[ -n "$installed_version" ]] ||
+        die "Obsidian installation could not be verified"
 
-  if [[ "$snap_installed" == true ]]; then
-    info "removing duplicate Obsidian snap"
-    snap remove obsidian || die "failed removing duplicate Obsidian snap"
-  fi
+    if [[ "$snap_installed" == true ]]; then
+        info "removing duplicate Obsidian snap"
+        snap remove obsidian || die "failed removing duplicate Obsidian snap"
+    fi
 
-  ok "Obsidian ${installed_version} installed from the official GitHub release"
+    ok "Obsidian ${installed_version} installed from the official GitHub release"
 )
 
 # --- Common user tools and shell configuration ---
 prepare_user_workspace() (
-  set -euo pipefail
+    set -euo pipefail
 
-  local account="${1:-$USER_NAME}"
-  local home
-  local group
-  local repos_root
-  local obsidian_dir
-  local ssh_dir
+    local account="${1:-$USER_NAME}"
+    local home
+    local group
+    local repos_root
+    local obsidian_dir
+    local ssh_dir
 
-  home="$(user_home "$account")"
-  [[ -n "$home" && -d "$home" ]] ||
-    die "could not determine home directory for ${account}"
+    home="$(user_home "$account")"
+    [[ -n "$home" && -d "$home" ]] ||
+        die "could not determine home directory for ${account}"
 
-  group="$(id -gn "$account")"
+    group="$(id -gn "$account")"
 
-  repos_root="$home/repos"
-  obsidian_dir="$home/obsidian"
-  ssh_dir="$home/.ssh"
+    gdrive_dir="$home/gdrive"
+    repos_root="$home/repos"
+    obsidian_dir="$home/obsidian"
+    ssh_dir="$home/.ssh"
 
-  info "preparing workspace directories for ${account}"
+    info "preparing workspace directories for ${account}"
 
-  install -d \
-    -o "$account" \
-    -g "$group" \
-    -m 0755 \
-    "$repos_root" \
-    "$repos_root/github" \
-    "$repos_root/gitlab" \
-    "$repos_root/forgejo" \
-    "$obsidian_dir"
+    install -d \
+        -o "$account" \
+        -g "$group" \
+        -m 0755 \
+        "$gdrive_dir" \
+        "$repos_root" \
+        "$repos_root/github" \
+        "$repos_root/gitlab" \
+        "$repos_root/forgejo" \
+        "$obsidian_dir"
 
-  install -d \
-    -o "$account" \
-    -g "$group" \
-    -m 0700 \
-    "$ssh_dir"
+    install -d \
+        -o "$account" \
+        -g "$group" \
+        -m 0700 \
+        "$ssh_dir"
 
-  ok "GitHub repository directory ready: ${repos_root}/github"
-  ok "GitLab repository directory ready: ${repos_root}/gitlab"
-  ok "Forgejo repository directory ready: ${repos_root}/forgejo"
-  ok "Obsidian directory ready: ${obsidian_dir}"
-  ok "SSH directory ready: ${ssh_dir}"
+    ok "Google Drive directory ready: ${gdrive_dir}"
+    ok "GitHub repository directory ready: ${repos_root}/github"
+    ok "GitLab repository directory ready: ${repos_root}/gitlab"
+    ok "Forgejo repository directory ready: ${repos_root}/forgejo"
+    ok "Obsidian directory ready: ${obsidian_dir}"
+    ok "SSH directory ready: ${ssh_dir}"
 )
 
 install_tldr_pipx() {
-  local installed_packages
+    local installed_packages
 
-  if ! installed_packages="$(run_as_target_user pipx list --short 2>/dev/null)"; then
-    die "could not inspect pipx packages for ${TARGET_USER}"
-  fi
+    if ! installed_packages="$(run_as_target_user pipx list --short 2>/dev/null)"; then
+        die "could not inspect pipx packages for ${TARGET_USER}"
+    fi
 
-  if grep -Eq '^tldr[[:space:]]' <<<"$installed_packages"; then
-    info "tldr already installed via pipx, skipping"
-    return
-  fi
+    if grep -Eq '^tldr[[:space:]]' <<<"$installed_packages"; then
+        info "tldr already installed via pipx, skipping"
+        return
+    fi
 
-  run_quiet_command "pipx tldr installation" run_as_target_user pipx install tldr ||
-    die "failed installing tldr via pipx"
-  run_quiet_command "pipx PATH configuration" run_as_target_user pipx ensurepath ||
-    die "failed configuring the pipx application path"
+    run_quiet_command "pipx tldr installation" run_as_target_user pipx install tldr ||
+        die "failed installing tldr via pipx"
+    run_quiet_command "pipx PATH configuration" run_as_target_user pipx ensurepath ||
+        die "failed configuring the pipx application path"
 
-  if ! installed_packages="$(run_as_target_user pipx list --short 2>/dev/null)"; then
-    die "could not verify pipx packages for ${TARGET_USER}"
-  fi
-  grep -Eq '^tldr[[:space:]]' <<<"$installed_packages" ||
-    die "tldr installation could not be verified"
-  ok "tldr installed via pipx"
+    if ! installed_packages="$(run_as_target_user pipx list --short 2>/dev/null)"; then
+        die "could not verify pipx packages for ${TARGET_USER}"
+    fi
+    grep -Eq '^tldr[[:space:]]' <<<"$installed_packages" ||
+        die "tldr installation could not be verified"
+    ok "tldr installed via pipx"
 }
 
 install_fzf_for_user() {
-  local account="$1"
-  local home
-  home="$(user_home "$account")"
-  [[ -n "$home" ]] || die "could not determine home directory for ${account}"
+    local account="$1"
+    local home
+    home="$(user_home "$account")"
+    [[ -n "$home" ]] || die "could not determine home directory for ${account}"
 
-  if [[ -d "$home/.fzf/.git" && -x "$home/.fzf/bin/fzf" && -f "$home/.fzf.bash" ]]; then
-    info "fzf already installed for ${account}, skipping"
-    return
-  elif [[ -d "$home/.fzf/.git" ]]; then
-    info "repairing incomplete fzf installation for ${account}"
-  elif [[ -e "$home/.fzf" ]]; then
-    warn "${home}/.fzf exists but is not a Git checkout; skipping fzf for ${account}"
-    return
-  else
-    info "cloning fzf for ${account}"
-    sudo -u "$account" -H git clone --quiet --depth 1 https://github.com/junegunn/fzf.git "$home/.fzf"
-  fi
+    if [[ -d "$home/.fzf/.git" && -x "$home/.fzf/bin/fzf" && -f "$home/.fzf.bash" ]]; then
+        info "fzf already installed for ${account}, skipping"
+        return
+    elif [[ -d "$home/.fzf/.git" ]]; then
+        info "repairing incomplete fzf installation for ${account}"
+    elif [[ -e "$home/.fzf" ]]; then
+        warn "${home}/.fzf exists but is not a Git checkout; skipping fzf for ${account}"
+        return
+    else
+        info "cloning fzf for ${account}"
+        sudo -u "$account" -H git clone --quiet --depth 1 https://github.com/junegunn/fzf.git "$home/.fzf"
+    fi
 
-  run_quiet_command \
-    "fzf installer for ${account}" \
-    sudo -u "$account" -H "$home/.fzf/install" \
-    --all --no-update-rc --no-zsh --no-fish --no-nushell ||
-    die "fzf installation failed for ${account}"
+    run_quiet_command \
+        "fzf installer for ${account}" \
+        sudo -u "$account" -H "$home/.fzf/install" \
+        --all --no-update-rc --no-zsh --no-fish --no-nushell ||
+        die "fzf installation failed for ${account}"
 
-  [[ -x "$home/.fzf/bin/fzf" && -f "$home/.fzf.bash" ]] ||
-    die "fzf installation could not be verified for ${account}"
-  ok "fzf installed for ${account}"
+    [[ -x "$home/.fzf/bin/fzf" && -f "$home/.fzf.bash" ]] ||
+        die "fzf installation could not be verified for ${account}"
+    ok "fzf installed for ${account}"
 }
 
 install_starship() (
-  set -Eeuo pipefail
+    set -Eeuo pipefail
 
-  local line
-  local temporary_dir
-  local version_output
+    local line
+    local temporary_dir
+    local version_output
 
-  if command -v starship >/dev/null 2>&1; then
-    version_output="$(starship --version)" || die "existing Starship command is not usable"
-    [[ "$version_output" == starship* ]] || die "existing Starship version could not be verified"
-    info "${version_output%%$'\n'*} already installed, skipping"
-    return
-  fi
+    if command -v starship >/dev/null 2>&1; then
+        version_output="$(starship --version)" || die "existing Starship command is not usable"
+        [[ "$version_output" == starship* ]] || die "existing Starship version could not be verified"
+        info "${version_output%%$'\n'*} already installed, skipping"
+        return
+    fi
 
-  temporary_dir="$(mktemp -d)"
-  trap 'rm -rf -- "$temporary_dir"' EXIT
+    temporary_dir="$(mktemp -d)"
+    trap 'rm -rf -- "$temporary_dir"' EXIT
 
-  info "installing Starship"
-  curl \
-    --fail \
-    --show-error \
-    --silent \
-    --location \
-    --output "$temporary_dir/install.sh" \
-    "$STARSHIP_INSTALL_URL" || die "failed downloading the Starship installer"
+    info "installing Starship"
+    curl \
+        --fail \
+        --show-error \
+        --silent \
+        --location \
+        --output "$temporary_dir/install.sh" \
+        "$STARSHIP_INSTALL_URL" || die "failed downloading the Starship installer"
 
-  [[ -s "$temporary_dir/install.sh" ]] || die "downloaded Starship installer is empty"
-  sh -n "$temporary_dir/install.sh" || die "downloaded Starship installer is not valid shell"
+    [[ -s "$temporary_dir/install.sh" ]] || die "downloaded Starship installer is empty"
+    sh -n "$temporary_dir/install.sh" || die "downloaded Starship installer is not valid shell"
 
-  if ! sh "$temporary_dir/install.sh" --yes >"$temporary_dir/install.log" 2>&1; then
-    while IFS= read -r line; do
-      error "Starship installer: ${line}"
-    done <"$temporary_dir/install.log"
-    die "Starship installation failed"
-  fi
+    if ! sh "$temporary_dir/install.sh" --yes >"$temporary_dir/install.log" 2>&1; then
+        while IFS= read -r line; do
+            error "Starship installer: ${line}"
+        done <"$temporary_dir/install.log"
+        die "Starship installation failed"
+    fi
 
-  command -v starship >/dev/null 2>&1 || die "Starship installation did not provide a starship command"
-  ok "Starship installed"
+    command -v starship >/dev/null 2>&1 || die "Starship installation did not provide a starship command"
+    ok "Starship installed"
 )
 
 install_jetbrainsmono_nerd_font_for_user() (
-  set -Eeuo pipefail
+    set -Eeuo pipefail
 
-  local account="$1"
-  local account_group
-  local account_uid
-  local api_url="https://api.github.com/repos/ryanoasis/nerd-fonts/releases/latest"
-  local asset_digest
-  local asset_url
-  local command_name
-  local home
-  local matched_family
-  local release_json
-  local temporary_dir
-  local -a account_command
+    local account="$1"
+    local account_group
+    local account_uid
+    local api_url="https://api.github.com/repos/ryanoasis/nerd-fonts/releases/latest"
+    local asset_digest
+    local asset_url
+    local command_name
+    local home
+    local matched_family
+    local release_json
+    local temporary_dir
+    local -a account_command
 
-  for command_name in curl fc-cache fc-match jq sha256sum unzip; do
-    command -v "$command_name" >/dev/null 2>&1 ||
-      die "${command_name} is required to install JetBrainsMono Nerd Font"
-  done
+    for command_name in curl fc-cache fc-match jq sha256sum unzip; do
+        command -v "$command_name" >/dev/null 2>&1 ||
+            die "${command_name} is required to install JetBrainsMono Nerd Font"
+    done
 
-  home="$(user_home "$account")"
-  [[ -n "$home" ]] || die "could not determine home directory for ${account}"
-  account_uid="$(id -u "$account")"
-  account_group="$(id -gn "$account")"
+    home="$(user_home "$account")"
+    [[ -n "$home" ]] || die "could not determine home directory for ${account}"
+    account_uid="$(id -u "$account")"
+    account_group="$(id -gn "$account")"
 
-  if [[ "$account" == "$TARGET_USER" ]]; then
-    account_command=(run_as_target_user)
-  else
-    account_command=(
-      sudo -u "$account" -g "$account_group" -H env
-      HOME="$home"
-      USER="$account"
-      LOGNAME="$account"
-      TARGET_USER="$account"
-      TARGET_HOME="$home"
-      TARGET_UID="$account_uid"
-      TARGET_GROUP="$account_group"
-    )
-  fi
+    if [[ "$account" == "$TARGET_USER" ]]; then
+        account_command=(run_as_target_user)
+    else
+        account_command=(
+            sudo -u "$account" -g "$account_group" -H env
+            HOME="$home"
+            USER="$account"
+            LOGNAME="$account"
+            TARGET_USER="$account"
+            TARGET_HOME="$home"
+            TARGET_UID="$account_uid"
+            TARGET_GROUP="$account_group"
+        )
+    fi
 
-  matched_family="$(
-    "${account_command[@]}" \
-      fc-match --format='%{family}\n' 'JetBrainsMono Nerd Font' 2>/dev/null
-  )" || die "could not inspect fonts for ${account}"
+    matched_family="$(
+        "${account_command[@]}" \
+            fc-match --format='%{family}\n' 'JetBrainsMono Nerd Font' 2>/dev/null
+    )" || die "could not inspect fonts for ${account}"
 
-  if [[ "$matched_family" == *"JetBrainsMono Nerd Font"* ]]; then
-    info "JetBrainsMono Nerd Font already installed for ${account}, skipping"
-    return
-  fi
+    if [[ "$matched_family" == *"JetBrainsMono Nerd Font"* ]]; then
+        info "JetBrainsMono Nerd Font already installed for ${account}, skipping"
+        return
+    fi
 
-  temporary_dir="$(mktemp -d)"
-  trap 'rm -rf -- "$temporary_dir"' EXIT
-  chmod 0755 "$temporary_dir"
+    temporary_dir="$(mktemp -d)"
+    trap 'rm -rf -- "$temporary_dir"' EXIT
+    chmod 0755 "$temporary_dir"
 
-  info "checking latest JetBrainsMono Nerd Font release"
-  fetch_file "$api_url" "$temporary_dir/release.json" ||
-    die "failed downloading JetBrainsMono Nerd Font release metadata"
-  release_json="$(<"$temporary_dir/release.json")"
-  asset_url="$(
-    jq -r '
+    info "checking latest JetBrainsMono Nerd Font release"
+    fetch_file "$api_url" "$temporary_dir/release.json" ||
+        die "failed downloading JetBrainsMono Nerd Font release metadata"
+    release_json="$(<"$temporary_dir/release.json")"
+    asset_url="$(
+        jq -r '
       [.assets[] | select(.name == "JetBrainsMono.zip")][0].browser_download_url // empty
     ' <<<"$release_json"
-  )" || die "JetBrainsMono Nerd Font release metadata is invalid"
-  asset_digest="$(
-    jq -r '
+    )" || die "JetBrainsMono Nerd Font release metadata is invalid"
+    asset_digest="$(
+        jq -r '
       [.assets[] | select(.name == "JetBrainsMono.zip")][0].digest // empty
     ' <<<"$release_json"
-  )" || die "JetBrainsMono Nerd Font release metadata is invalid"
-  [[ -n "$asset_url" ]] ||
-    die "JetBrainsMono Nerd Font archive is missing from the latest release"
+    )" || die "JetBrainsMono Nerd Font release metadata is invalid"
+    [[ -n "$asset_url" ]] ||
+        die "JetBrainsMono Nerd Font archive is missing from the latest release"
 
-  info "downloading JetBrainsMono Nerd Font for ${account}"
-  fetch_file "$asset_url" "$temporary_dir/JetBrainsMono.zip" ||
-    die "failed downloading JetBrainsMono Nerd Font"
-  verify_github_asset_digest \
-    "$temporary_dir/JetBrainsMono.zip" \
-    "$asset_digest" \
-    "JetBrainsMono Nerd Font archive"
-  validate_zip_archive "$temporary_dir/JetBrainsMono.zip" "JetBrainsMono Nerd Font"
-  chmod 0644 "$temporary_dir/JetBrainsMono.zip"
+    info "downloading JetBrainsMono Nerd Font for ${account}"
+    fetch_file "$asset_url" "$temporary_dir/JetBrainsMono.zip" ||
+        die "failed downloading JetBrainsMono Nerd Font"
+    verify_github_asset_digest \
+        "$temporary_dir/JetBrainsMono.zip" \
+        "$asset_digest" \
+        "JetBrainsMono Nerd Font archive"
+    validate_zip_archive "$temporary_dir/JetBrainsMono.zip" "JetBrainsMono Nerd Font"
+    chmod 0644 "$temporary_dir/JetBrainsMono.zip"
 
-  if ! run_quiet_command \
-    "JetBrainsMono Nerd Font installer for ${account}" \
-    "${account_command[@]}" \
-    bash -s -- "$temporary_dir/JetBrainsMono.zip" <<'USER_INSTALL'; then
+    if ! run_quiet_command \
+        "JetBrainsMono Nerd Font installer for ${account}" \
+        "${account_command[@]}" \
+        bash -s -- "$temporary_dir/JetBrainsMono.zip" <<'USER_INSTALL'; then
 set -Eeuo pipefail
 
 archive="$1"
@@ -2514,49 +2519,49 @@ mkdir -p "$font_dir"
 unzip -q -o "$archive" -d "$font_dir"
 fc-cache -f "$font_dir"
 USER_INSTALL
-    die "JetBrainsMono Nerd Font installation failed for ${account}"
-  fi
+        die "JetBrainsMono Nerd Font installation failed for ${account}"
+    fi
 
-  matched_family="$(
-    "${account_command[@]}" \
-      fc-match --format='%{family}\n' 'JetBrainsMono Nerd Font' 2>/dev/null
-  )" || die "could not verify fonts for ${account}"
-  [[ "$matched_family" == *"JetBrainsMono Nerd Font"* ]] ||
-    die "JetBrainsMono Nerd Font installation could not be verified for ${account}"
-  ok "JetBrainsMono Nerd Font installed for ${account}"
+    matched_family="$(
+        "${account_command[@]}" \
+            fc-match --format='%{family}\n' 'JetBrainsMono Nerd Font' 2>/dev/null
+    )" || die "could not verify fonts for ${account}"
+    [[ "$matched_family" == *"JetBrainsMono Nerd Font"* ]] ||
+        die "JetBrainsMono Nerd Font installation could not be verified for ${account}"
+    ok "JetBrainsMono Nerd Font installed for ${account}"
 )
 
 ensure_bat_symlink_for_user() {
-  local account="$1"
-  local home="$2"
-  local bat_link="$home/.local/bin/bat"
+    local account="$1"
+    local home="$2"
+    local bat_link="$home/.local/bin/bat"
 
-  if [[ -L "$bat_link" && "$(readlink -- "$bat_link")" == "/usr/bin/batcat" ]]; then
-    return
-  fi
+    if [[ -L "$bat_link" && "$(readlink -- "$bat_link")" == "/usr/bin/batcat" ]]; then
+        return
+    fi
 
-  if [[ ! -d "$home/.local/bin" ]]; then
-    sudo -u "$account" -H mkdir -p "$home/.local/bin"
-  fi
+    if [[ ! -d "$home/.local/bin" ]]; then
+        sudo -u "$account" -H mkdir -p "$home/.local/bin"
+    fi
 
-  if [[ -L "$bat_link" ]]; then
-    sudo -u "$account" -H ln -sfn /usr/bin/batcat "$bat_link"
-  elif [[ -e "$bat_link" ]]; then
-    warn "${bat_link} is not a symlink; preserving it"
-  else
-    sudo -u "$account" -H ln -s /usr/bin/batcat "$bat_link"
-  fi
+    if [[ -L "$bat_link" ]]; then
+        sudo -u "$account" -H ln -sfn /usr/bin/batcat "$bat_link"
+    elif [[ -e "$bat_link" ]]; then
+        warn "${bat_link} is not a symlink; preserving it"
+    else
+        sudo -u "$account" -H ln -s /usr/bin/batcat "$bat_link"
+    fi
 }
 
 configure_bash_for_user() {
-  local account="$1"
-  local home
-  home="$(user_home "$account")"
-  [[ -n "$home" ]] || die "could not determine home directory for ${account}"
+    local account="$1"
+    local home
+    home="$(user_home "$account")"
+    [[ -n "$home" ]] || die "could not determine home directory for ${account}"
 
-  ensure_bat_symlink_for_user "$account" "$home"
+    ensure_bat_symlink_for_user "$account" "$home"
 
-  sudo -u "$account" -H python3 - "$home" <<'PY'
+    sudo -u "$account" -H python3 - "$home" <<'PY'
 from datetime import datetime
 from pathlib import Path
 import os
@@ -2762,18 +2767,18 @@ install_if_changed(aliases_path, aliases)
 install_if_changed(bashrc, source)
 PY
 
-  sudo -u "$account" -H bash -n "$home/.bashrc"
-  sudo -u "$account" -H bash -n "$home/.bash_aliases"
-  ok "Bash configuration installed for ${account}"
+    sudo -u "$account" -H bash -n "$home/.bashrc"
+    sudo -u "$account" -H bash -n "$home/.bash_aliases"
+    ok "Bash configuration installed for ${account}"
 }
 
 configure_starship_for_user() {
-  local account="$1"
-  local home
-  home="$(user_home "$account")"
-  [[ -n "$home" ]] || die "could not determine home directory for ${account}"
+    local account="$1"
+    local home
+    home="$(user_home "$account")"
+    [[ -n "$home" ]] || die "could not determine home directory for ${account}"
 
-  sudo -u "$account" -H python3 - "$home" <<'PY'
+    sudo -u "$account" -H python3 - "$home" <<'PY'
 from datetime import datetime
 from pathlib import Path
 import os
@@ -2910,132 +2915,132 @@ if old != content:
     finally:
         candidate.unlink(missing_ok=True)
 PY
-  ok "Starship configuration installed for ${account}"
+    ok "Starship configuration installed for ${account}"
 }
 
 configure_git_for_user() {
-  local account="$1"
-  local changed=false
-  local current
-  local git_name="syselement"
-  local git_email="81392234+syselement@users.noreply.github.com"
+    local account="$1"
+    local changed=false
+    local current
+    local git_name="syselement"
+    local git_email="81392234+syselement@users.noreply.github.com"
 
-  if ! id "$account" >/dev/null 2>&1; then
-    warn "user not found: ${account}; skipping Git configuration"
-    return
-  fi
+    if ! id "$account" >/dev/null 2>&1; then
+        warn "user not found: ${account}; skipping Git configuration"
+        return
+    fi
 
-  [[ "$account" == "$TARGET_USER" ]] ||
-    die "Git configuration account does not match target user: ${account}"
+    [[ "$account" == "$TARGET_USER" ]] ||
+        die "Git configuration account does not match target user: ${account}"
 
-  if ! current="$(run_as_target_user git config --global --get user.name 2>/dev/null)"; then
-    current=""
-  fi
-  if [[ "$current" != "$git_name" ]]; then
-    run_as_target_user git config --global user.name "$git_name"
-    changed=true
-  fi
+    if ! current="$(run_as_target_user git config --global --get user.name 2>/dev/null)"; then
+        current=""
+    fi
+    if [[ "$current" != "$git_name" ]]; then
+        run_as_target_user git config --global user.name "$git_name"
+        changed=true
+    fi
 
-  if ! current="$(run_as_target_user git config --global --get user.email 2>/dev/null)"; then
-    current=""
-  fi
-  if [[ "$current" != "$git_email" ]]; then
-    run_as_target_user git config --global user.email "$git_email"
-    changed=true
-  fi
+    if ! current="$(run_as_target_user git config --global --get user.email 2>/dev/null)"; then
+        current=""
+    fi
+    if [[ "$current" != "$git_email" ]]; then
+        run_as_target_user git config --global user.email "$git_email"
+        changed=true
+    fi
 
-  if ! current="$(run_as_target_user git config --global --get pull.rebase 2>/dev/null)"; then
-    current=""
-  fi
-  if [[ "$current" != "true" ]]; then
-    run_as_target_user git config --global pull.rebase true
-    changed=true
-  fi
+    if ! current="$(run_as_target_user git config --global --get pull.rebase 2>/dev/null)"; then
+        current=""
+    fi
+    if [[ "$current" != "true" ]]; then
+        run_as_target_user git config --global pull.rebase true
+        changed=true
+    fi
 
-  if ! current="$(run_as_target_user git config --global --get rebase.autoStash 2>/dev/null)"; then
-    current=""
-  fi
-  if [[ "$current" != "true" ]]; then
-    run_as_target_user git config --global rebase.autoStash true
-    changed=true
-  fi
+    if ! current="$(run_as_target_user git config --global --get rebase.autoStash 2>/dev/null)"; then
+        current=""
+    fi
+    if [[ "$current" != "true" ]]; then
+        run_as_target_user git config --global rebase.autoStash true
+        changed=true
+    fi
 
-  if [[ "$(
-    run_as_target_user git config --global --get user.name
-  )" != "$git_name" ]] ||
-     [[ "$(
-       run_as_target_user git config --global --get user.email
-     )" != "$git_email" ]] ||
-     [[ "$(
-       run_as_target_user git config --global --get pull.rebase
-     )" != "true" ]] ||
-     [[ "$(
-       run_as_target_user git config --global --get rebase.autoStash
-     )" != "true" ]]; then
-    die "failed to configure Git for ${account}"
-  fi
+    if [[ "$(
+        run_as_target_user git config --global --get user.name
+    )" != "$git_name" ]] ||
+        [[ "$(
+            run_as_target_user git config --global --get user.email
+        )" != "$git_email" ]] ||
+        [[ "$(
+            run_as_target_user git config --global --get pull.rebase
+        )" != "true" ]] ||
+        [[ "$(
+            run_as_target_user git config --global --get rebase.autoStash
+        )" != "true" ]]; then
+        die "failed to configure Git for ${account}"
+    fi
 
-  if [[ "$changed" == true ]]; then
-    ok "Git configured for ${account}: identity and pull-rebase policy"
-  else
-    info "Git already configured for ${account}, skipping"
-  fi
+    if [[ "$changed" == true ]]; then
+        ok "Git configured for ${account}: identity and pull-rebase policy"
+    else
+        info "Git already configured for ${account}, skipping"
+    fi
 }
 
 install_homebrew_for_user() (
-  set -Eeuo pipefail
+    set -Eeuo pipefail
 
-  local configured_prefix
-  local installer_file
-  local prefix="$HOMEBREW_PREFIX"
-  local brew_bin="${prefix}/bin/brew"
-  local temporary_dir
-  local version_output
+    local configured_prefix
+    local installer_file
+    local prefix="$HOMEBREW_PREFIX"
+    local brew_bin="${prefix}/bin/brew"
+    local temporary_dir
+    local version_output
 
-  if [[ -x "$brew_bin" ]]; then
-    info "Homebrew already installed; skipping installer prerequisites"
-  else
-    install_package_array "Homebrew prerequisite" \
-      build-essential \
-      procps \
-      curl \
-      file \
-      git
+    if [[ -x "$brew_bin" ]]; then
+        info "Homebrew already installed; skipping installer prerequisites"
+    else
+        install_package_array "Homebrew prerequisite" \
+            build-essential \
+            procps \
+            curl \
+            file \
+            git
 
-    info "staging Homebrew installer for ${TARGET_USER}"
+        info "staging Homebrew installer for ${TARGET_USER}"
 
-    temporary_dir="$(mktemp -d)"
-    trap 'rm -rf -- "$temporary_dir"' EXIT
-    chmod 0755 "$temporary_dir"
-    installer_file="${temporary_dir}/install.sh"
+        temporary_dir="$(mktemp -d)"
+        trap 'rm -rf -- "$temporary_dir"' EXIT
+        chmod 0755 "$temporary_dir"
+        installer_file="${temporary_dir}/install.sh"
 
-    fetch_file "$HOMEBREW_INSTALL_URL" "$installer_file" ||
-      die "failed downloading the Homebrew installer"
-    [[ -s "$installer_file" ]] || die "downloaded Homebrew installer is empty"
-    chmod 0644 "$installer_file"
-    bash -n "$installer_file" || die "downloaded Homebrew installer is not valid Bash"
+        fetch_file "$HOMEBREW_INSTALL_URL" "$installer_file" ||
+            die "failed downloading the Homebrew installer"
+        [[ -s "$installer_file" ]] || die "downloaded Homebrew installer is empty"
+        chmod 0644 "$installer_file"
+        bash -n "$installer_file" || die "downloaded Homebrew installer is not valid Bash"
 
-    # Pre-create the supported Linux prefix so the non-interactive installer does not require password-based sudo access.
-    if [[ ! -d "$(dirname -- "$prefix")" ]]; then
-      install -d -m 0755 -o "$TARGET_USER" -g "$TARGET_GROUP" "$(dirname -- "$prefix")"
+        # Pre-create the supported Linux prefix so the non-interactive installer does not require password-based sudo access.
+        if [[ ! -d "$(dirname -- "$prefix")" ]]; then
+            install -d -m 0755 -o "$TARGET_USER" -g "$TARGET_GROUP" "$(dirname -- "$prefix")"
+        fi
+        if [[ ! -d "$prefix" ]]; then
+            install -d -m 0755 -o "$TARGET_USER" -g "$TARGET_GROUP" "$prefix"
+        fi
+        verify_target_ownership "$prefix" "Homebrew prefix"
+
+        if ! run_quiet_command \
+            "Homebrew installer" \
+            run_as_target_user env NONINTERACTIVE=1 /bin/bash "$installer_file"; then
+            die "Homebrew installation failed"
+        fi
+
+        [[ -x "$brew_bin" ]] ||
+            die "Homebrew installation did not provide ${brew_bin}"
     fi
-    if [[ ! -d "$prefix" ]]; then
-      install -d -m 0755 -o "$TARGET_USER" -g "$TARGET_GROUP" "$prefix"
-    fi
-    verify_target_ownership "$prefix" "Homebrew prefix"
 
-    if ! run_quiet_command \
-      "Homebrew installer" \
-      run_as_target_user env NONINTERACTIVE=1 /bin/bash "$installer_file"; then
-      die "Homebrew installation failed"
-    fi
-
-    [[ -x "$brew_bin" ]] ||
-      die "Homebrew installation did not provide ${brew_bin}"
-  fi
-
-  # Add Homebrew to Bash PATH idempotently.
-  run_as_target_user bash -s -- "$brew_bin" <<'TARGET_BASHRC'
+    # Add Homebrew to Bash PATH idempotently.
+    run_as_target_user bash -s -- "$brew_bin" <<'TARGET_BASHRC'
 set -euo pipefail
 
 brew_bin="$1"
@@ -3052,285 +3057,285 @@ if ! grep -Fqx "$line" "$rc"; then
 fi
 TARGET_BASHRC
 
-  verify_target_ownership "$prefix" "Homebrew prefix"
-  verify_target_ownership "$brew_bin" "Homebrew binary"
+    verify_target_ownership "$prefix" "Homebrew prefix"
+    verify_target_ownership "$brew_bin" "Homebrew binary"
 
-  configured_prefix="$(run_as_target_user "$brew_bin" --prefix)"
-  [[ "$configured_prefix" == "$prefix" ]] ||
-    die "Homebrew reported unexpected prefix: ${configured_prefix}"
+    configured_prefix="$(run_as_target_user "$brew_bin" --prefix)"
+    [[ "$configured_prefix" == "$prefix" ]] ||
+        die "Homebrew reported unexpected prefix: ${configured_prefix}"
 
-  version_output="$(run_as_target_user "$brew_bin" --version)"
-  [[ "$version_output" == Homebrew* ]] || die "Homebrew version verification failed"
-  ok "${version_output%%$'\n'*} installed and verified for ${TARGET_USER}"
+    version_output="$(run_as_target_user "$brew_bin" --version)"
+    [[ "$version_output" == Homebrew* ]] || die "Homebrew version verification failed"
+    ok "${version_output%%$'\n'*} installed and verified for ${TARGET_USER}"
 )
 
 show_manual_setup_hints() {
-  local home
-  home="$(user_home "$USER_NAME")"
+    local home
+    home="$(user_home "$USER_NAME")"
 
-  warn "=============================================================="
-  warn "MANUAL POST-INSTALL SETUP"
-  warn "=============================================================="
-  info "1. Fingerprint login"
-  info "   Settings → System → Users → Fingerprint Login"
-  info "   Enroll at least two fingers and verify sudo authentication."
-  info "=============================================================="
-  info "2. Keyboard shortcuts"
-  info "   Settings → Keyboard → View and Customize Shortcuts"
-  info "   → Custom Shortcuts → Add Shortcut"
-  info ""
-  info "   - Flameshot"
-  info "   Name: Flameshot"
-  info "   Command:"
-  info "   script --quiet --command \"/usr/bin/flameshot gui --clipboard --path ${home}/Pictures/flameshot\" /dev/null"
-  info "   Recommended shortcut: Print, or Shift+Alt+S"
-  info ""
-  info "   - Emote keyboard shortcut"
-  info "   Name: Emote"
-  info "   Command:"
-  info "   /snap/bin/emote"
-  info "   Shortcut: Super+Period (Windows key + .)"
-  info "=============================================================="
-  info "3. Bluetooth devices"
-  info "   Settings → Bluetooth"
-  info "   Pair the mouse, soundbar, etc."
-  info "=============================================================="
-  info "4. Visual Studio Code"
-  info "   Open VS Code → Accounts → Sign in with GitHub"
-  info "   Enable Settings Sync and verify extensions/settings are restored."
-  info "=============================================================="
-  info "5. Bitwarden and EnteAuth"
-  info "   Sign in and complete MFA."
-  info "   Verify vault synchronization."
-  info "=============================================================="
-  info "6. Brave"
-  info "   Open brave://settings/braveSync/setup"
-  info "   Join the existing sync chain and verify bookmarks/extensions."
-  info "=============================================================="
-  info "7. Obsidian"
-  info "   Create Obsidian vault inside:"
-  info "   ${home}/obsidian"
-  info "   Configure Obsidian Sync, Git, or the selected backup method."
-  info "=============================================================="
-  info "8. Telegram"
-  info "   Sign in and verify the session."
-  info "=============================================================="
-  info "9. SSH private key"
-  info "   - Copy the private key from a trusted offline source/password manager:"
-  info "   cat > ${home}/.ssh/id_ed25519"
-  info "   # paste key, then Ctrl-D"
-  info "   chmod 600 ${home}/.ssh/id_ed25519"
-  info ""
-  info "   - Generate the matching public key:"
-  info "   ssh-keygen -y -f ${home}/.ssh/id_ed25519 > ${home}/.ssh/id_ed25519.pub"
-  info "   chmod 0644 ${home}/.ssh/id_ed25519.pub"
-  info ""
-  info "   - Load and test the key:"
-  info "   ssh-add ${home}/.ssh/id_ed25519 || { eval \"\$(ssh-agent -s)\"; ssh-add ${home}/.ssh/id_ed25519; }"
-  info "   ssh -T git@github.com"
-  info "=============================================================="
-  info "10. Tailscale client"
-  info "    sudo tailscale up"
-  info "    Open the authentication URL, then verify the connection:"
-  info "    tailscale status"
-  info "=============================================================="
-  info "11. Cockpit web console"
-  info "    Visit https://localhost:9090/"
-  info "=============================================================="
-  info "12. Clone GitHub repositories over SSH"
-  info "    - GitHub:  cd ${home}/repos/github"
-  info "    - GitLab:  cd ${home}/repos/gitlab"
-  info "    - Forgejo: cd ${home}/repos/forgejo"
-  info "    git clone git@github.com:syselement/<repository>.git"
-  info ""
-  info "    - Verify configured Git identity:"
-  info "    git config list"
-  warn "=============================================================="
+    warn "=============================================================="
+    warn "MANUAL POST-INSTALL SETUP"
+    warn "=============================================================="
+    info "1. Fingerprint login"
+    info "   Settings → System → Users → Fingerprint Login"
+    info "   Enroll at least two fingers and verify sudo authentication."
+    info "=============================================================="
+    info "2. Keyboard shortcuts"
+    info "   Settings → Keyboard → View and Customize Shortcuts"
+    info "   → Custom Shortcuts → Add Shortcut"
+    info ""
+    info "   - Flameshot"
+    info "   Name: Flameshot"
+    info "   Command:"
+    info "   script --quiet --command \"/usr/bin/flameshot gui --clipboard --path ${home}/Pictures/flameshot\" /dev/null"
+    info "   Recommended shortcut: Print, or Shift+Alt+S"
+    info ""
+    info "   - Emote keyboard shortcut"
+    info "   Name: Emote"
+    info "   Command:"
+    info "   /snap/bin/emote"
+    info "   Shortcut: Super+Period (Windows key + .)"
+    info "=============================================================="
+    info "3. Bluetooth devices"
+    info "   Settings → Bluetooth"
+    info "   Pair the mouse, soundbar, etc."
+    info "=============================================================="
+    info "4. Visual Studio Code"
+    info "   Open VS Code → Accounts → Sign in with GitHub"
+    info "   Enable Settings Sync and verify extensions/settings are restored."
+    info "=============================================================="
+    info "5. Bitwarden and EnteAuth"
+    info "   Sign in and complete MFA."
+    info "   Verify vault synchronization."
+    info "=============================================================="
+    info "6. Brave"
+    info "   Open brave://settings/braveSync/setup"
+    info "   Join the existing sync chain and verify bookmarks/extensions."
+    info "=============================================================="
+    info "7. Obsidian"
+    info "   Create Obsidian vault inside:"
+    info "   ${home}/obsidian"
+    info "   Configure Obsidian Sync, Git, or the selected backup method."
+    info "=============================================================="
+    info "8. Telegram"
+    info "   Sign in and verify the session."
+    info "=============================================================="
+    info "9. SSH private key"
+    info "   - Copy the private key from a trusted offline source/password manager:"
+    info "   cat > ${home}/.ssh/id_ed25519"
+    info "   # paste key, then Ctrl-D"
+    info "   chmod 600 ${home}/.ssh/id_ed25519"
+    info ""
+    info "   - Generate the matching public key:"
+    info "   ssh-keygen -y -f ${home}/.ssh/id_ed25519 > ${home}/.ssh/id_ed25519.pub"
+    info "   chmod 0644 ${home}/.ssh/id_ed25519.pub"
+    info ""
+    info "   - Load and test the key:"
+    info "   ssh-add ${home}/.ssh/id_ed25519 || { eval \"\$(ssh-agent -s)\"; ssh-add ${home}/.ssh/id_ed25519; }"
+    info "   ssh -T git@github.com"
+    info "=============================================================="
+    info "10. Tailscale client"
+    info "    sudo tailscale up"
+    info "    Open the authentication URL, then verify the connection:"
+    info "    tailscale status"
+    info "=============================================================="
+    info "11. Cockpit web console"
+    info "    Visit https://localhost:9090/"
+    info "=============================================================="
+    info "12. Clone GitHub repositories over SSH"
+    info "    - GitHub:  cd ${home}/repos/github"
+    info "    - GitLab:  cd ${home}/repos/gitlab"
+    info "    - Forgejo: cd ${home}/repos/forgejo"
+    info "    git clone git@github.com:syselement/<repository>.git"
+    info ""
+    info "    - Verify configured Git identity:"
+    info "    git config list"
+    warn "=============================================================="
 }
 
 main() {
-  local end_ts elapsed start_ts
+    local end_ts elapsed start_ts
 
-  initialize_runtime
+    initialize_runtime
 
-  echo "################################"
-  echo "# Customize System"
-  echo "################################"
+    echo "################################"
+    echo "# Customize System"
+    echo "################################"
 
-  info "================ RUN START ================"
-  info "run_id: ${RUN_ID}"
-  info "started_at: $(date -Is)"
-  start_ts="$(date +%s)"
+    info "================ RUN START ================"
+    info "run_id: ${RUN_ID}"
+    info "started_at: $(date -Is)"
+    start_ts="$(date +%s)"
 
-  info "distro version=${VERSION_ID} codename=${CODENAME} variant=${UBUNTU_VARIANT} variant_source=${UBUNTU_VARIANT_SOURCE} arch=${ARCH}"
-  info "execution mode=${EXECUTION_MODE} context=${EXECUTION_CONTEXT} interactive=${EXECUTION_INTERACTIVE}"
-  ok "target user=${TARGET_USER} home=${TARGET_HOME}"
+    info "distro version=${VERSION_ID} codename=${CODENAME} variant=${UBUNTU_VARIANT} variant_source=${UBUNTU_VARIANT_SOURCE} arch=${ARCH}"
+    info "execution mode=${EXECUTION_MODE} context=${EXECUTION_CONTEXT} interactive=${EXECUTION_INTERACTIVE}"
+    ok "target user=${TARGET_USER} home=${TARGET_HOME}"
 
-  # --- Connectivity checks ---
-  info "checking internet and DNS"
-  if ping -c 1 -W 1 1.1.1.1 &>/dev/null || ping -c 1 -W 1 8.8.8.8 &>/dev/null || ping -c 1 -W 1 9.9.9.9 &>/dev/null; then
-    ok "Internet connected (ICMP ping)"
-  else
-    warn "Internet not connected (ICMP ping failed)"
-  fi
-
-  if getent hosts ubuntu.com >/dev/null 2>&1; then
-    ok "DNS resolution OK (ubuntu.com)"
-  else
-    warn "DNS resolution FAILED (ubuntu.com)"
-  fi
-
-  # --- Update system ---
-  info "apt update/dist-upgrade"
-  run_apt_get update -qq
-  run_apt_get dist-upgrade -y -qq
-  ok "apt update/dist-upgrade completed"
-
-  # --- Update snaps (Desktop only) ---
-  if [[ "$UBUNTU_VARIANT" == "desktop" ]]; then
-    if command -v snap >/dev/null 2>&1; then
-      info "snap refresh"
-      if snap refresh; then
-        ok "snap refresh completed"
-      else
-        warn "snap refresh failed, continuing"
-      fi
+    # --- Connectivity checks ---
+    info "checking internet and DNS"
+    if ping -c 1 -W 1 1.1.1.1 &>/dev/null || ping -c 1 -W 1 8.8.8.8 &>/dev/null || ping -c 1 -W 1 9.9.9.9 &>/dev/null; then
+        ok "Internet connected (ICMP ping)"
     else
-      warn "snap command not found, skipping snap refresh"
+        warn "Internet not connected (ICMP ping failed)"
     fi
-  else
-    info "server variant detected; skipping Desktop snap refresh"
-  fi
 
-  # --- APT prerequisites ---
-  install_package_array "APT bootstrap" "${APT_BOOTSTRAP_PACKAGES[@]}"
-  if [[ "$VERSION_ID" == 24.* ]]; then
-    install_package_array "Ubuntu 24 repository bootstrap" software-properties-common
-  fi
+    if getent hosts ubuntu.com >/dev/null 2>&1; then
+        ok "DNS resolution OK (ubuntu.com)"
+    else
+        warn "DNS resolution FAILED (ubuntu.com)"
+    fi
 
-  # --- Configure repositories before one cache refresh ---
-  info "ensuring common repositories"
-  ensure_fastfetch_ppa
-  apply_repository_setup install_docker_ctop_repository
-  apply_repository_setup ensure_tailscale_repository
-
-  if [[ "$UBUNTU_VARIANT" == "desktop" ]]; then
-    info "ensuring Desktop application repositories"
-    apply_repository_setup ensure_sublime_text_repository
-    apply_repository_setup ensure_brave_browser_repository
-    apply_repository_setup ensure_dbeaver_repository
-    apply_repository_setup ensure_mullvad_repository
-    apply_repository_setup ensure_typora_repository
-  else
-    info "server variant detected; skipping Desktop application repositories"
-  fi
-
-  if [[ "$APT_SOURCES_CHANGED" == true ]]; then
-    info "apt update after repository changes"
+    # --- Update system ---
+    info "apt update/dist-upgrade"
     run_apt_get update -qq
-  else
-    info "APT repositories unchanged; existing package cache is current"
-  fi
+    run_apt_get dist-upgrade -y -qq
+    ok "apt update/dist-upgrade completed"
 
-  # --- Install requested tools ---
-  install_package_array "common" "${COMMON_PACKAGES[@]}"
-  configure_cockpit_socket
-  install_pandoc
-  if [[ "$UBUNTU_VARIANT" == "desktop" ]]; then
-    install_package_array "Desktop" "${DESKTOP_PACKAGES[@]}"
-    configure_flathub
-    install_flatpak_package_array "Desktop Flatpak" "${FLATPAK_PACKAGES[@]}"
-    install_termix
-    install_termius
-    install_rustdesk
-    install_nomachine
-    install_typora_themeable
-  else
-    info "server variant detected; skipping Desktop packages"
-  fi
+    # --- Update snaps (Desktop only) ---
+    if [[ "$UBUNTU_VARIANT" == "desktop" ]]; then
+        if command -v snap >/dev/null 2>&1; then
+            info "snap refresh"
+            if snap refresh; then
+                ok "snap refresh completed"
+            else
+                warn "snap refresh failed, continuing"
+            fi
+        else
+            warn "snap command not found, skipping snap refresh"
+        fi
+    else
+        info "server variant detected; skipping Desktop snap refresh"
+    fi
 
-  # --- Install common user tools and shell configuration ---
-  info "installing common user tools and shell configuration"
-  prepare_user_workspace "$USER_NAME"
-  install_starship
-  for account in "$USER_NAME" root; do
-    install_fzf_for_user "$account"
-    install_jetbrainsmono_nerd_font_for_user "$account"
-    configure_bash_for_user "$account"
-    configure_starship_for_user "$account"
-  done
-  install_tldr_pipx
-  configure_git_for_user "$USER_NAME"
-  install_homebrew_for_user
-  ok "common user tools and shell configuration completed"
+    # --- APT prerequisites ---
+    install_package_array "APT bootstrap" "${APT_BOOTSTRAP_PACKAGES[@]}"
+    if [[ "$VERSION_ID" == 24.* ]]; then
+        install_package_array "Ubuntu 24 repository bootstrap" software-properties-common
+    fi
 
-  # --- Install/configure Desktop-specific tools ---
-  if [[ "$UBUNTU_VARIANT" == "desktop" ]]; then
-    info "installing/configuring Desktop-specific tools"
-    configure_desktop_wallpaper
-    install_flameshot
-    configure_flameshot
-    install_obsidian
-    configure_terminator
-    configure_terminator_as_default "$USER_NAME"
-    install_snap_package discord "Discord"
-    connect_snap_interface discord:system-observe "Discord system-observe"
-    install_snap_package emote "Emote"
-    install_snap_package postman "Postman"
-    install_snap_package telegram-desktop "Telegram Desktop"
-    ok "Desktop-specific tools installed/configured"
-  else
-    info "server variant detected; skipping Desktop-specific tools"
-  fi
+    # --- Configure repositories before one cache refresh ---
+    info "ensuring common repositories"
+    ensure_fastfetch_ppa
+    apply_repository_setup install_docker_ctop_repository
+    apply_repository_setup ensure_tailscale_repository
 
-  # --- Post-install tweaks ---
-  info "updating locate database (best effort)"
-  updatedb || true
+    if [[ "$UBUNTU_VARIANT" == "desktop" ]]; then
+        info "ensuring Desktop application repositories"
+        apply_repository_setup ensure_sublime_text_repository
+        apply_repository_setup ensure_brave_browser_repository
+        apply_repository_setup ensure_dbeaver_repository
+        apply_repository_setup ensure_mullvad_repository
+        apply_repository_setup ensure_typora_repository
+    else
+        info "server variant detected; skipping Desktop application repositories"
+    fi
 
-  # --- GNOME and Dock customization (Desktop only) ---
-  if [[ "$UBUNTU_VARIANT" == "desktop" ]]; then
-    # Apply now, inside this provisioning run. When GNOME is already running,
-    # target its real per-user bus; during headless SSH/Vagrant provisioning,
-    # use the temporary-bus fallback from run_as_gnome_user().
-    install_system_monitor_panel_extension "$USER_NAME"
-    install_hide_universal_access_extension "$USER_NAME"
-    apply_gnome_preferences
-    enable_battery_health_preservation
-  else
-    info "server variant detected; skipping GNOME preferences"
-  fi
+    if [[ "$APT_SOURCES_CHANGED" == true ]]; then
+        info "apt update after repository changes"
+        run_apt_get update -qq
+    else
+        info "APT repositories unchanged; existing package cache is current"
+    fi
 
-  # --- Cleanup and update repositories ---
-  info "cleanup"
-  run_apt_get -y -qq autoremove --purge
-  run_apt_get -y clean
-  ok "cleanup completed"
+    # --- Install requested tools ---
+    install_package_array "common" "${COMMON_PACKAGES[@]}"
+    configure_cockpit_socket
+    install_pandoc
+    if [[ "$UBUNTU_VARIANT" == "desktop" ]]; then
+        install_package_array "Desktop" "${DESKTOP_PACKAGES[@]}"
+        configure_flathub
+        install_flatpak_package_array "Desktop Flatpak" "${FLATPAK_PACKAGES[@]}"
+        install_termix
+        install_termius
+        install_rustdesk
+        install_nomachine
+        install_typora_themeable
+    else
+        info "server variant detected; skipping Desktop packages"
+    fi
 
-  # --- Manual setup hints ---
-  show_manual_setup_hints
+    # --- Install common user tools and shell configuration ---
+    info "installing common user tools and shell configuration"
+    prepare_user_workspace "$USER_NAME"
+    install_starship
+    for account in "$USER_NAME" root; do
+        install_fzf_for_user "$account"
+        install_jetbrainsmono_nerd_font_for_user "$account"
+        configure_bash_for_user "$account"
+        configure_starship_for_user "$account"
+    done
+    install_tldr_pipx
+    configure_git_for_user "$USER_NAME"
+    install_homebrew_for_user
+    ok "common user tools and shell configuration completed"
 
-  end_ts="$(date +%s)"
-  elapsed="$((end_ts - start_ts))"
-  info "done: $(date -Is)"
-  info "elapsed: $(printf '%02d:%02d:%02d' "$((elapsed / 3600))" "$((elapsed % 3600 / 60))" "$((elapsed % 60))")"
-  info "log file: ${LOG_FILE}"
-  info "run_id: ${RUN_ID}"
-  info "================= RUN END ================="
+    # --- Install/configure Desktop-specific tools ---
+    if [[ "$UBUNTU_VARIANT" == "desktop" ]]; then
+        info "installing/configuring Desktop-specific tools"
+        configure_desktop_wallpaper
+        install_flameshot
+        configure_flameshot
+        install_obsidian
+        configure_terminator
+        configure_terminator_as_default "$USER_NAME"
+        install_snap_package discord "Discord"
+        connect_snap_interface discord:system-observe "Discord system-observe"
+        install_snap_package emote "Emote"
+        install_snap_package postman "Postman"
+        install_snap_package telegram-desktop "Telegram Desktop"
+        ok "Desktop-specific tools installed/configured"
+    else
+        info "server variant detected; skipping Desktop-specific tools"
+    fi
 
-  echo "################################"
-  echo "# System Provisioning Complete"
-  echo "################################"
+    # --- Post-install tweaks ---
+    info "updating locate database (best effort)"
+    updatedb || true
 
-  if [[ "$REBOOT_AT_END" == "true" ]]; then
-    echo "[${SCRIPT_NAME}] rebooting in 10 seconds..."
-    sleep 10
-    sync
-    shutdown -r now
-  else
-    echo "[${SCRIPT_NAME}] reboot deferred to orchestrator"
-  fi
+    # --- GNOME and Dock customization (Desktop only) ---
+    if [[ "$UBUNTU_VARIANT" == "desktop" ]]; then
+        # Apply now, inside this provisioning run. When GNOME is already running,
+        # target its real per-user bus; during headless SSH/Vagrant provisioning,
+        # use the temporary-bus fallback from run_as_gnome_user().
+        install_system_monitor_panel_extension "$USER_NAME"
+        install_hide_universal_access_extension "$USER_NAME"
+        apply_gnome_preferences
+        enable_battery_health_preservation
+    else
+        info "server variant detected; skipping GNOME preferences"
+    fi
+
+    # --- Cleanup and update repositories ---
+    info "cleanup"
+    run_apt_get -y -qq autoremove --purge
+    run_apt_get -y clean
+    ok "cleanup completed"
+
+    # --- Manual setup hints ---
+    show_manual_setup_hints
+
+    end_ts="$(date +%s)"
+    elapsed="$((end_ts - start_ts))"
+    info "done: $(date -Is)"
+    info "elapsed: $(printf '%02d:%02d:%02d' "$((elapsed / 3600))" "$((elapsed % 3600 / 60))" "$((elapsed % 60))")"
+    info "log file: ${LOG_FILE}"
+    info "run_id: ${RUN_ID}"
+    info "================= RUN END ================="
+
+    echo "################################"
+    echo "# System Provisioning Complete"
+    echo "################################"
+
+    if [[ "$REBOOT_AT_END" == "true" ]]; then
+        echo "[${SCRIPT_NAME}] rebooting in 10 seconds..."
+        sleep 10
+        sync
+        shutdown -r now
+    else
+        echo "[${SCRIPT_NAME}] reboot deferred to orchestrator"
+    fi
 }
 
 if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
-  main "$@"
+    main "$@"
 fi

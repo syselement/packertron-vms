@@ -8,7 +8,7 @@ set -Eeuo pipefail
 export DEBIAN_FRONTEND=noninteractive
 
 SCRIPT_DIR="$(
-  cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd
+    cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd
 )"
 
 STATE_DIR="/var/lib/packertron-bootstrap"
@@ -16,8 +16,8 @@ LOG_FILE="/var/log/packertron-bootstrap.log"
 LOCK_FILE="/run/lock/packertron-bootstrap.lock"
 
 [[ "$EUID" -eq 0 ]] || {
-  echo "ERROR: run as root" >&2
-  exit 1
+    echo "ERROR: run as root" >&2
+    exit 1
 }
 
 mkdir -p "$STATE_DIR"
@@ -28,32 +28,32 @@ exec > >(tee -a "$LOG_FILE") 2>&1
 
 exec 9>"$LOCK_FILE"
 if ! flock -n 9; then
-  echo "Another bootstrap execution is already running"
-  exit 0
+    echo "Another bootstrap execution is already running"
+    exit 0
 fi
 
 if [[ -f "$STATE_DIR/complete" ]]; then
-  echo "Bare-metal bootstrap already completed"
-  exit 0
+    echo "Bare-metal bootstrap already completed"
+    exit 0
 fi
 
 run_step() {
-  local name="$1"
-  local script="$2"
-  local marker="$STATE_DIR/${name}.done"
+    local name="$1"
+    local script="$2"
+    local marker="$STATE_DIR/${name}.done"
 
-  if [[ -f "$marker" ]]; then
-    echo "SKIP: ${name} already completed"
-    return
-  fi
+    if [[ -f "$marker" ]]; then
+        echo "SKIP: ${name} already completed"
+        return
+    fi
 
-  echo "RUN: ${name}"
+    echo "RUN: ${name}"
 
-  REBOOT_AT_END=false \
-    bash "$SCRIPT_DIR/$script"
+    REBOOT_AT_END=false \
+        bash "$SCRIPT_DIR/$script"
 
-  touch "$marker"
-  echo "DONE: ${name}"
+    touch "$marker"
+    echo "DONE: ${name}"
 }
 
 # Intentionally omitted:
@@ -72,6 +72,6 @@ echo "Log: $LOG_FILE"
 sync
 
 systemd-run \
-  --unit=packertron-bootstrap-reboot \
-  --on-active=2m \
-  /usr/bin/systemctl reboot -i
+    --unit=packertron-bootstrap-reboot \
+    --on-active=2m \
+    /usr/bin/systemctl reboot -i
