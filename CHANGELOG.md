@@ -1,3 +1,13 @@
+# [0.43.0](https://github.com/syselement/packertron-vms/compare/v0.42.2...v0.43.0) (2026-07-27)
+
+
+### Features
+
+* add support for Vagrant and additional packages in provisioning scripts ([6a2ccd3](https://github.com/syselement/packertron-vms/commit/6a2ccd34399b93d701a08a7e9c410d390f4b8ab2))
+* added io.github.sigmasd.pingmonitor to Flatpak packages ([b774f34](https://github.com/syselement/packertron-vms/commit/b774f347fdced08d954e2d4f3f6fea67d5c83c1a))
+
+
+
 ## [0.42.2](https://github.com/syselement/packertron-vms/compare/v0.42.1...v0.42.2) (2026-07-21)
 
 
@@ -31,15 +41,6 @@
 ### Features
 
 * add 'bats', 'shellcheck', and 'shfmt' to common packages ([eb9628b](https://github.com/syselement/packertron-vms/commit/eb9628b37271e7201dabb3ac7a44b8193eb53970))
-
-
-
-## [0.40.1](https://github.com/syselement/packertron-vms/compare/v0.40.0...v0.40.1) (2026-07-19)
-
-
-### Bug Fixes
-
-* update sudoers file naming convention for consistency ([48661e9](https://github.com/syselement/packertron-vms/commit/48661e9cdea26da9b8e84feb2fc35a2d1580a73b))
 
 
 
