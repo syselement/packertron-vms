@@ -32,6 +32,7 @@ APT_SOURCES_CHANGED=false
 STARSHIP_INSTALL_URL="${STARSHIP_INSTALL_URL:-https://starship.rs/install.sh}"
 SYSTEM_KEYRING_DIR="${PACKERTRON_SYSTEM_KEYRING_DIR:-/usr/share/keyrings}"
 APT_SOURCES_DIR="${PACKERTRON_APT_SOURCES_DIR:-/etc/apt/sources.list.d}"
+APT_TRUSTED_KEY_DIR="${PACKERTRON_APT_TRUSTED_KEY_DIR:-/etc/apt/trusted.gpg.d}"
 HOMEBREW_PREFIX="${PACKERTRON_HOMEBREW_PREFIX:-/home/linuxbrew/.linuxbrew}"
 HOMEBREW_INSTALL_URL="${HOMEBREW_INSTALL_URL:-https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh}"
 
@@ -81,6 +82,7 @@ readonly -a COMMON_PACKAGES=(
   sshpass
   stress
   sysstat
+  tailscale
   tmux
   tor
   tree
@@ -101,10 +103,12 @@ readonly -a DESKTOP_PACKAGES=(
   gnome-shell-extensions
   gnome-system-monitor
   gnome-tweaks
+  meld
   mullvad-vpn
   qbittorrent
   sublime-text
   terminator
+  typora
   vlc
   xclip
 )
@@ -112,6 +116,8 @@ readonly -a DESKTOP_PACKAGES=(
 readonly -a FLATPAK_PACKAGES=(
   com.bitwarden.desktop
   io.ente.auth
+  io.github.sigmasd.pingmonitor
+  org.cryptomator.Cryptomator
   org.gnome.Boxes
 )
 
@@ -293,6 +299,165 @@ verify_github_asset_digest() {
   [[ "$actual_digest" == "$expected_digest" ]] ||
     die "SHA-256 verification failed for ${description}"
 }
+
+fetch_latest_github_release_metadata() {
+  local repository="$1"
+  local metadata_file="$2"
+  local description="$3"
+
+  fetch_file "https://api.github.com/repos/${repository}/releases/latest" "$metadata_file" ||
+    die "failed downloading ${description} release metadata"
+}
+
+fetch_github_asset_from_metadata() {
+  local match_type="$1"
+  local asset_pattern="$2"
+  local destination_file="$3"
+  local metadata_file="$4"
+  local description="$5"
+  local asset_count asset_digest asset_url jq_filter
+
+  # shellcheck disable=SC2016 # $pattern is expanded by jq.
+  case "$match_type" in
+    exact) jq_filter='.name == $pattern' ;;
+    suffix) jq_filter='.name | endswith($pattern)' ;;
+    *) die "unsupported GitHub asset match type: ${match_type}" ;;
+  esac
+
+  asset_count="$(
+    jq --arg pattern "$asset_pattern" \
+      "[.assets[] | select(${jq_filter})] | length" \
+      "$metadata_file"
+  )"
+  [[ "$asset_count" == "1" ]] ||
+    die "expected one ${description} release asset matching ${asset_pattern}, found ${asset_count}"
+
+  asset_url="$(
+    jq -r --arg pattern "$asset_pattern" \
+      ".assets[] | select(${jq_filter}) | .browser_download_url" \
+      "$metadata_file"
+  )"
+  asset_digest="$(
+    jq -r --arg pattern "$asset_pattern" \
+      ".assets[] | select(${jq_filter}) | .digest // empty" \
+      "$metadata_file"
+  )"
+  [[ "$asset_url" == https://github.com/* ]] ||
+    die "unexpected ${description} release asset URL"
+
+  fetch_file "$asset_url" "$destination_file" ||
+    die "failed downloading ${description}"
+  verify_github_asset_digest "$destination_file" "$asset_digest" "$description"
+}
+
+fetch_latest_github_asset() {
+  local repository="$1"
+  local match_type="$2"
+  local asset_pattern="$3"
+  local destination_file="$4"
+  local metadata_file="$5"
+  local description="$6"
+
+  fetch_latest_github_release_metadata "$repository" "$metadata_file" "$description"
+  fetch_github_asset_from_metadata \
+    "$match_type" \
+    "$asset_pattern" \
+    "$destination_file" \
+    "$metadata_file" \
+    "$description"
+}
+
+validate_debian_package() {
+  local deb_file="$1"
+  local expected_package="$2"
+  local description="$3"
+  local package_architecture package_name package_version
+
+  [[ -s "$deb_file" ]] || die "downloaded ${description} package is empty"
+  dpkg-deb --info "$deb_file" >/dev/null 2>&1 ||
+    die "downloaded ${description} package is invalid"
+
+  package_name="$(dpkg-deb -f "$deb_file" Package)"
+  package_architecture="$(dpkg-deb -f "$deb_file" Architecture)"
+  package_version="$(dpkg-deb -f "$deb_file" Version)"
+
+  [[ "$package_name" == "$expected_package" ]] ||
+    die "unexpected ${description} package name: ${package_name}; expected ${expected_package}"
+  [[ "$package_architecture" == "$ARCH" || "$package_architecture" == "all" ]] ||
+    die "unexpected ${description} package architecture: ${package_architecture}; expected ${ARCH}"
+  [[ -n "$package_version" ]] ||
+    die "downloaded ${description} package does not declare a version"
+}
+
+install_debian_package() {
+  local deb_file="$1"
+  local package_name="$2"
+  local description="$3"
+  local installed_version package_version
+
+  validate_debian_package "$deb_file" "$package_name" "$description"
+  package_version="$(dpkg-deb -f "$deb_file" Version)"
+  installed_version="$(dpkg-query -W -f='${Version}' "$package_name" 2>/dev/null || true)"
+
+  if [[ -n "$installed_version" ]] &&
+    dpkg --compare-versions "$installed_version" ge "$package_version"; then
+    info "${description} ${installed_version} already installed, skipping"
+    return
+  fi
+
+  info "installing ${description} ${package_version}"
+  run_quiet_command "${description} installation failed" \
+    run_apt_get install -y -qq "$deb_file" ||
+    die "failed installing ${description} ${package_version}"
+
+  installed_version="$(dpkg-query -W -f='${Version}' "$package_name" 2>/dev/null || true)"
+  if [[ -z "$installed_version" ]] ||
+    ! dpkg --compare-versions "$installed_version" ge "$package_version"; then
+    die "${description} installation could not be verified"
+  fi
+  ok "${description} ${installed_version} installed"
+}
+
+install_downloaded_debian_package() (
+  set -Eeuo pipefail
+
+  local url="$1"
+  local package_name="$2"
+  local description="$3"
+  local temporary_dir
+
+  temporary_dir="$(mktemp -d)"
+  trap 'rm -rf -- "$temporary_dir"' EXIT
+
+  info "downloading ${description}"
+  fetch_file "$url" "$temporary_dir/package.deb" ||
+    die "failed downloading ${description}"
+  install_debian_package "$temporary_dir/package.deb" "$package_name" "$description"
+)
+
+install_latest_github_debian_package() (
+  set -Eeuo pipefail
+
+  local repository="$1"
+  local asset_suffix="$2"
+  local package_name="$3"
+  local description="$4"
+  local temporary_dir
+
+  temporary_dir="$(mktemp -d)"
+  trap 'rm -rf -- "$temporary_dir"' EXIT
+
+  info "checking latest ${description} GitHub release"
+  info "downloading ${description} package"
+  fetch_latest_github_asset \
+    "$repository" \
+    "suffix" \
+    "$asset_suffix" \
+    "$temporary_dir/package.deb" \
+    "$temporary_dir/release.json" \
+    "${description} package"
+  install_debian_package "$temporary_dir/package.deb" "$package_name" "$description"
+)
 
 install_target_config_file() {
   local source_file="$1"
@@ -1071,6 +1236,55 @@ EOF
   [[ "$changed" == false ]] || return 10
 )
 
+ensure_tailscale_repository() (
+  set -Eeuo pipefail
+
+  local changed=false
+  local key_file="${SYSTEM_KEYRING_DIR}/tailscale-archive-keyring.gpg"
+  local repository_url="https://pkgs.tailscale.com/stable/ubuntu"
+  local source_file="${APT_SOURCES_DIR}/tailscale.list"
+  local temporary_dir
+
+  case "$CODENAME" in
+    noble | resolute) ;;
+    *)
+      die "Tailscale repository is not configured for Ubuntu codename ${CODENAME}"
+      ;;
+  esac
+
+  temporary_dir="$(mktemp -d)"
+  trap 'rm -rf -- "$temporary_dir"' EXIT
+
+  fetch_file \
+    "${repository_url}/${CODENAME}.noarmor.gpg" \
+    "$temporary_dir/tailscale-archive-keyring.gpg" ||
+    die "failed downloading the Tailscale signing key"
+  validate_openpgp_key "$temporary_dir/tailscale-archive-keyring.gpg" "Tailscale"
+
+  cat >"$temporary_dir/tailscale.list" <<EOF
+deb [signed-by=${key_file}] ${repository_url} ${CODENAME} main
+EOF
+  validate_repository_source \
+    "$temporary_dir/tailscale.list" \
+    "$repository_url" \
+    "$key_file"
+
+  if write_file_if_changed "$temporary_dir/tailscale-archive-keyring.gpg" "$key_file"; then
+    changed=true
+    ok "installed Tailscale repository signing key"
+  else
+    info "Tailscale repository signing key already current"
+  fi
+  if write_file_if_changed "$temporary_dir/tailscale.list" "$source_file"; then
+    changed=true
+    ok "configured Tailscale repository"
+  else
+    info "Tailscale repository already configured"
+  fi
+
+  [[ "$changed" == false ]] || return 10
+)
+
 ensure_sublime_text_repository() (
   set -Eeuo pipefail
 
@@ -1248,6 +1462,53 @@ EOF
   [[ "$changed" == false ]] || return 10
 )
 
+ensure_typora_repository() (
+  set -Eeuo pipefail
+
+  local changed=false
+  local key_file="${SYSTEM_KEYRING_DIR}/typora.gpg"
+  local legacy_key_file="${APT_TRUSTED_KEY_DIR}/typora.asc"
+  local source_file="${APT_SOURCES_DIR}/typora.list"
+  local temporary_dir
+
+  temporary_dir="$(mktemp -d)"
+  trap 'rm -rf -- "$temporary_dir"' EXIT
+
+  fetch_file \
+    "https://downloads.typora.io/typora.gpg" \
+    "$temporary_dir/typora.gpg" ||
+    die "failed downloading the Typora signing key"
+  validate_openpgp_key "$temporary_dir/typora.gpg" "Typora"
+
+  cat >"$temporary_dir/typora.list" <<EOF
+deb [signed-by=${key_file}] https://downloads.typora.io/linux ./
+EOF
+  validate_repository_source \
+    "$temporary_dir/typora.list" \
+    "https://downloads.typora.io/linux" \
+    "$key_file"
+
+  if write_file_if_changed "$temporary_dir/typora.gpg" "$key_file"; then
+    changed=true
+    ok "installed Typora repository signing key"
+  else
+    info "Typora repository signing key already current"
+  fi
+  if write_file_if_changed "$temporary_dir/typora.list" "$source_file"; then
+    changed=true
+    ok "configured Typora repository"
+  else
+    info "Typora repository already configured"
+  fi
+  if [[ -e "$legacy_key_file" ]]; then
+    rm -f -- "$legacy_key_file"
+    changed=true
+    info "removed obsolete Typora repository key: ${legacy_key_file}"
+  fi
+
+  [[ "$changed" == false ]] || return 10
+)
+
 configure_flathub() (
   set -euo pipefail
 
@@ -1272,6 +1533,193 @@ configure_flathub() (
 )
 
 # --- Desktop tools ---
+
+install_termix() (
+  set -Eeuo pipefail
+
+  local app_id="com.karmaa.termix"
+  local temporary_dir
+
+  if [[ "$ARCH" != "amd64" ]]; then
+    warn "Termix Flatpak bundle is only configured for amd64; skipping on ${ARCH}"
+    return
+  fi
+  command -v flatpak >/dev/null 2>&1 ||
+    die "flatpak is required to install Termix"
+
+  if run_as_target_user flatpak info --user "$app_id" >/dev/null 2>&1; then
+    info "Termix Flatpak already installed for ${TARGET_USER}, skipping"
+    return
+  fi
+
+  temporary_dir="$(mktemp -d)"
+  trap 'rm -rf -- "$temporary_dir"' EXIT
+
+  info "checking latest Termix GitHub release"
+  info "downloading Termix Flatpak bundle"
+  fetch_latest_github_asset \
+    "Termix-SSH/Termix" \
+    "exact" \
+    "termix_linux_flatpak.flatpak" \
+    "$temporary_dir/termix.flatpak" \
+    "$temporary_dir/release.json" \
+    "Termix Flatpak bundle"
+
+  chmod 0755 "$temporary_dir"
+  chmod 0644 "$temporary_dir/termix.flatpak"
+  info "installing Termix Flatpak for ${TARGET_USER}"
+  run_quiet_command "Termix Flatpak installation failed" \
+    run_as_target_user flatpak install --user --noninteractive -y \
+    "$temporary_dir/termix.flatpak" ||
+    die "failed installing Termix Flatpak"
+  run_as_target_user flatpak info --user "$app_id" >/dev/null 2>&1 ||
+    die "Termix Flatpak installation could not be verified"
+  ok "Termix Flatpak installed for ${TARGET_USER}"
+)
+
+install_termius() {
+  if [[ "$ARCH" != "amd64" ]]; then
+    warn "Termius DEB is only configured for amd64; skipping on ${ARCH}"
+    return
+  fi
+
+  install_downloaded_debian_package \
+    "https://download.termius.com/linux/Termius.deb" \
+    "termius-app" \
+    "Termius"
+}
+
+install_rustdesk() {
+  local asset_suffix
+
+  case "$ARCH" in
+    amd64) asset_suffix="-x86_64.deb" ;;
+    arm64) asset_suffix="-aarch64.deb" ;;
+    *)
+      warn "RustDesk release installation is not configured for ${ARCH}; skipping"
+      return
+      ;;
+  esac
+
+  install_latest_github_debian_package \
+    "rustdesk/rustdesk" \
+    "$asset_suffix" \
+    "rustdesk" \
+    "RustDesk"
+}
+
+install_nomachine() (
+  set -Eeuo pipefail
+
+  local download_page="https://download.nomachine.com/download/?id=1&platform=linux"
+  local download_url page_content release_series release_version
+  local temporary_dir
+
+  if [[ "$ARCH" != "amd64" ]]; then
+    warn "NoMachine Linux DEB (amd64) is not compatible with ${ARCH}; skipping"
+    return
+  fi
+
+  temporary_dir="$(mktemp -d)"
+  trap 'rm -rf -- "$temporary_dir"' EXIT
+
+  info "checking latest NoMachine Linux DEB release"
+  fetch_file "$download_page" "$temporary_dir/download-page.html" ||
+    die "failed downloading the NoMachine release page"
+  page_content="$(<"$temporary_dir/download-page.html")"
+
+  if [[ "$page_content" =~ ([0-9]+\.[0-9]+\.[0-9]+_[0-9]+) ]]; then
+    release_version="${BASH_REMATCH[1]}"
+  else
+    die "could not determine the latest NoMachine Linux DEB version"
+  fi
+  if [[ "$release_version" =~ ^([0-9]+\.[0-9]+)\. ]]; then
+    release_series="${BASH_REMATCH[1]}"
+  else
+    die "unexpected NoMachine release version: ${release_version}"
+  fi
+
+  download_url="https://download.nomachine.com/download/${release_series}/Linux/nomachine_${release_version}_amd64.deb"
+  install_downloaded_debian_package "$download_url" "nomachine" "NoMachine"
+)
+
+install_pandoc() {
+  local asset_suffix
+
+  case "$ARCH" in
+    amd64 | arm64) asset_suffix="-1-${ARCH}.deb" ;;
+    *)
+      warn "Pandoc release installation is not configured for ${ARCH}; skipping"
+      return
+      ;;
+  esac
+
+  install_latest_github_debian_package \
+    "jgm/pandoc" \
+    "$asset_suffix" \
+    "pandoc" \
+    "Pandoc"
+}
+
+install_typora_themeable() (
+  set -Eeuo pipefail
+
+  local installed_version release_version
+  local marker_file="${TARGET_HOME}/.config/Typora/themes/.packertron-themeable-version"
+  local theme_directory="${TARGET_HOME}/.config/Typora/themes"
+  local temporary_dir
+
+  temporary_dir="$(mktemp -d)"
+  trap 'rm -rf -- "$temporary_dir"' EXIT
+
+  info "checking latest Typora Themeable release"
+  fetch_latest_github_release_metadata \
+    "jhildenbiddle/typora-themeable" \
+    "$temporary_dir/release.json" \
+    "Typora Themeable"
+  release_version="$(jq -r '.tag_name // empty' "$temporary_dir/release.json")"
+  [[ -n "$release_version" ]] ||
+    die "Typora Themeable release metadata does not contain a version"
+
+  installed_version=""
+  [[ ! -f "$marker_file" ]] || installed_version="$(<"$marker_file")"
+  if [[ "$installed_version" == "$release_version" &&
+    -f "$theme_directory/themeable.css" ]]; then
+    info "Typora Themeable ${release_version} already installed, skipping"
+    return
+  fi
+
+  info "downloading Typora Themeable ${release_version}"
+  fetch_github_asset_from_metadata \
+    "exact" \
+    "typora-themeable.zip" \
+    "$temporary_dir/typora-themeable.zip" \
+    "$temporary_dir/release.json" \
+    "Typora Themeable archive"
+  info "installing Typora Themeable ${release_version}"
+  validate_zip_archive "$temporary_dir/typora-themeable.zip" "Typora Themeable"
+
+  install -d -m 0755 -o "$TARGET_USER" -g "$TARGET_GROUP" "$theme_directory"
+  chmod 0755 "$temporary_dir"
+  chmod 0644 "$temporary_dir/typora-themeable.zip"
+  run_quiet_command "Typora Themeable extraction failed" \
+    run_as_target_user unzip -q -o \
+    "$temporary_dir/typora-themeable.zip" \
+    -d "$theme_directory" ||
+    die "failed installing Typora Themeable"
+  [[ -f "$theme_directory/themeable.css" ]] ||
+    die "Typora Themeable installation could not be verified"
+
+  printf '%s\n' "$release_version" >"$temporary_dir/theme-version"
+  install \
+    -o "$TARGET_USER" \
+    -g "$TARGET_GROUP" \
+    -m 0644 \
+    "$temporary_dir/theme-version" \
+    "$marker_file"
+  verify_target_ownership "$marker_file" "Typora Themeable version marker"
+  ok "Typora Themeable ${release_version} installed for ${TARGET_USER}"
+)
 
 configure_desktop_wallpaper() (
   set -euo pipefail
@@ -2617,7 +3065,12 @@ show_manual_setup_hints() {
   info "   ssh-add ${home}/.ssh/id_ed25519 || { eval \"\$(ssh-agent -s)\"; ssh-add ${home}/.ssh/id_ed25519; }"
   info "   ssh -T git@github.com"
   info "=============================================================="
-  info "10. Clone GitHub repositories over SSH"
+  info "10. Tailscale client"
+  info "    sudo tailscale up"
+  info "    Open the authentication URL, then verify the connection:"
+  info "    tailscale status"
+  info "=============================================================="
+  info "11. Clone GitHub repositories over SSH"
   info "    - GitHub:  cd ${home}/repos/github"
   info "    - GitLab:  cd ${home}/repos/gitlab"
   info "    - Forgejo: cd ${home}/repos/forgejo"
@@ -2692,6 +3145,7 @@ main() {
   info "ensuring common repositories"
   ensure_fastfetch_ppa
   apply_repository_setup install_docker_ctop_repository
+  apply_repository_setup ensure_tailscale_repository
 
   if [[ "$UBUNTU_VARIANT" == "desktop" ]]; then
     info "ensuring Desktop application repositories"
@@ -2699,6 +3153,7 @@ main() {
     apply_repository_setup ensure_brave_browser_repository
     apply_repository_setup ensure_dbeaver_repository
     apply_repository_setup ensure_mullvad_repository
+    apply_repository_setup ensure_typora_repository
   else
     info "server variant detected; skipping Desktop application repositories"
   fi
@@ -2712,10 +3167,16 @@ main() {
 
   # --- Install requested tools ---
   install_package_array "common" "${COMMON_PACKAGES[@]}"
+  install_pandoc
   if [[ "$UBUNTU_VARIANT" == "desktop" ]]; then
     install_package_array "Desktop" "${DESKTOP_PACKAGES[@]}"
     configure_flathub
     install_flatpak_package_array "Desktop Flatpak" "${FLATPAK_PACKAGES[@]}"
+    install_termix
+    install_termius
+    install_rustdesk
+    install_nomachine
+    install_typora_themeable
   else
     info "server variant detected; skipping Desktop packages"
   fi
@@ -2775,10 +3236,6 @@ main() {
   info "cleanup"
   run_apt_get -y -qq autoremove --purge
   run_apt_get -y clean
-  rm -rf /var/lib/apt/lists/*
-  if ! run_apt_get -y update >/dev/null 2>&1; then
-    warn "apt update after cleanup failed; package lists will be refreshed on the next run"
-  fi
   ok "cleanup completed"
 
   # --- Manual setup hints ---

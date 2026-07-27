@@ -72,9 +72,10 @@ readonly -a TOOLCHAIN_PACKAGES=(
   docker-compose-plugin
   packer
   tofu
+  vagrant
 )
 
-readonly -a REQUIRED_TOOL_COMMANDS=(ansible code docker packer tofu)
+readonly -a REQUIRED_TOOL_COMMANDS=(ansible code docker packer tofu vagrant)
 
 # --- Logging setup ---
 _ts() { date +'%F %T'; }
@@ -415,6 +416,7 @@ validate_toolchain() {
   local docker_version
   local packer_version
   local tofu_version
+  local vagrant_version
 
   for command_name in "${REQUIRED_TOOL_COMMANDS[@]}"; do
     command -v "$command_name" >/dev/null 2>&1 ||
@@ -444,6 +446,10 @@ validate_toolchain() {
   tofu_version="$(tofu --version 2>/dev/null)" ||
     die "OpenTofu version check failed"
   printf 'tofu:    %s\n' "${tofu_version%%$'\n'*}"
+
+  vagrant_version="$(vagrant --version 2>/dev/null)" ||
+    die "Vagrant version check failed"
+  printf 'vagrant: %s\n' "${vagrant_version%%$'\n'*}"
 }
 
 cleanup_apt() {
