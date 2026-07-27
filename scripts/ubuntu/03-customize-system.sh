@@ -142,6 +142,7 @@ CODENAME=""
 ARCH=""
 t_bold=""
 t_dim=""
+t_cyan=""
 t_green=""
 t_yellow=""
 t_red=""
@@ -151,9 +152,10 @@ initialize_runtime() {
     require_root
 
     # Console keeps ANSI colors, while the log file stores plain text.
-    if [[ -t 1 ]]; then
+    if [[ -t 1 && "${TERM:-dumb}" != "dumb" && -z "${NO_COLOR+x}" ]]; then
         t_bold=$'\e[1m'
         t_dim=$'\e[2m'
+        t_cyan=$'\e[36m'
         t_green=$'\e[32m'
         t_yellow=$'\e[33m'
         t_red=$'\e[31m'
@@ -170,15 +172,34 @@ initialize_runtime() {
 
 _ts() { date +'%F %T'; }
 log() {
-    local msg="$*"
+    local level="$1"
+    local level_color="$2"
+    shift 2
+
+    local message="$*"
     local ts
+
     ts="$(_ts)"
-    printf '%s %s %b\n' "[$ts]" "$LOG_PREFIX" "$msg"
+    printf '%s %s %s%-5s%s %s\n' \
+        "[$ts]" \
+        "$LOG_PREFIX" \
+        "$level_color" \
+        "$level" \
+        "$t_reset" \
+        "$message"
 }
-info() { log "${t_dim}INFO${t_reset}  $*"; }
-ok() { log "${t_green}${t_bold}OK${t_reset}    $*"; }
-warn() { log "${t_yellow}${t_bold}WARN${t_reset}  $*"; }
-error() { log "${t_red}${t_bold}ERROR${t_reset} $*"; }
+section() {
+    printf '\n'
+    log "STEP" "${t_cyan}${t_bold}" "── $* ──"
+}
+info() { log "INFO" "$t_dim" "$@"; }
+ok() { log "OK" "${t_green}${t_bold}" "$@"; }
+warn() { log "WARN" "${t_yellow}${t_bold}" "$@"; }
+error() { log "ERROR" "${t_red}${t_bold}" "$@"; }
+manual_step() { section "$@"; }
+manual_line() { printf '    %s\n' "$*"; }
+manual_item() { printf '    • %s\n' "$*"; }
+manual_command() { printf '      $ %s\n' "$*"; }
 die() {
     error "$*"
     exit 1
@@ -3073,84 +3094,73 @@ show_manual_setup_hints() {
     local home
     home="$(user_home "$USER_NAME")"
 
-    warn "=============================================================="
-    warn "MANUAL POST-INSTALL SETUP"
-    warn "=============================================================="
-    info "1. Fingerprint login"
-    info "   Settings → System → Users → Fingerprint Login"
-    info "   Enroll at least two fingers and verify sudo authentication."
-    info "=============================================================="
-    info "2. Keyboard shortcuts"
-    info "   Settings → Keyboard → View and Customize Shortcuts"
-    info "   → Custom Shortcuts → Add Shortcut"
-    info ""
-    info "   - Flameshot"
-    info "   Name: Flameshot"
-    info "   Command:"
-    info "   script --quiet --command \"/usr/bin/flameshot gui --clipboard --path ${home}/Pictures/flameshot\" /dev/null"
-    info "   Recommended shortcut: Print, or Shift+Alt+S"
-    info ""
-    info "   - Emote keyboard shortcut"
-    info "   Name: Emote"
-    info "   Command:"
-    info "   /snap/bin/emote"
-    info "   Shortcut: Super+Period (Windows key + .)"
-    info "=============================================================="
-    info "3. Bluetooth devices"
-    info "   Settings → Bluetooth"
-    info "   Pair the mouse, soundbar, etc."
-    info "=============================================================="
-    info "4. Visual Studio Code"
-    info "   Open VS Code → Accounts → Sign in with GitHub"
-    info "   Enable Settings Sync and verify extensions/settings are restored."
-    info "=============================================================="
-    info "5. Bitwarden and EnteAuth"
-    info "   Sign in and complete MFA."
-    info "   Verify vault synchronization."
-    info "=============================================================="
-    info "6. Brave"
-    info "   Open brave://settings/braveSync/setup"
-    info "   Join the existing sync chain and verify bookmarks/extensions."
-    info "=============================================================="
-    info "7. Obsidian"
-    info "   Create Obsidian vault inside:"
-    info "   ${home}/obsidian"
-    info "   Configure Obsidian Sync, Git, or the selected backup method."
-    info "=============================================================="
-    info "8. Telegram"
-    info "   Sign in and verify the session."
-    info "=============================================================="
-    info "9. SSH private key"
-    info "   - Copy the private key from a trusted offline source/password manager:"
-    info "   cat > ${home}/.ssh/id_ed25519"
-    info "   # paste key, then Ctrl-D"
-    info "   chmod 600 ${home}/.ssh/id_ed25519"
-    info ""
-    info "   - Generate the matching public key:"
-    info "   ssh-keygen -y -f ${home}/.ssh/id_ed25519 > ${home}/.ssh/id_ed25519.pub"
-    info "   chmod 0644 ${home}/.ssh/id_ed25519.pub"
-    info ""
-    info "   - Load and test the key:"
-    info "   ssh-add ${home}/.ssh/id_ed25519 || { eval \"\$(ssh-agent -s)\"; ssh-add ${home}/.ssh/id_ed25519; }"
-    info "   ssh -T git@github.com"
-    info "=============================================================="
-    info "10. Tailscale client"
-    info "    sudo tailscale up"
-    info "    Open the authentication URL, then verify the connection:"
-    info "    tailscale status"
-    info "=============================================================="
-    info "11. Cockpit web console"
-    info "    Visit https://localhost:9090/"
-    info "=============================================================="
-    info "12. Clone GitHub repositories over SSH"
-    info "    - GitHub:  cd ${home}/repos/github"
-    info "    - GitLab:  cd ${home}/repos/gitlab"
-    info "    - Forgejo: cd ${home}/repos/forgejo"
-    info "    git clone git@github.com:syselement/<repository>.git"
-    info ""
-    info "    - Verify configured Git identity:"
-    info "    git config list"
-    warn "=============================================================="
+    section "Manual post-install setup"
+
+    manual_step "1/12 Fingerprint login"
+    manual_line "Open: Settings → System → Users → Fingerprint Login"
+    manual_line "Enroll at least two fingers and verify sudo authentication."
+
+    manual_step "2/12 Keyboard shortcuts"
+    manual_line "Open: Settings → Keyboard → View and Customize Shortcuts"
+    manual_line "Then: Custom Shortcuts → Add Shortcut"
+    manual_item "Flameshot"
+    manual_line "Command:"
+    manual_command "script --quiet --command \"/usr/bin/flameshot gui --clipboard --path ${home}/Pictures/flameshot\" /dev/null"
+    manual_line "Shortcut: Print or Shift+Alt+S"
+    manual_item "Emote"
+    manual_line "Command:"
+    manual_command "/snap/bin/emote"
+    manual_line "Shortcut: Super+Period (Windows key + .)"
+
+    manual_step "3/12 Bluetooth devices"
+    manual_line "Open: Settings → Bluetooth"
+    manual_line "Pair the mouse, soundbar, and other devices."
+
+    manual_step "4/12 Visual Studio Code"
+    manual_line "Open: VS Code → Accounts → Sign in with GitHub"
+    manual_line "Enable Settings Sync and verify restored extensions and settings."
+
+    manual_step "5/12 Bitwarden and Ente Auth"
+    manual_line "Sign in, complete MFA, and verify vault synchronization."
+
+    manual_step "6/12 Brave"
+    manual_line "Open: brave://settings/braveSync/setup"
+    manual_line "Join the existing sync chain and verify bookmarks and extensions."
+
+    manual_step "7/12 Obsidian"
+    manual_line "Vault path: ${home}/obsidian"
+    manual_line "Configure Obsidian Sync, Git, or the selected backup method."
+
+    manual_step "8/12 Telegram"
+    manual_line "Sign in and verify the session."
+
+    manual_step "9/12 SSH private key"
+    manual_line "Copy the private key from a trusted offline source or password manager:"
+    manual_command "cat > ${home}/.ssh/id_ed25519"
+    manual_line "Paste the key, then press Ctrl-D."
+    manual_command "chmod 600 ${home}/.ssh/id_ed25519"
+    manual_line "Generate the matching public key:"
+    manual_command "ssh-keygen -y -f ${home}/.ssh/id_ed25519 > ${home}/.ssh/id_ed25519.pub"
+    manual_command "chmod 0644 ${home}/.ssh/id_ed25519.pub"
+    manual_line "Load and test the key:"
+    manual_command "ssh-add ${home}/.ssh/id_ed25519 || { eval \"\$(ssh-agent -s)\"; ssh-add ${home}/.ssh/id_ed25519; }"
+    manual_command "ssh -T git@github.com"
+
+    manual_step "10/12 Tailscale client"
+    manual_command "sudo tailscale up"
+    manual_line "Open the authentication URL, then verify the connection:"
+    manual_command "tailscale status"
+
+    manual_step "11/12 Cockpit web console"
+    manual_line "Visit: https://localhost:9090/"
+
+    manual_step "12/12 Clone Git repositories over SSH"
+    manual_item "GitHub:  cd ${home}/repos/github"
+    manual_item "GitLab:  cd ${home}/repos/gitlab"
+    manual_item "Forgejo: cd ${home}/repos/forgejo"
+    manual_command "git clone git@github.com:syselement/<repository>.git"
+    manual_line "Verify the configured Git identity:"
+    manual_command "git config list"
 }
 
 main() {
@@ -3158,11 +3168,7 @@ main() {
 
     initialize_runtime
 
-    echo "################################"
-    echo "# Customize System"
-    echo "################################"
-
-    info "================ RUN START ================"
+    section "Run context"
     info "run_id: ${RUN_ID}"
     info "started_at: $(date -Is)"
     start_ts="$(date +%s)"
@@ -3171,7 +3177,7 @@ main() {
     info "execution mode=${EXECUTION_MODE} context=${EXECUTION_CONTEXT} interactive=${EXECUTION_INTERACTIVE}"
     ok "target user=${TARGET_USER} home=${TARGET_HOME}"
 
-    # --- Connectivity checks ---
+    section "Connectivity"
     info "checking internet and DNS"
     if ping -c 1 -W 1 1.1.1.1 &>/dev/null || ping -c 1 -W 1 8.8.8.8 &>/dev/null || ping -c 1 -W 1 9.9.9.9 &>/dev/null; then
         ok "Internet connected (ICMP ping)"
@@ -3185,13 +3191,12 @@ main() {
         warn "DNS resolution FAILED (ubuntu.com)"
     fi
 
-    # --- Update system ---
+    section "System update"
     info "apt update/dist-upgrade"
     run_apt_get update -qq
     run_apt_get dist-upgrade -y -qq
     ok "apt update/dist-upgrade completed"
 
-    # --- Update snaps (Desktop only) ---
     if [[ "$UBUNTU_VARIANT" == "desktop" ]]; then
         if command -v snap >/dev/null 2>&1; then
             info "snap refresh"
@@ -3207,13 +3212,12 @@ main() {
         info "server variant detected; skipping Desktop snap refresh"
     fi
 
-    # --- APT prerequisites ---
     install_package_array "APT bootstrap" "${APT_BOOTSTRAP_PACKAGES[@]}"
     if [[ "$VERSION_ID" == 24.* ]]; then
         install_package_array "Ubuntu 24 repository bootstrap" software-properties-common
     fi
 
-    # --- Configure repositories before one cache refresh ---
+    section "Repositories"
     info "ensuring common repositories"
     ensure_fastfetch_ppa
     apply_repository_setup install_docker_ctop_repository
@@ -3221,10 +3225,10 @@ main() {
 
     if [[ "$UBUNTU_VARIANT" == "desktop" ]]; then
         info "ensuring Desktop application repositories"
-        apply_repository_setup ensure_sublime_text_repository
         apply_repository_setup ensure_brave_browser_repository
         apply_repository_setup ensure_dbeaver_repository
         apply_repository_setup ensure_mullvad_repository
+        apply_repository_setup ensure_sublime_text_repository
         apply_repository_setup ensure_typora_repository
     else
         info "server variant detected; skipping Desktop application repositories"
@@ -3237,7 +3241,7 @@ main() {
         info "APT repositories unchanged; existing package cache is current"
     fi
 
-    # --- Install requested tools ---
+    section "Packages"
     install_package_array "common" "${COMMON_PACKAGES[@]}"
     configure_cockpit_socket
     install_pandoc
@@ -3245,16 +3249,16 @@ main() {
         install_package_array "Desktop" "${DESKTOP_PACKAGES[@]}"
         configure_flathub
         install_flatpak_package_array "Desktop Flatpak" "${FLATPAK_PACKAGES[@]}"
-        install_termix
-        install_termius
-        install_rustdesk
         install_nomachine
+        install_rustdesk
+        install_termius
+        install_termix
         install_typora_themeable
     else
         info "server variant detected; skipping Desktop packages"
     fi
 
-    # --- Install common user tools and shell configuration ---
+    section "User environment"
     info "installing common user tools and shell configuration"
     prepare_user_workspace "$USER_NAME"
     install_starship
@@ -3269,7 +3273,7 @@ main() {
     install_homebrew_for_user
     ok "common user tools and shell configuration completed"
 
-    # --- Install/configure Desktop-specific tools ---
+    section "Desktop configuration"
     if [[ "$UBUNTU_VARIANT" == "desktop" ]]; then
         info "installing/configuring Desktop-specific tools"
         configure_desktop_wallpaper
@@ -3288,11 +3292,10 @@ main() {
         info "server variant detected; skipping Desktop-specific tools"
     fi
 
-    # --- Post-install tweaks ---
     info "updating locate database (best effort)"
     updatedb || true
 
-    # --- GNOME and Dock customization (Desktop only) ---
+    section "GNOME"
     if [[ "$UBUNTU_VARIANT" == "desktop" ]]; then
         # Apply now, inside this provisioning run. When GNOME is already running,
         # target its real per-user bus; during headless SSH/Vagrant provisioning,
@@ -3305,34 +3308,30 @@ main() {
         info "server variant detected; skipping GNOME preferences"
     fi
 
-    # --- Cleanup and update repositories ---
+    section "Cleanup"
     info "cleanup"
     run_apt_get -y -qq autoremove --purge
     run_apt_get -y clean
     ok "cleanup completed"
 
-    # --- Manual setup hints ---
     show_manual_setup_hints
 
     end_ts="$(date +%s)"
     elapsed="$((end_ts - start_ts))"
+    section "Summary"
     info "done: $(date -Is)"
     info "elapsed: $(printf '%02d:%02d:%02d' "$((elapsed / 3600))" "$((elapsed % 3600 / 60))" "$((elapsed % 60))")"
     info "log file: ${LOG_FILE}"
     info "run_id: ${RUN_ID}"
-    info "================= RUN END ================="
-
-    echo "################################"
-    echo "# System Provisioning Complete"
-    echo "################################"
+    ok "System provisioning complete"
 
     if [[ "$REBOOT_AT_END" == "true" ]]; then
-        echo "[${SCRIPT_NAME}] rebooting in 10 seconds..."
+        info "rebooting in 10 seconds"
         sleep 10
         sync
         shutdown -r now
     else
-        echo "[${SCRIPT_NAME}] reboot deferred to orchestrator"
+        info "reboot deferred to orchestrator"
     fi
 }
 

@@ -24,9 +24,47 @@ setup() {
 @test "customization script can be sourced without initializing provisioning" {
   declare -F main >/dev/null
   declare -F initialize_runtime >/dev/null
+  declare -F section >/dev/null
   declare -F install_package_array >/dev/null
   [[ -z "$USER_NAME" ]]
   [[ -z "$ARCH" ]]
+}
+
+@test "logger renders message content literally" {
+  t_reset=""
+
+  run log "INFO" "" 'literal \n and %s content'
+
+  [[ "$status" -eq 0 ]]
+  [[ "$output" == *' INFO  literal \n and %s content' ]]
+}
+
+@test "section logger is neutral and ANSI-free without terminal colors" {
+  t_bold=""
+  t_cyan=""
+  t_reset=""
+
+  run section "Repositories"
+
+  [[ "$status" -eq 0 ]]
+  [[ "$output" == *" STEP  ── Repositories ──" ]]
+  [[ "$output" != *" WARN "* ]]
+  [[ "$output" != *$'\e['* ]]
+}
+
+@test "manual setup instructions use clean unprefixed body lines" {
+  USER_NAME="$(id -un)"
+
+  run show_manual_setup_hints
+
+  [[ "$status" -eq 0 ]]
+  [[ "$output" == *"STEP  ── Manual post-install setup ──"* ]]
+  [[ "$output" == *"STEP  ── 1/12 Fingerprint login ──"* ]]
+  [[ "$output" == *"STEP  ── 12/12 Clone Git repositories over SSH ──"* ]]
+  [[ "$output" == *$'\n    Open: Settings → System → Users → Fingerprint Login'* ]]
+  [[ "$output" == *$'\n      $ script --quiet --command'* ]]
+  [[ "$output" != *" INFO  "* ]]
+  [[ "$output" != *" WARN "* ]]
 }
 
 @test "requested APT and Flatpak packages remain organized by scope" {
@@ -1379,7 +1417,7 @@ EOF
   run show_manual_setup_hints
 
   [[ "$status" -eq 0 ]]
-  [[ "$output" == *"11. Cockpit web console"* ]]
+  [[ "$output" == *"11/12 Cockpit web console"* ]]
   [[ "$output" == *"https://localhost:9090/"* ]]
-  [[ "$output" == *"12. Clone GitHub repositories over SSH"* ]]
+  [[ "$output" == *"12/12 Clone Git repositories over SSH"* ]]
 }
