@@ -8,7 +8,8 @@ setup() {
 
   SYSTEM_KEYRING_DIR="$BATS_TEST_TMPDIR/usr/share/keyrings"
   APT_SOURCES_DIR="$BATS_TEST_TMPDIR/etc/apt/sources.list.d"
-  mkdir -p "$SYSTEM_KEYRING_DIR" "$APT_SOURCES_DIR"
+  APT_TRUSTED_KEY_DIR="$BATS_TEST_TMPDIR/etc/apt/trusted.gpg.d"
+  mkdir -p "$SYSTEM_KEYRING_DIR" "$APT_SOURCES_DIR" "$APT_TRUSTED_KEY_DIR"
 
   info() {
     printf 'INFO: %s\n' "$*"
@@ -25,6 +26,13 @@ setup() {
   declare -F install_package_array >/dev/null
   [[ -z "$USER_NAME" ]]
   [[ -z "$ARCH" ]]
+}
+
+@test "requested APT and Flatpak packages remain organized by scope" {
+  [[ " ${COMMON_PACKAGES[*]} " == *" tailscale "* ]]
+  [[ " ${DESKTOP_PACKAGES[*]} " == *" meld "* ]]
+  [[ " ${DESKTOP_PACKAGES[*]} " == *" typora "* ]]
+  [[ " ${FLATPAK_PACKAGES[*]} " == *" org.cryptomator.Cryptomator "* ]]
 }
 
 @test "target-user helper provides the resolved identity and home" {
@@ -892,6 +900,194 @@ FAKE_INSTALLER
   [[ "$output" == *"SHA-256 verification failed for test asset"* ]]
 }
 
+@test "validated downloaded DEB skips an installed equal version" {
+  local package_dir="$BATS_TEST_TMPDIR/package"
+  local deb_file="$BATS_TEST_TMPDIR/test-package.deb"
+
+  ARCH="amd64"
+  mkdir -p "$package_dir/DEBIAN"
+  cat >"$package_dir/DEBIAN/control" <<'EOF'
+Package: test-package
+Version: 1.2.3-1
+Architecture: amd64
+Maintainer: Test <test@example.invalid>
+Description: Test package
+EOF
+  dpkg-deb --build "$package_dir" "$deb_file" >/dev/null
+
+  dpkg-query() {
+    printf '1.2.3-1\n'
+  }
+  run_apt_get() {
+    printf 'unexpected APT installation\n' >&2
+    return 99
+  }
+
+  run install_debian_package "$deb_file" "test-package" "Test package"
+
+  [[ "$status" -eq 0 ]]
+  [[ "$output" == *"already installed, skipping"* ]]
+  [[ "$output" != *"unexpected APT installation"* ]]
+}
+
+@test "GitHub DEB installer selects one architecture-specific asset" {
+  local install_record="$BATS_TEST_TMPDIR/install-record"
+
+  fetch_file() {
+    if [[ "$1" == *"/releases/latest" ]]; then
+      cat >"$2" <<'EOF'
+{
+  "assets": [
+    {
+      "name": "rustdesk-1.2.3-x86_64.deb",
+      "browser_download_url": "https://github.com/rustdesk/rustdesk/releases/download/1.2.3/rustdesk-1.2.3-x86_64.deb",
+      "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    {
+      "name": "rustdesk-1.2.3-aarch64.deb",
+      "browser_download_url": "https://github.com/rustdesk/rustdesk/releases/download/1.2.3/rustdesk-1.2.3-aarch64.deb",
+      "digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    }
+  ]
+}
+EOF
+    else
+      printf 'test package\n' >"$2"
+    fi
+  }
+  verify_github_asset_digest() {
+    return 0
+  }
+  install_debian_package() {
+    printf '%s|%s|%s\n' "$1" "$2" "$3" >"$install_record"
+  }
+
+  run install_latest_github_debian_package \
+    "rustdesk/rustdesk" \
+    "-x86_64.deb" \
+    "rustdesk" \
+    "RustDesk"
+
+  [[ "$status" -eq 0 ]]
+  [[ "$(<"$install_record")" == *"/package.deb|rustdesk|RustDesk" ]]
+}
+
+@test "installed target-user Termix Flatpak skips release download" {
+  ARCH="amd64"
+  TARGET_USER="testuser"
+
+  flatpak() {
+    return 0
+  }
+  run_as_target_user() {
+    "$@"
+  }
+  fetch_file() {
+    printf 'unexpected Termix download\n' >&2
+    return 99
+  }
+
+  run install_termix
+
+  [[ "$status" -eq 0 ]]
+  [[ "$output" == *"Termix Flatpak already installed"* ]]
+  [[ "$output" != *"unexpected Termix download"* ]]
+}
+
+@test "Termix bundle is installed before its application ID is verified" {
+  local command_record="$BATS_TEST_TMPDIR/termix-command-record"
+  local installed_marker="$BATS_TEST_TMPDIR/termix-installed"
+
+  ARCH="amd64"
+  TARGET_USER="testuser"
+
+  flatpak() {
+    printf '%s\n' "$*" >>"$command_record"
+    case "$1" in
+      info)
+        [[ -e "$installed_marker" ]]
+        ;;
+      install)
+        touch "$installed_marker"
+        ;;
+      *)
+        return 2
+        ;;
+    esac
+  }
+  run_as_target_user() {
+    "$@"
+  }
+  fetch_file() {
+    if [[ "$1" == *"/releases/latest" ]]; then
+      cat >"$2" <<'EOF'
+{
+  "assets": [
+    {
+      "name": "termix_linux_flatpak.flatpak",
+      "browser_download_url": "https://github.com/Termix-SSH/Termix/releases/download/test/termix_linux_flatpak.flatpak",
+      "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    }
+  ]
+}
+EOF
+    else
+      printf 'test Flatpak bundle\n' >"$2"
+    fi
+  }
+  verify_github_asset_digest() {
+    return 0
+  }
+
+  run install_termix
+
+  [[ "$status" -eq 0 ]]
+  [[ "$output" == *"Termix Flatpak installed for testuser"* ]]
+  grep -Fq 'install --user --noninteractive -y' "$command_record"
+  ! grep -Fq -- '--show-ref' "$command_record"
+}
+
+@test "NoMachine installer derives the official amd64 DEB URL" {
+  local install_record="$BATS_TEST_TMPDIR/nomachine-install-record"
+
+  ARCH="amd64"
+  fetch_file() {
+    printf '<p>Version: 9.8.2_1</p>\n' >"$2"
+  }
+  install_downloaded_debian_package() {
+    printf '%s|%s|%s\n' "$1" "$2" "$3" >"$install_record"
+  }
+
+  run install_nomachine
+
+  [[ "$status" -eq 0 ]]
+  [[ "$(<"$install_record")" == "https://download.nomachine.com/download/9.8/Linux/nomachine_9.8.2_1_amd64.deb|nomachine|NoMachine" ]]
+}
+
+@test "current Typora Themeable release skips archive download" {
+  TARGET_USER="$(id -un)"
+  TARGET_GROUP="$(id -gn)"
+  TARGET_HOME="$BATS_TEST_TMPDIR/home"
+  mkdir -p "$TARGET_HOME/.config/Typora/themes"
+  printf 'v1.2.3\n' >"$TARGET_HOME/.config/Typora/themes/.packertron-themeable-version"
+  printf 'theme\n' >"$TARGET_HOME/.config/Typora/themes/themeable.css"
+
+  fetch_file() {
+    if [[ "$1" == *"/releases/latest" ]]; then
+      printf '{"tag_name":"v1.2.3","assets":[]}\n' >"$2"
+      return
+    fi
+    printf 'unexpected theme archive download\n' >&2
+    return 99
+  }
+
+  run install_typora_themeable
+
+  [[ "$status" -eq 0 ]]
+  [[ "$output" == *"Typora Themeable v1.2.3 already installed, skipping"* ]]
+  [[ "$output" != *"unexpected theme archive download"* ]]
+}
+
 @test "failed repository download preserves existing files" {
   local key_file="$SYSTEM_KEYRING_DIR/sublimehq-pub.asc"
   local source_file="$APT_SOURCES_DIR/sublime-text.sources"
@@ -937,6 +1133,51 @@ FAKE_INSTALLER
   grep -Fqx 'URIs: https://download.sublimetext.com/' "$APT_SOURCES_DIR/sublime-text.sources"
 }
 
+@test "Tailscale repository is repeatable and uses the Ubuntu codename" {
+  CODENAME="resolute"
+
+  fetch_file() {
+    printf 'Tailscale test key\n' >"$2"
+  }
+  validate_openpgp_key() {
+    return 0
+  }
+
+  apply_repository_setup ensure_tailscale_repository
+  [[ "$APT_SOURCES_CHANGED" == true ]]
+
+  APT_SOURCES_CHANGED=false
+  apply_repository_setup ensure_tailscale_repository
+
+  [[ "$APT_SOURCES_CHANGED" == false ]]
+  grep -Fqx \
+    "deb [signed-by=${SYSTEM_KEYRING_DIR}/tailscale-archive-keyring.gpg] https://pkgs.tailscale.com/stable/ubuntu resolute main" \
+    "$APT_SOURCES_DIR/tailscale.list"
+}
+
+@test "Typora repository removes its obsolete key and is repeatable" {
+  printf 'obsolete key\n' >"$APT_TRUSTED_KEY_DIR/typora.asc"
+
+  fetch_file() {
+    printf 'Typora test key\n' >"$2"
+  }
+  validate_openpgp_key() {
+    return 0
+  }
+
+  apply_repository_setup ensure_typora_repository
+  [[ "$APT_SOURCES_CHANGED" == true ]]
+  [[ ! -e "$APT_TRUSTED_KEY_DIR/typora.asc" ]]
+
+  APT_SOURCES_CHANGED=false
+  apply_repository_setup ensure_typora_repository
+
+  [[ "$APT_SOURCES_CHANGED" == false ]]
+  grep -Fqx \
+    "deb [signed-by=${SYSTEM_KEYRING_DIR}/typora.gpg] https://downloads.typora.io/linux ./" \
+    "$APT_SOURCES_DIR/typora.list"
+}
+
 @test "AZLux repository uses HTTPS and validates its published fingerprint" {
   local validation_record="$BATS_TEST_TMPDIR/azlux-validation"
 
@@ -963,6 +1204,7 @@ FAKE_INSTALLER
     ensure_brave_browser_repository
     ensure_dbeaver_repository
     ensure_mullvad_repository
+    ensure_typora_repository
   )
   UBUNTU_VARIANT="desktop"
 
@@ -999,4 +1241,11 @@ FAKE_INSTALLER
     "$APT_SOURCES_DIR/brave-browser-release.sources"
   grep -Fq "$SYSTEM_KEYRING_DIR/dbeaver.gpg.key" "$APT_SOURCES_DIR/dbeaver.list"
   grep -Fq "$SYSTEM_KEYRING_DIR/mullvad-keyring.asc" "$APT_SOURCES_DIR/mullvad.list"
+  grep -Fq "$SYSTEM_KEYRING_DIR/typora.gpg" "$APT_SOURCES_DIR/typora.list"
+}
+
+@test "cleanup keeps the current APT package lists" {
+  run grep -Fq 'rm -rf /var/lib/apt/lists/' "$CUSTOMIZE_SCRIPT"
+
+  [[ "$status" -ne 0 ]]
 }
