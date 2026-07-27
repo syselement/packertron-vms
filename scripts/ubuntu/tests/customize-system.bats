@@ -9,6 +9,7 @@ setup() {
   SYSTEM_KEYRING_DIR="$BATS_TEST_TMPDIR/usr/share/keyrings"
   APT_SOURCES_DIR="$BATS_TEST_TMPDIR/etc/apt/sources.list.d"
   APT_TRUSTED_KEY_DIR="$BATS_TEST_TMPDIR/etc/apt/trusted.gpg.d"
+  SYSTEMD_RUNTIME_DIR="$BATS_TEST_TMPDIR/run/systemd/system"
   mkdir -p "$SYSTEM_KEYRING_DIR" "$APT_SOURCES_DIR" "$APT_TRUSTED_KEY_DIR"
 
   info() {
@@ -29,6 +30,7 @@ setup() {
 }
 
 @test "requested APT and Flatpak packages remain organized by scope" {
+  [[ " ${COMMON_PACKAGES[*]} " == *" cockpit "* ]]
   [[ " ${COMMON_PACKAGES[*]} " == *" tailscale "* ]]
   [[ " ${DESKTOP_PACKAGES[*]} " == *" meld "* ]]
   [[ " ${DESKTOP_PACKAGES[*]} " == *" typora "* ]]
@@ -349,6 +351,68 @@ FAKE_GSETTINGS
   [[ "$status" -ne 0 ]]
   [[ "$output" == *"failed installing test packages: required-package"* ]]
   [[ "$output" != *"package installation completed"* ]]
+}
+
+@test "Cockpit socket helper skips an already enabled active socket" {
+  mkdir -p "$SYSTEMD_RUNTIME_DIR"
+
+  systemctl() {
+    case "$1" in
+      cat) return 0 ;;
+      is-enabled | is-active) return 0 ;;
+      *)
+        printf 'unexpected Cockpit socket mutation: %s\n' "$*" >&2
+        return 99
+        ;;
+    esac
+  }
+
+  run configure_cockpit_socket
+
+  [[ "$status" -eq 0 ]]
+  [[ "$output" == *"Cockpit socket already enabled and active"* ]]
+  [[ "$output" != *"unexpected Cockpit socket mutation"* ]]
+}
+
+@test "Cockpit socket helper enables and starts a missing socket state" {
+  local command_record="$BATS_TEST_TMPDIR/cockpit-systemctl-record"
+  mkdir -p "$SYSTEMD_RUNTIME_DIR"
+
+  systemctl() {
+    printf '%s\n' "$*" >>"$command_record"
+    case "$1" in
+      cat | enable | start) return 0 ;;
+      is-enabled | is-active) return 1 ;;
+      *) return 2 ;;
+    esac
+  }
+
+  run configure_cockpit_socket
+
+  [[ "$status" -eq 0 ]]
+  [[ "$output" == *"Cockpit socket enabled and active"* ]]
+  grep -Fqx 'enable cockpit.socket' "$command_record"
+  grep -Fqx 'start cockpit.socket' "$command_record"
+}
+
+@test "Cockpit socket activation is deferred when systemd is not running" {
+  local command_record="$BATS_TEST_TMPDIR/cockpit-deferred-record"
+
+  systemctl() {
+    printf '%s\n' "$*" >>"$command_record"
+    case "$1" in
+      cat | enable) return 0 ;;
+      is-enabled) return 1 ;;
+      *) return 99 ;;
+    esac
+  }
+
+  run configure_cockpit_socket
+
+  [[ "$status" -eq 0 ]]
+  [[ "$output" == *"Cockpit socket activation is deferred until boot"* ]]
+  grep -Fqx 'enable cockpit.socket' "$command_record"
+  ! grep -Fq 'start cockpit.socket' "$command_record"
 }
 
 @test "Snap package helper skips an installed package" {
@@ -1248,4 +1312,18 @@ EOF
   run grep -Fq 'rm -rf /var/lib/apt/lists/' "$CUSTOMIZE_SCRIPT"
 
   [[ "$status" -ne 0 ]]
+}
+
+@test "post-install instructions include the Cockpit URL" {
+  USER_NAME="testuser"
+  user_home() {
+    printf '/home/testuser\n'
+  }
+
+  run show_manual_setup_hints
+
+  [[ "$status" -eq 0 ]]
+  [[ "$output" == *"11. Cockpit web console"* ]]
+  [[ "$output" == *"https://localhost:9090/"* ]]
+  [[ "$output" == *"12. Clone GitHub repositories over SSH"* ]]
 }

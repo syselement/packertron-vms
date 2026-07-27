@@ -33,6 +33,7 @@ STARSHIP_INSTALL_URL="${STARSHIP_INSTALL_URL:-https://starship.rs/install.sh}"
 SYSTEM_KEYRING_DIR="${PACKERTRON_SYSTEM_KEYRING_DIR:-/usr/share/keyrings}"
 APT_SOURCES_DIR="${PACKERTRON_APT_SOURCES_DIR:-/etc/apt/sources.list.d}"
 APT_TRUSTED_KEY_DIR="${PACKERTRON_APT_TRUSTED_KEY_DIR:-/etc/apt/trusted.gpg.d}"
+SYSTEMD_RUNTIME_DIR="${PACKERTRON_SYSTEMD_RUNTIME_DIR:-/run/systemd/system}"
 HOMEBREW_PREFIX="${PACKERTRON_HOMEBREW_PREFIX:-/home/linuxbrew/.linuxbrew}"
 HOMEBREW_INSTALL_URL="${HOMEBREW_INSTALL_URL:-https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh}"
 
@@ -44,6 +45,8 @@ readonly -a APT_BOOTSTRAP_PACKAGES=(
 )
 
 readonly -a COMMON_PACKAGES=(
+  7zip
+  7zip-rar
   aptitude
   arp-scan
   bash-completion
@@ -51,6 +54,7 @@ readonly -a COMMON_PACKAGES=(
   bats
   btop
   build-essential
+  cockpit
   docker-ctop
   duf
   eza
@@ -90,6 +94,7 @@ readonly -a COMMON_PACKAGES=(
   unzip
   vim
   wget
+  wireguard
   zsh
 )
 
@@ -617,6 +622,38 @@ install_package_array() {
     die "failed installing ${description} packages: ${missing[*]}"
   fi
   ok "${description} package installation completed"
+}
+
+configure_cockpit_socket() {
+  local changed=false
+
+  command -v systemctl >/dev/null 2>&1 ||
+    die "systemctl is required to configure Cockpit"
+  systemctl cat cockpit.socket >/dev/null 2>&1 ||
+    die "Cockpit socket unit is not available after package installation"
+
+  if ! systemctl is-enabled --quiet cockpit.socket; then
+    systemctl enable cockpit.socket >/dev/null ||
+      die "failed enabling Cockpit socket"
+    changed=true
+  fi
+
+  if [[ ! -d "$SYSTEMD_RUNTIME_DIR" ]]; then
+    warn "systemd is not running; Cockpit socket activation is deferred until boot"
+    return
+  fi
+
+  if ! systemctl is-active --quiet cockpit.socket; then
+    systemctl start cockpit.socket ||
+      die "failed starting Cockpit socket"
+    changed=true
+  fi
+
+  if [[ "$changed" == true ]]; then
+    ok "Cockpit socket enabled and active"
+  else
+    info "Cockpit socket already enabled and active"
+  fi
 }
 
 install_flatpak_package_array() {
@@ -3070,7 +3107,10 @@ show_manual_setup_hints() {
   info "    Open the authentication URL, then verify the connection:"
   info "    tailscale status"
   info "=============================================================="
-  info "11. Clone GitHub repositories over SSH"
+  info "11. Cockpit web console"
+  info "    Visit https://localhost:9090/"
+  info "=============================================================="
+  info "12. Clone GitHub repositories over SSH"
   info "    - GitHub:  cd ${home}/repos/github"
   info "    - GitLab:  cd ${home}/repos/gitlab"
   info "    - Forgejo: cd ${home}/repos/forgejo"
@@ -3167,6 +3207,7 @@ main() {
 
   # --- Install requested tools ---
   install_package_array "common" "${COMMON_PACKAGES[@]}"
+  configure_cockpit_socket
   install_pandoc
   if [[ "$UBUNTU_VARIANT" == "desktop" ]]; then
     install_package_array "Desktop" "${DESKTOP_PACKAGES[@]}"
