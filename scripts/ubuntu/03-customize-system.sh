@@ -59,7 +59,6 @@ readonly -a COMMON_PACKAGES=(
     btop
     build-essential
     cockpit
-    cockpit-machines
     docker-ctop
     duf
     eza
@@ -132,6 +131,7 @@ readonly -a FLATPAK_PACKAGES=(
 )
 
 readonly -a VIRTUALIZATION_HOST_PACKAGES=(
+    cockpit-machines
     cpu-checker
     libvirt-daemon-system
 )
