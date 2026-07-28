@@ -3261,7 +3261,8 @@ show_manual_setup_hints() {
     manual_command "git config list"
 
     manual_step "13/13 Virtualization"
-    manual_line "Log out and back in, or reboot, to apply libvirt group membership."
+    manual_line "Log out and back in, or reboot, before managing virtual machines."
+    manual_line "This applies the new libvirt group membership."
     if [[ "$UBUNTU_VARIANT" == "desktop" ]]; then
         manual_line "Open Virtual Machine Manager:"
         manual_command "virt-manager --connect qemu:///system"

@@ -48,7 +48,7 @@ setup() {
   run section "Repositories"
 
   [[ "$status" -eq 0 ]]
-  [[ "$output" == *" STEP  ── Repositories ──" ]]
+  [[ "$output" == *" STEP  --- Repositories ---" ]]
   [[ "$output" != *" WARN "* ]]
   [[ "$output" != *$'\e['* ]]
 }
@@ -60,10 +60,14 @@ setup() {
   run show_manual_setup_hints
 
   [[ "$status" -eq 0 ]]
-  [[ "$output" == *"STEP  ── Manual post-install setup ──"* ]]
-  [[ "$output" == *"STEP  ── 1/13 Fingerprint login ──"* ]]
-  [[ "$output" == *"STEP  ── 12/13 Clone Git repositories over SSH ──"* ]]
-  [[ "$output" == *"STEP  ── 13/13 Virtualization ──"* ]]
+  [[ "$output" == *"STEP  --- Manual post-install setup ---"* ]]
+  [[ "$output" == *"STEP  --- 1/13 Fingerprint login ---"* ]]
+  [[ "$output" == *"STEP  --- 11/13 Cockpit web console ---"* ]]
+  [[ "$output" == *"STEP  --- 12/13 Clone Git repositories over SSH ---"* ]]
+  [[ "$output" == *"STEP  --- 13/13 Virtualization ---"* ]]
+  [[ "$output" == *"Visit: https://localhost:9090/"* ]]
+  [[ "$output" == *"Open: Virtual Machines"* ]]
+  [[ "$output" == *"This applies the new libvirt group membership."* ]]
   [[ "$output" == *$'\n    Open: Settings → System → Users → Fingerprint Login'* ]]
   [[ "$output" == *$'\n      $ script --quiet --command'* ]]
   [[ "$output" != *" INFO  "* ]]
@@ -87,8 +91,11 @@ setup() {
   [[ " ${DESKTOP_PACKAGES[*]} " == *" meld "* ]]
   [[ " ${DESKTOP_PACKAGES[*]} " == *" typora "* ]]
   [[ " ${FLATPAK_PACKAGES[*]} " == *" org.cryptomator.Cryptomator "* ]]
+  [[ " ${VIRTUALIZATION_HOST_PACKAGES[*]} " == *" cockpit-machines "* ]]
   [[ " ${VIRTUALIZATION_HOST_PACKAGES[*]} " == *" libvirt-daemon-system "* ]]
+  [[ " ${VIRTUALIZATION_HOST_PACKAGES[*]} " != *" virt-manager "* ]]
   [[ " ${VIRTUALIZATION_DESKTOP_PACKAGES[*]} " == *" virt-manager "* ]]
+  [[ " ${VIRTUALIZATION_DESKTOP_PACKAGES[*]} " != *" cockpit-machines "* ]]
   [[ " ${VIRTUALIZATION_HOST_PACKAGES[*]} " != *" qemu-kvm "* ]]
 }
 
@@ -103,6 +110,7 @@ setup() {
   run install_virtualization_stack
 
   [[ "$status" -eq 0 ]]
+  [[ "$output" == *"<cockpit-machines>"* ]]
   [[ "$output" == *"<cpu-checker>"* ]]
   [[ "$output" == *"<libvirt-daemon-system>"* ]]
   [[ "$output" == *"<qemu-system-x86>"* ]]
@@ -121,9 +129,35 @@ setup() {
   run install_virtualization_stack
 
   [[ "$status" -eq 0 ]]
+  [[ "$output" == *"<cockpit-machines>"* ]]
   [[ "$output" == *"<libvirt-daemon-system>"* ]]
   [[ "$output" == *"<qemu-system-x86>"* ]]
   [[ "$output" != *"<virt-manager>"* ]]
+}
+
+@test "virtualization rerun skips packages that are already installed" {
+  local query_record="$BATS_TEST_TMPDIR/virtualization-query-record"
+  ARCH="amd64"
+  UBUNTU_VARIANT="desktop"
+
+  dpkg-query() {
+    printf '%s\n' "${@: -1}" >>"$query_record"
+    printf 'install ok installed'
+  }
+  run_apt_get() {
+    printf 'unexpected package installation: %s\n' "$*" >&2
+    return 99
+  }
+
+  run install_virtualization_stack
+
+  [[ "$status" -eq 0 ]]
+  [[ "$output" == *"virtualization: all packages already installed"* ]]
+  [[ "$output" != *"unexpected package installation"* ]]
+  grep -Fqx "cockpit-machines" "$query_record"
+  grep -Fqx "libvirt-daemon-system" "$query_record"
+  grep -Fqx "qemu-system-x86" "$query_record"
+  grep -Fqx "virt-manager" "$query_record"
 }
 
 @test "virtualization selects native QEMU for ARM64" {
