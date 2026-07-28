@@ -3224,7 +3224,7 @@ show_manual_setup_hints() {
     manual_item "Emote"
     manual_line "Command:"
     manual_command "/snap/bin/emote"
-    manual_line "Shortcut: Super+Period (Windows key + .)"
+    manual_line "Shortcut: Super+Comma (Windows key + ,)"
 
     manual_step "3/13 Bluetooth devices"
     manual_line "Open: Settings → Bluetooth"
