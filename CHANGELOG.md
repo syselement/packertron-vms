@@ -1,3 +1,14 @@
+# [0.45.0](https://github.com/syselement/packertron-vms/compare/v0.44.0...v0.45.0) (2026-07-28)
+
+
+### Features
+
+* add cockpit-machines package to virtualization host packages ([ce85059](https://github.com/syselement/packertron-vms/commit/ce850591074216e52d1b2d732f0a6b8244a43c84))
+* add virtualization support and related configuration to customization script ([2b6b52a](https://github.com/syselement/packertron-vms/commit/2b6b52ae41a487dcdabeb5254c67a27d6991e79f))
+* update manual setup instructions and enhance test cases for virtualization ([afc39b3](https://github.com/syselement/packertron-vms/commit/afc39b36b079af498f544564e37ec187c1d54615))
+
+
+
 # [0.44.0](https://github.com/syselement/packertron-vms/compare/v0.43.0...v0.44.0) (2026-07-28)
 
 
@@ -34,15 +45,6 @@
 ### Bug Fixes
 
 * update Brave repository URL to remove trailing slash in customization script and tests ([3f4246b](https://github.com/syselement/packertron-vms/commit/3f4246beb952c21a0f531a7c5091c36a3c7a4de0))
-
-
-
-# [0.42.0](https://github.com/syselement/packertron-vms/compare/v0.41.0...v0.42.0) (2026-07-19)
-
-
-### Features
-
-* add Mullvad VPN support and enhance repository management in customization script ([2a836ae](https://github.com/syselement/packertron-vms/commit/2a836aeed2b7dcd6338a8d0fb7b6297f24221020))
 
 
 
