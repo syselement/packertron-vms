@@ -26,6 +26,7 @@ setup() {
   declare -F initialize_runtime >/dev/null
   declare -F section >/dev/null
   declare -F install_package_array >/dev/null
+  declare -F install_virtualization_stack >/dev/null
   [[ -z "$USER_NAME" ]]
   [[ -z "$ARCH" ]]
 }
@@ -47,24 +48,41 @@ setup() {
   run section "Repositories"
 
   [[ "$status" -eq 0 ]]
-  [[ "$output" == *" STEP  ── Repositories ──" ]]
+  [[ "$output" == *" STEP  --- Repositories ---" ]]
   [[ "$output" != *" WARN "* ]]
   [[ "$output" != *$'\e['* ]]
 }
 
 @test "manual setup instructions use clean unprefixed body lines" {
+  UBUNTU_VARIANT="desktop"
   USER_NAME="$(id -un)"
 
   run show_manual_setup_hints
 
   [[ "$status" -eq 0 ]]
-  [[ "$output" == *"STEP  ── Manual post-install setup ──"* ]]
-  [[ "$output" == *"STEP  ── 1/12 Fingerprint login ──"* ]]
-  [[ "$output" == *"STEP  ── 12/12 Clone Git repositories over SSH ──"* ]]
+  [[ "$output" == *"STEP  --- Manual post-install setup ---"* ]]
+  [[ "$output" == *"STEP  --- 1/13 Fingerprint login ---"* ]]
+  [[ "$output" == *"STEP  --- 11/13 Cockpit web console ---"* ]]
+  [[ "$output" == *"STEP  --- 12/13 Clone Git repositories over SSH ---"* ]]
+  [[ "$output" == *"STEP  --- 13/13 Virtualization ---"* ]]
+  [[ "$output" == *"Visit: https://localhost:9090/"* ]]
+  [[ "$output" == *"Open: Virtual Machines"* ]]
+  [[ "$output" == *"This applies the new libvirt group membership."* ]]
   [[ "$output" == *$'\n    Open: Settings → System → Users → Fingerprint Login'* ]]
   [[ "$output" == *$'\n      $ script --quiet --command'* ]]
   [[ "$output" != *" INFO  "* ]]
   [[ "$output" != *" WARN "* ]]
+}
+
+@test "Server manual setup uses headless virtualization instructions" {
+  UBUNTU_VARIANT="server"
+  USER_NAME="$(id -un)"
+
+  run show_manual_setup_hints
+
+  [[ "$status" -eq 0 ]]
+  [[ "$output" == *"Manage this headless host with virsh or a remote virt-manager client."* ]]
+  [[ "$output" != *'$ virt-manager --connect qemu:///system'* ]]
 }
 
 @test "requested APT and Flatpak packages remain organized by scope" {
@@ -73,6 +91,103 @@ setup() {
   [[ " ${DESKTOP_PACKAGES[*]} " == *" meld "* ]]
   [[ " ${DESKTOP_PACKAGES[*]} " == *" typora "* ]]
   [[ " ${FLATPAK_PACKAGES[*]} " == *" org.cryptomator.Cryptomator "* ]]
+  [[ " ${VIRTUALIZATION_HOST_PACKAGES[*]} " == *" cockpit-machines "* ]]
+  [[ " ${VIRTUALIZATION_HOST_PACKAGES[*]} " == *" libvirt-daemon-system "* ]]
+  [[ " ${VIRTUALIZATION_HOST_PACKAGES[*]} " != *" virt-manager "* ]]
+  [[ " ${VIRTUALIZATION_DESKTOP_PACKAGES[*]} " == *" virt-manager "* ]]
+  [[ " ${VIRTUALIZATION_DESKTOP_PACKAGES[*]} " != *" cockpit-machines "* ]]
+  [[ " ${VIRTUALIZATION_HOST_PACKAGES[*]} " != *" qemu-kvm "* ]]
+}
+
+@test "Desktop virtualization installs the native QEMU host and virt-manager" {
+  ARCH="amd64"
+  UBUNTU_VARIANT="desktop"
+
+  install_package_array() {
+    printf '<%s>\n' "$@"
+  }
+
+  run install_virtualization_stack
+
+  [[ "$status" -eq 0 ]]
+  [[ "$output" == *"<cockpit-machines>"* ]]
+  [[ "$output" == *"<cpu-checker>"* ]]
+  [[ "$output" == *"<libvirt-daemon-system>"* ]]
+  [[ "$output" == *"<qemu-system-x86>"* ]]
+  [[ "$output" == *"<virt-manager>"* ]]
+  [[ "$output" != *"<qemu-kvm>"* ]]
+}
+
+@test "Server virtualization installs libvirt and native QEMU without virt-manager" {
+  ARCH="amd64"
+  UBUNTU_VARIANT="server"
+
+  install_package_array() {
+    printf '<%s>\n' "$@"
+  }
+
+  run install_virtualization_stack
+
+  [[ "$status" -eq 0 ]]
+  [[ "$output" == *"<cockpit-machines>"* ]]
+  [[ "$output" == *"<libvirt-daemon-system>"* ]]
+  [[ "$output" == *"<qemu-system-x86>"* ]]
+  [[ "$output" != *"<virt-manager>"* ]]
+}
+
+@test "virtualization rerun skips packages that are already installed" {
+  local query_record="$BATS_TEST_TMPDIR/virtualization-query-record"
+  ARCH="amd64"
+  UBUNTU_VARIANT="desktop"
+
+  dpkg-query() {
+    printf '%s\n' "${@: -1}" >>"$query_record"
+    printf 'install ok installed'
+  }
+  run_apt_get() {
+    printf 'unexpected package installation: %s\n' "$*" >&2
+    return 99
+  }
+
+  run install_virtualization_stack
+
+  [[ "$status" -eq 0 ]]
+  [[ "$output" == *"virtualization: all packages already installed"* ]]
+  [[ "$output" != *"unexpected package installation"* ]]
+  grep -Fqx "cockpit-machines" "$query_record"
+  grep -Fqx "libvirt-daemon-system" "$query_record"
+  grep -Fqx "qemu-system-x86" "$query_record"
+  grep -Fqx "virt-manager" "$query_record"
+}
+
+@test "virtualization selects native QEMU for ARM64" {
+  ARCH="arm64"
+  UBUNTU_VARIANT="server"
+
+  install_package_array() {
+    printf '<%s>\n' "$@"
+  }
+
+  run install_virtualization_stack
+
+  [[ "$status" -eq 0 ]]
+  [[ "$output" == *"<qemu-system-arm>"* ]]
+}
+
+@test "virtualization rejects an unsupported architecture clearly" {
+  ARCH="unsupported"
+  UBUNTU_VARIANT="server"
+
+  install_package_array() {
+    printf 'unexpected package installation\n' >&2
+    return 99
+  }
+
+  run install_virtualization_stack
+
+  [[ "$status" -ne 0 ]]
+  [[ "$output" == *"virtualization is not configured for architecture unsupported"* ]]
+  [[ "$output" != *"unexpected package installation"* ]]
 }
 
 @test "target-user helper provides the resolved identity and home" {
@@ -451,6 +566,160 @@ FAKE_GSETTINGS
   [[ "$output" == *"Cockpit socket activation is deferred until boot"* ]]
   grep -Fqx 'enable cockpit.socket' "$command_record"
   ! grep -Fq 'start cockpit.socket' "$command_record"
+}
+
+@test "Libvirt configuration skips existing access and active socket state" {
+  TARGET_USER="testuser"
+  mkdir -p "$SYSTEMD_RUNTIME_DIR"
+
+  getent() {
+    [[ "$1" == "group" && "$2" == "libvirt" ]]
+  }
+  id() {
+    [[ "$1" == "-nG" && "$2" == "$TARGET_USER" ]]
+    printf 'testgroup libvirt\n'
+  }
+  usermod() {
+    printf 'unexpected libvirt group mutation\n' >&2
+    return 99
+  }
+  systemctl() {
+    case "$1" in
+      cat | is-enabled | is-active) return 0 ;;
+      *)
+        printf 'unexpected Libvirt socket mutation: %s\n' "$*" >&2
+        return 99
+        ;;
+    esac
+  }
+
+  run configure_libvirt
+
+  [[ "$status" -eq 0 ]]
+  [[ "$output" == *"already a member of the libvirt group"* ]]
+  [[ "$output" == *"Libvirt socket already enabled and active"* ]]
+  [[ "$output" != *"unexpected"* ]]
+}
+
+@test "Libvirt configuration adds only missing target-user membership" {
+  local usermod_record="$BATS_TEST_TMPDIR/libvirt-usermod-record"
+  TARGET_USER="testuser"
+  mkdir -p "$SYSTEMD_RUNTIME_DIR"
+
+  getent() {
+    [[ "$1" == "group" && "$2" == "libvirt" ]]
+  }
+  id() {
+    [[ "$1" == "-nG" && "$2" == "$TARGET_USER" ]]
+    printf 'testgroup\n'
+  }
+  usermod() {
+    printf '%s\n' "$*" >"$usermod_record"
+  }
+  systemctl() {
+    case "$1" in
+      cat | is-enabled | is-active) return 0 ;;
+      *) return 99 ;;
+    esac
+  }
+
+  run configure_libvirt
+
+  [[ "$status" -eq 0 ]]
+  [[ "$output" == *"added testuser to the libvirt group"* ]]
+  [[ "$(<"$usermod_record")" == "-aG libvirt testuser" ]]
+}
+
+@test "Libvirt configuration enables only its local Unix socket" {
+  local command_record="$BATS_TEST_TMPDIR/libvirt-systemctl-record"
+  TARGET_USER="testuser"
+  mkdir -p "$SYSTEMD_RUNTIME_DIR"
+
+  getent() {
+    [[ "$1" == "group" && "$2" == "libvirt" ]]
+  }
+  id() {
+    printf 'testgroup libvirt\n'
+  }
+  systemctl() {
+    printf '%s\n' "$*" >>"$command_record"
+    case "$1" in
+      cat | enable | start) return 0 ;;
+      is-enabled | is-active) return 1 ;;
+      *) return 2 ;;
+    esac
+  }
+
+  run configure_libvirt
+
+  [[ "$status" -eq 0 ]]
+  [[ "$output" == *"Libvirt socket enabled and active"* ]]
+  grep -Fqx 'enable libvirtd.socket' "$command_record"
+  grep -Fqx 'start libvirtd.socket' "$command_record"
+  ! grep -Eq 'libvirtd-(tcp|tls)\\.socket' "$command_record"
+}
+
+@test "virtualization validation defers services and tolerates missing KVM" {
+  KVM_DEVICE="$BATS_TEST_TMPDIR/missing-kvm"
+  SYSTEMD_RUNTIME_DIR="$BATS_TEST_TMPDIR/missing-systemd"
+
+  kvm-ok() {
+    return 1
+  }
+  virsh() {
+    printf 'unexpected virsh invocation\n' >&2
+    return 99
+  }
+
+  run validate_virtualization_stack
+
+  [[ "$status" -eq 0 ]]
+  [[ "$output" == *"KVM hardware acceleration is unavailable"* ]]
+  [[ "$output" == *"libvirt connection validation is deferred until boot"* ]]
+  [[ "$output" != *"unexpected virsh invocation"* ]]
+}
+
+@test "Desktop virtualization validation checks local service without changing networks" {
+  local virsh_record="$BATS_TEST_TMPDIR/virtualization-virsh-record"
+  KVM_DEVICE="/dev/null"
+  UBUNTU_VARIANT="desktop"
+  mkdir -p "$SYSTEMD_RUNTIME_DIR"
+
+  virt-manager() {
+    return 0
+  }
+  virsh() {
+    printf '%s\n' "$*" >>"$virsh_record"
+    if [[ "$*" == *" net-info default" ]]; then
+      printf 'Name: default\nActive: no\n'
+    fi
+  }
+
+  run validate_virtualization_stack
+
+  [[ "$status" -eq 0 ]]
+  [[ "$output" == *"KVM hardware acceleration is available"* ]]
+  [[ "$output" == *"local qemu:///system libvirt connection verified"* ]]
+  [[ "$output" == *"Virtual Machine Manager installation verified"* ]]
+  [[ "$output" == *"default network is defined but inactive"* ]]
+  grep -Fqx -- '--connect qemu:///system list --all' "$virsh_record"
+  grep -Fqx -- '--connect qemu:///system net-info default' "$virsh_record"
+  ! grep -Eq 'net-(start|autostart)' "$virsh_record"
+}
+
+@test "virtualization validation fails on an unusable local libvirt service" {
+  KVM_DEVICE="/dev/null"
+  UBUNTU_VARIANT="server"
+  mkdir -p "$SYSTEMD_RUNTIME_DIR"
+
+  virsh() {
+    return 1
+  }
+
+  run validate_virtualization_stack
+
+  [[ "$status" -ne 0 ]]
+  [[ "$output" == *"cannot connect to the local qemu:///system libvirt service"* ]]
 }
 
 @test "Snap package helper skips an installed package" {
@@ -1409,6 +1678,7 @@ EOF
 }
 
 @test "post-install instructions include the Cockpit URL" {
+  UBUNTU_VARIANT="desktop"
   USER_NAME="testuser"
   user_home() {
     printf '/home/testuser\n'
@@ -1417,7 +1687,9 @@ EOF
   run show_manual_setup_hints
 
   [[ "$status" -eq 0 ]]
-  [[ "$output" == *"11/12 Cockpit web console"* ]]
+  [[ "$output" == *"11/13 Cockpit web console"* ]]
   [[ "$output" == *"https://localhost:9090/"* ]]
-  [[ "$output" == *"12/12 Clone Git repositories over SSH"* ]]
+  [[ "$output" == *"12/13 Clone Git repositories over SSH"* ]]
+  [[ "$output" == *"13/13 Virtualization"* ]]
+  [[ "$output" == *"virsh --connect qemu:///system list --all"* ]]
 }

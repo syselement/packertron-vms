@@ -37,6 +37,7 @@ SYSTEM_KEYRING_DIR="${PACKERTRON_SYSTEM_KEYRING_DIR:-/usr/share/keyrings}"
 APT_SOURCES_DIR="${PACKERTRON_APT_SOURCES_DIR:-/etc/apt/sources.list.d}"
 APT_TRUSTED_KEY_DIR="${PACKERTRON_APT_TRUSTED_KEY_DIR:-/etc/apt/trusted.gpg.d}"
 SYSTEMD_RUNTIME_DIR="${PACKERTRON_SYSTEMD_RUNTIME_DIR:-/run/systemd/system}"
+KVM_DEVICE="${PACKERTRON_KVM_DEVICE:-/dev/kvm}"
 HOMEBREW_PREFIX="${PACKERTRON_HOMEBREW_PREFIX:-/home/linuxbrew/.linuxbrew}"
 HOMEBREW_INSTALL_URL="${HOMEBREW_INSTALL_URL:-https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh}"
 
@@ -129,6 +130,16 @@ readonly -a FLATPAK_PACKAGES=(
     org.gnome.Boxes
 )
 
+readonly -a VIRTUALIZATION_HOST_PACKAGES=(
+    cockpit-machines
+    cpu-checker
+    libvirt-daemon-system
+)
+
+readonly -a VIRTUALIZATION_DESKTOP_PACKAGES=(
+    virt-manager
+)
+
 require_root() {
     if [[ "${EUID}" -ne 0 ]]; then
         echo "[${SCRIPT_NAME}] ERROR must run as root (use: sudo bash $0)" >&2
@@ -190,7 +201,7 @@ log() {
 }
 section() {
     printf '\n'
-    log "STEP" "${t_cyan}${t_bold}" "── $* ──"
+    log "STEP" "${t_cyan}${t_bold}" "--- $* ---"
 }
 info() { log "INFO" "$t_dim" "$@"; }
 ok() { log "OK" "${t_green}${t_bold}" "$@"; }
@@ -667,35 +678,122 @@ install_package_array() {
     ok "${description} package installation completed"
 }
 
-configure_cockpit_socket() {
+virtualization_qemu_package() {
+    case "$ARCH" in
+        amd64) printf 'qemu-system-x86\n' ;;
+        arm64 | armhf) printf 'qemu-system-arm\n' ;;
+        *) return 1 ;;
+    esac
+}
+
+install_virtualization_stack() {
+    local qemu_package
+    local -a packages=("${VIRTUALIZATION_HOST_PACKAGES[@]}")
+
+    qemu_package="$(virtualization_qemu_package)" ||
+        die "virtualization is not configured for architecture ${ARCH}"
+    packages+=("$qemu_package")
+
+    if [[ "$UBUNTU_VARIANT" == "desktop" ]]; then
+        packages+=("${VIRTUALIZATION_DESKTOP_PACKAGES[@]}")
+    fi
+
+    install_package_array "virtualization" "${packages[@]}"
+}
+
+configure_system_socket() {
+    local unit="$1"
+    local description="$2"
     local changed=false
 
     command -v systemctl >/dev/null 2>&1 ||
-        die "systemctl is required to configure Cockpit"
-    systemctl cat cockpit.socket >/dev/null 2>&1 ||
-        die "Cockpit socket unit is not available after package installation"
+        die "systemctl is required to configure ${description}"
+    systemctl cat "$unit" >/dev/null 2>&1 ||
+        die "${description} socket unit is not available after package installation"
 
-    if ! systemctl is-enabled --quiet cockpit.socket; then
-        systemctl enable cockpit.socket >/dev/null ||
-            die "failed enabling Cockpit socket"
+    if ! systemctl is-enabled --quiet "$unit"; then
+        systemctl enable "$unit" >/dev/null ||
+            die "failed enabling ${description} socket"
         changed=true
     fi
 
     if [[ ! -d "$SYSTEMD_RUNTIME_DIR" ]]; then
-        warn "systemd is not running; Cockpit socket activation is deferred until boot"
+        warn "systemd is not running; ${description} socket activation is deferred until boot"
         return
     fi
 
-    if ! systemctl is-active --quiet cockpit.socket; then
-        systemctl start cockpit.socket ||
-            die "failed starting Cockpit socket"
+    if ! systemctl is-active --quiet "$unit"; then
+        systemctl start "$unit" ||
+            die "failed starting ${description} socket"
         changed=true
     fi
 
     if [[ "$changed" == true ]]; then
-        ok "Cockpit socket enabled and active"
+        ok "${description} socket enabled and active"
     else
-        info "Cockpit socket already enabled and active"
+        info "${description} socket already enabled and active"
+    fi
+}
+
+configure_cockpit_socket() {
+    configure_system_socket "cockpit.socket" "Cockpit"
+}
+
+configure_libvirt() {
+    local user_groups
+
+    getent group libvirt >/dev/null 2>&1 ||
+        die "libvirt group is unavailable after package installation"
+    user_groups="$(id -nG "$TARGET_USER")" ||
+        die "failed reading group membership for ${TARGET_USER}"
+
+    if [[ " ${user_groups} " == *" libvirt "* ]]; then
+        info "${TARGET_USER} is already a member of the libvirt group"
+    else
+        usermod -aG libvirt "$TARGET_USER" ||
+            die "failed adding ${TARGET_USER} to the libvirt group"
+        ok "added ${TARGET_USER} to the libvirt group; membership applies after login or reboot"
+    fi
+
+    configure_system_socket "libvirtd.socket" "Libvirt"
+}
+
+validate_virtualization_stack() {
+    local network_info
+
+    if [[ -c "$KVM_DEVICE" ]] ||
+        { command -v kvm-ok >/dev/null 2>&1 && kvm-ok >/dev/null 2>&1; }; then
+        ok "KVM hardware acceleration is available"
+    else
+        warn "KVM hardware acceleration is unavailable; enable virtualization or nested virtualization if required"
+    fi
+
+    if [[ ! -d "$SYSTEMD_RUNTIME_DIR" ]]; then
+        warn "systemd is not running; libvirt connection validation is deferred until boot"
+        return
+    fi
+
+    command -v virsh >/dev/null 2>&1 ||
+        die "virsh is unavailable after libvirt installation"
+    if ! virsh --connect qemu:///system list --all >/dev/null 2>&1; then
+        die "cannot connect to the local qemu:///system libvirt service"
+    fi
+    ok "local qemu:///system libvirt connection verified"
+
+    if [[ "$UBUNTU_VARIANT" == "desktop" ]]; then
+        command -v virt-manager >/dev/null 2>&1 ||
+            die "virt-manager is unavailable after Desktop virtualization installation"
+        ok "Virtual Machine Manager installation verified"
+    fi
+
+    if network_info="$(virsh --connect qemu:///system net-info default 2>/dev/null)"; then
+        if grep -Eq '^Active:[[:space:]]+yes$' <<<"$network_info"; then
+            info "libvirt default network is active"
+        else
+            warn "libvirt default network is defined but inactive; network state was not changed"
+        fi
+    else
+        warn "libvirt default network is not defined; network state was not changed"
     fi
 }
 
@@ -3096,11 +3194,11 @@ show_manual_setup_hints() {
 
     section "Manual post-install setup"
 
-    manual_step "1/12 Fingerprint login"
+    manual_step "1/13 Fingerprint login"
     manual_line "Open: Settings → System → Users → Fingerprint Login"
     manual_line "Enroll at least two fingers and verify sudo authentication."
 
-    manual_step "2/12 Keyboard shortcuts"
+    manual_step "2/13 Keyboard shortcuts"
     manual_line "Open: Settings → Keyboard → View and Customize Shortcuts"
     manual_line "Then: Custom Shortcuts → Add Shortcut"
     manual_item "Flameshot"
@@ -3112,29 +3210,29 @@ show_manual_setup_hints() {
     manual_command "/snap/bin/emote"
     manual_line "Shortcut: Super+Period (Windows key + .)"
 
-    manual_step "3/12 Bluetooth devices"
+    manual_step "3/13 Bluetooth devices"
     manual_line "Open: Settings → Bluetooth"
     manual_line "Pair the mouse, soundbar, and other devices."
 
-    manual_step "4/12 Visual Studio Code"
+    manual_step "4/13 Visual Studio Code"
     manual_line "Open: VS Code → Accounts → Sign in with GitHub"
     manual_line "Enable Settings Sync and verify restored extensions and settings."
 
-    manual_step "5/12 Bitwarden and Ente Auth"
+    manual_step "5/13 Bitwarden and Ente Auth"
     manual_line "Sign in, complete MFA, and verify vault synchronization."
 
-    manual_step "6/12 Brave"
+    manual_step "6/13 Brave"
     manual_line "Open: brave://settings/braveSync/setup"
     manual_line "Join the existing sync chain and verify bookmarks and extensions."
 
-    manual_step "7/12 Obsidian"
+    manual_step "7/13 Obsidian"
     manual_line "Vault path: ${home}/obsidian"
     manual_line "Configure Obsidian Sync, Git, or the selected backup method."
 
-    manual_step "8/12 Telegram"
+    manual_step "8/13 Telegram"
     manual_line "Sign in and verify the session."
 
-    manual_step "9/12 SSH private key"
+    manual_step "9/13 SSH private key"
     manual_line "Copy the private key from a trusted offline source or password manager:"
     manual_command "cat > ${home}/.ssh/id_ed25519"
     manual_line "Paste the key, then press Ctrl-D."
@@ -3146,21 +3244,34 @@ show_manual_setup_hints() {
     manual_command "ssh-add ${home}/.ssh/id_ed25519 || { eval \"\$(ssh-agent -s)\"; ssh-add ${home}/.ssh/id_ed25519; }"
     manual_command "ssh -T git@github.com"
 
-    manual_step "10/12 Tailscale client"
+    manual_step "10/13 Tailscale client"
     manual_command "sudo tailscale up"
     manual_line "Open the authentication URL, then verify the connection:"
     manual_command "tailscale status"
 
-    manual_step "11/12 Cockpit web console"
+    manual_step "11/13 Cockpit web console"
     manual_line "Visit: https://localhost:9090/"
 
-    manual_step "12/12 Clone Git repositories over SSH"
+    manual_step "12/13 Clone Git repositories over SSH"
     manual_item "GitHub:  cd ${home}/repos/github"
     manual_item "GitLab:  cd ${home}/repos/gitlab"
     manual_item "Forgejo: cd ${home}/repos/forgejo"
     manual_command "git clone git@github.com:syselement/<repository>.git"
     manual_line "Verify the configured Git identity:"
     manual_command "git config list"
+
+    manual_step "13/13 Virtualization"
+    manual_line "Log out and back in, or reboot, before managing virtual machines."
+    manual_line "This applies the new libvirt group membership."
+    if [[ "$UBUNTU_VARIANT" == "desktop" ]]; then
+        manual_line "Open Virtual Machine Manager:"
+        manual_command "virt-manager --connect qemu:///system"
+    else
+        manual_line "Manage this headless host with virsh or a remote virt-manager client."
+    fi
+    manual_line "Verify the local system connection and network state:"
+    manual_command "virsh --connect qemu:///system list --all"
+    manual_command "virsh --connect qemu:///system net-list --all"
 }
 
 main() {
@@ -3257,6 +3368,11 @@ main() {
     else
         info "server variant detected; skipping Desktop packages"
     fi
+
+    section "Virtualization"
+    install_virtualization_stack
+    configure_libvirt
+    validate_virtualization_stack
 
     section "User environment"
     info "installing common user tools and shell configuration"
