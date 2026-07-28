@@ -9,6 +9,7 @@ setup() {
   SYSTEM_KEYRING_DIR="$BATS_TEST_TMPDIR/usr/share/keyrings"
   APT_SOURCES_DIR="$BATS_TEST_TMPDIR/etc/apt/sources.list.d"
   APT_TRUSTED_KEY_DIR="$BATS_TEST_TMPDIR/etc/apt/trusted.gpg.d"
+  SYSTEMD_RUNTIME_DIR="$BATS_TEST_TMPDIR/run/systemd/system"
   mkdir -p "$SYSTEM_KEYRING_DIR" "$APT_SOURCES_DIR" "$APT_TRUSTED_KEY_DIR"
 
   info() {
@@ -23,12 +24,51 @@ setup() {
 @test "customization script can be sourced without initializing provisioning" {
   declare -F main >/dev/null
   declare -F initialize_runtime >/dev/null
+  declare -F section >/dev/null
   declare -F install_package_array >/dev/null
   [[ -z "$USER_NAME" ]]
   [[ -z "$ARCH" ]]
 }
 
+@test "logger renders message content literally" {
+  t_reset=""
+
+  run log "INFO" "" 'literal \n and %s content'
+
+  [[ "$status" -eq 0 ]]
+  [[ "$output" == *' INFO  literal \n and %s content' ]]
+}
+
+@test "section logger is neutral and ANSI-free without terminal colors" {
+  t_bold=""
+  t_cyan=""
+  t_reset=""
+
+  run section "Repositories"
+
+  [[ "$status" -eq 0 ]]
+  [[ "$output" == *" STEP  ── Repositories ──" ]]
+  [[ "$output" != *" WARN "* ]]
+  [[ "$output" != *$'\e['* ]]
+}
+
+@test "manual setup instructions use clean unprefixed body lines" {
+  USER_NAME="$(id -un)"
+
+  run show_manual_setup_hints
+
+  [[ "$status" -eq 0 ]]
+  [[ "$output" == *"STEP  ── Manual post-install setup ──"* ]]
+  [[ "$output" == *"STEP  ── 1/12 Fingerprint login ──"* ]]
+  [[ "$output" == *"STEP  ── 12/12 Clone Git repositories over SSH ──"* ]]
+  [[ "$output" == *$'\n    Open: Settings → System → Users → Fingerprint Login'* ]]
+  [[ "$output" == *$'\n      $ script --quiet --command'* ]]
+  [[ "$output" != *" INFO  "* ]]
+  [[ "$output" != *" WARN "* ]]
+}
+
 @test "requested APT and Flatpak packages remain organized by scope" {
+  [[ " ${COMMON_PACKAGES[*]} " == *" cockpit "* ]]
   [[ " ${COMMON_PACKAGES[*]} " == *" tailscale "* ]]
   [[ " ${DESKTOP_PACKAGES[*]} " == *" meld "* ]]
   [[ " ${DESKTOP_PACKAGES[*]} " == *" typora "* ]]
@@ -349,6 +389,68 @@ FAKE_GSETTINGS
   [[ "$status" -ne 0 ]]
   [[ "$output" == *"failed installing test packages: required-package"* ]]
   [[ "$output" != *"package installation completed"* ]]
+}
+
+@test "Cockpit socket helper skips an already enabled active socket" {
+  mkdir -p "$SYSTEMD_RUNTIME_DIR"
+
+  systemctl() {
+    case "$1" in
+      cat) return 0 ;;
+      is-enabled | is-active) return 0 ;;
+      *)
+        printf 'unexpected Cockpit socket mutation: %s\n' "$*" >&2
+        return 99
+        ;;
+    esac
+  }
+
+  run configure_cockpit_socket
+
+  [[ "$status" -eq 0 ]]
+  [[ "$output" == *"Cockpit socket already enabled and active"* ]]
+  [[ "$output" != *"unexpected Cockpit socket mutation"* ]]
+}
+
+@test "Cockpit socket helper enables and starts a missing socket state" {
+  local command_record="$BATS_TEST_TMPDIR/cockpit-systemctl-record"
+  mkdir -p "$SYSTEMD_RUNTIME_DIR"
+
+  systemctl() {
+    printf '%s\n' "$*" >>"$command_record"
+    case "$1" in
+      cat | enable | start) return 0 ;;
+      is-enabled | is-active) return 1 ;;
+      *) return 2 ;;
+    esac
+  }
+
+  run configure_cockpit_socket
+
+  [[ "$status" -eq 0 ]]
+  [[ "$output" == *"Cockpit socket enabled and active"* ]]
+  grep -Fqx 'enable cockpit.socket' "$command_record"
+  grep -Fqx 'start cockpit.socket' "$command_record"
+}
+
+@test "Cockpit socket activation is deferred when systemd is not running" {
+  local command_record="$BATS_TEST_TMPDIR/cockpit-deferred-record"
+
+  systemctl() {
+    printf '%s\n' "$*" >>"$command_record"
+    case "$1" in
+      cat | enable) return 0 ;;
+      is-enabled) return 1 ;;
+      *) return 99 ;;
+    esac
+  }
+
+  run configure_cockpit_socket
+
+  [[ "$status" -eq 0 ]]
+  [[ "$output" == *"Cockpit socket activation is deferred until boot"* ]]
+  grep -Fqx 'enable cockpit.socket' "$command_record"
+  ! grep -Fq 'start cockpit.socket' "$command_record"
 }
 
 @test "Snap package helper skips an installed package" {
@@ -937,6 +1039,7 @@ EOF
     if [[ "$1" == *"/releases/latest" ]]; then
       cat >"$2" <<'EOF'
 {
+  "tag_name": "1.2.3",
   "assets": [
     {
       "name": "rustdesk-1.2.3-x86_64.deb",
@@ -958,6 +1061,9 @@ EOF
   verify_github_asset_digest() {
     return 0
   }
+  dpkg-query() {
+    return 1
+  }
   install_debian_package() {
     printf '%s|%s|%s\n' "$1" "$2" "$3" >"$install_record"
   }
@@ -970,6 +1076,35 @@ EOF
 
   [[ "$status" -eq 0 ]]
   [[ "$(<"$install_record")" == *"/package.deb|rustdesk|RustDesk" ]]
+}
+
+@test "current GitHub DEB release skips the asset download" {
+  dpkg-query() {
+    printf '1.2.3-1\n'
+  }
+  fetch_file() {
+    if [[ "$1" == *"/releases/latest" ]]; then
+      printf '{"tag_name":"v1.2.3","assets":[]}\n' >"$2"
+      return
+    fi
+    printf 'unexpected GitHub asset download\n' >&2
+    return 99
+  }
+  install_debian_package() {
+    printf 'unexpected package installation\n' >&2
+    return 99
+  }
+
+  run install_latest_github_debian_package \
+    "example/project" \
+    "-amd64.deb" \
+    "example-package" \
+    "Example"
+
+  [[ "$status" -eq 0 ]]
+  [[ "$output" == *"already matches latest release 1.2.3, skipping download"* ]]
+  [[ "$output" != *"unexpected GitHub asset download"* ]]
+  [[ "$output" != *"unexpected package installation"* ]]
 }
 
 @test "installed target-user Termix Flatpak skips release download" {
@@ -1054,6 +1189,9 @@ EOF
   fetch_file() {
     printf '<p>Version: 9.8.2_1</p>\n' >"$2"
   }
+  dpkg-query() {
+    return 1
+  }
   install_downloaded_debian_package() {
     printf '%s|%s|%s\n' "$1" "$2" "$3" >"$install_record"
   }
@@ -1062,6 +1200,26 @@ EOF
 
   [[ "$status" -eq 0 ]]
   [[ "$(<"$install_record")" == "https://download.nomachine.com/download/9.8/Linux/nomachine_9.8.2_1_amd64.deb|nomachine|NoMachine" ]]
+}
+
+@test "current NoMachine release skips the DEB download" {
+  ARCH="amd64"
+  fetch_file() {
+    printf '<p>Version: 9.8.2_1</p>\n' >"$2"
+  }
+  dpkg-query() {
+    printf '9.8.2-1\n'
+  }
+  install_downloaded_debian_package() {
+    printf 'unexpected NoMachine package download\n' >&2
+    return 99
+  }
+
+  run install_nomachine
+
+  [[ "$status" -eq 0 ]]
+  [[ "$output" == *"already matches latest release 9.8.2-1, skipping download"* ]]
+  [[ "$output" != *"unexpected NoMachine package download"* ]]
 }
 
 @test "current Typora Themeable release skips archive download" {
@@ -1248,4 +1406,18 @@ EOF
   run grep -Fq 'rm -rf /var/lib/apt/lists/' "$CUSTOMIZE_SCRIPT"
 
   [[ "$status" -ne 0 ]]
+}
+
+@test "post-install instructions include the Cockpit URL" {
+  USER_NAME="testuser"
+  user_home() {
+    printf '/home/testuser\n'
+  }
+
+  run show_manual_setup_hints
+
+  [[ "$status" -eq 0 ]]
+  [[ "$output" == *"11/12 Cockpit web console"* ]]
+  [[ "$output" == *"https://localhost:9090/"* ]]
+  [[ "$output" == *"12/12 Clone Git repositories over SSH"* ]]
 }
