@@ -1,3 +1,21 @@
+# [0.46.0](https://github.com/syselement/packertron-vms/compare/v0.45.0...v0.46.0) (2026-07-28)
+
+
+### Bug Fixes
+
+* update shortcut for Emote command in manual setup hints ([e60071c](https://github.com/syselement/packertron-vms/commit/e60071cb61252c3867268ec3ff71ea228443ad93))
+
+
+### Features
+
+* add data directory creation in user workspace setup ([4aa688f](https://github.com/syselement/packertron-vms/commit/4aa688f83031b1eac20736b7272b7e3e1455094f))
+* add de.swsnr.turnon Flatpak package to desktop environment setup ([d15f67d](https://github.com/syselement/packertron-vms/commit/d15f67df2f7aea5bf7833274f22fcebfaa64eebf))
+* add Docker directory creation in user workspace setup ([8ce13dc](https://github.com/syselement/packertron-vms/commit/8ce13dcc0cea3327e4afa51332390d3c0b12f494))
+* ensure Typora configuration and theme directories are created with correct ownership ([a9108b7](https://github.com/syselement/packertron-vms/commit/a9108b77792af50950642254e274ffeab1721965))
+* refactor Vagrantfile to use inline provisioning scripts and add integration tests ([891e1dc](https://github.com/syselement/packertron-vms/commit/891e1dcfc8fe939cd267b4bae5013327a920dbce))
+
+
+
 # [0.45.0](https://github.com/syselement/packertron-vms/compare/v0.44.0...v0.45.0) (2026-07-28)
 
 
@@ -36,15 +54,6 @@
 ### Bug Fixes
 
 * update GNOME system monitor panel extension download URL and enhance autoinstall.yaml documentation ([4812989](https://github.com/syselement/packertron-vms/commit/481298914ca12b4afba34f6e73d0957cfc6f3e58))
-
-
-
-## [0.42.1](https://github.com/syselement/packertron-vms/compare/v0.42.0...v0.42.1) (2026-07-19)
-
-
-### Bug Fixes
-
-* update Brave repository URL to remove trailing slash in customization script and tests ([3f4246b](https://github.com/syselement/packertron-vms/commit/3f4246beb952c21a0f531a7c5091c36a3c7a4de0))
 
 
 
