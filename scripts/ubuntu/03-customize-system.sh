@@ -2417,6 +2417,7 @@ prepare_user_workspace() (
 
     group="$(id -gn "$account")"
 
+    data_dir="$home/data"
     gdrive_dir="$home/gdrive"
     repos_root="$home/repos"
     obsidian_dir="$home/obsidian"
@@ -2428,6 +2429,7 @@ prepare_user_workspace() (
         -o "$account" \
         -g "$group" \
         -m 0755 \
+        "$data_dir" \
         "$gdrive_dir" \
         "$repos_root" \
         "$repos_root/github" \
@@ -2441,6 +2443,7 @@ prepare_user_workspace() (
         -m 0700 \
         "$ssh_dir"
 
+    ok "Data directory ready: ${data_dir}"
     ok "Google Drive directory ready: ${gdrive_dir}"
     ok "GitHub repository directory ready: ${repos_root}/github"
     ok "GitLab repository directory ready: ${repos_root}/gitlab"
