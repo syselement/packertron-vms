@@ -1851,9 +1851,19 @@ install_typora_themeable() (
     set -Eeuo pipefail
 
     local installed_version release_version
+    local typora_config_directory="${TARGET_HOME}/.config/Typora"
     local marker_file="${TARGET_HOME}/.config/Typora/themes/.packertron-themeable-version"
     local theme_directory="${TARGET_HOME}/.config/Typora/themes"
     local temporary_dir
+
+    install -d \
+        -m 0755 \
+        -o "$TARGET_USER" \
+        -g "$TARGET_GROUP" \
+        "$typora_config_directory" \
+        "$theme_directory"
+    verify_target_ownership "$typora_config_directory" "Typora configuration directory"
+    verify_target_ownership "$theme_directory" "Typora theme directory"
 
     temporary_dir="$(mktemp -d)"
     trap 'rm -rf -- "$temporary_dir"' EXIT
@@ -1885,7 +1895,6 @@ install_typora_themeable() (
     info "installing Typora Themeable ${release_version}"
     validate_zip_archive "$temporary_dir/typora-themeable.zip" "Typora Themeable"
 
-    install -d -m 0755 -o "$TARGET_USER" -g "$TARGET_GROUP" "$theme_directory"
     chmod 0755 "$temporary_dir"
     chmod 0644 "$temporary_dir/typora-themeable.zip"
     run_quiet_command "Typora Themeable extraction failed" \

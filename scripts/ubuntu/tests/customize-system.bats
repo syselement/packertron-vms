@@ -1491,11 +1491,12 @@ EOF
   [[ "$output" != *"unexpected NoMachine package download"* ]]
 }
 
-@test "current Typora Themeable release skips archive download" {
+@test "current Typora Themeable release repairs directory ownership before skipping download" {
   TARGET_USER="$(id -un)"
   TARGET_GROUP="$(id -gn)"
   TARGET_HOME="$BATS_TEST_TMPDIR/home"
   mkdir -p "$TARGET_HOME/.config/Typora/themes"
+  chmod 0700 "$TARGET_HOME/.config/Typora" "$TARGET_HOME/.config/Typora/themes"
   printf 'v1.2.3\n' >"$TARGET_HOME/.config/Typora/themes/.packertron-themeable-version"
   printf 'theme\n' >"$TARGET_HOME/.config/Typora/themes/themeable.css"
 
@@ -1513,6 +1514,8 @@ EOF
   [[ "$status" -eq 0 ]]
   [[ "$output" == *"Typora Themeable v1.2.3 already installed, skipping"* ]]
   [[ "$output" != *"unexpected theme archive download"* ]]
+  [[ "$(stat -c '%U:%G:%a' "$TARGET_HOME/.config/Typora")" == "$TARGET_USER:$TARGET_GROUP:755" ]]
+  [[ "$(stat -c '%U:%G:%a' "$TARGET_HOME/.config/Typora/themes")" == "$TARGET_USER:$TARGET_GROUP:755" ]]
 }
 
 @test "failed repository download preserves existing files" {
