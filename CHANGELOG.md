@@ -1,3 +1,14 @@
+# [0.44.0](https://github.com/syselement/packertron-vms/compare/v0.43.0...v0.44.0) (2026-07-28)
+
+
+### Features
+
+* add Cockpit socket configuration and related tests ([0259609](https://github.com/syselement/packertron-vms/commit/0259609cba6ce9e57c237d9a9219ced5f3b74374))
+* enhance logging and manual setup instructions in customization script ([4111a3d](https://github.com/syselement/packertron-vms/commit/4111a3d55b897ab9fa766f8c9a14a420cbb150d6))
+* enhance package installation logic to skip downloads for already installed versions ([bd2efb0](https://github.com/syselement/packertron-vms/commit/bd2efb017a884b94bda81ab9631b42a9064fc894))
+
+
+
 # [0.43.0](https://github.com/syselement/packertron-vms/compare/v0.42.2...v0.43.0) (2026-07-27)
 
 
@@ -32,15 +43,6 @@
 ### Features
 
 * add Mullvad VPN support and enhance repository management in customization script ([2a836ae](https://github.com/syselement/packertron-vms/commit/2a836aeed2b7dcd6338a8d0fb7b6297f24221020))
-
-
-
-# [0.41.0](https://github.com/syselement/packertron-vms/compare/v0.40.1...v0.41.0) (2026-07-19)
-
-
-### Features
-
-* add 'bats', 'shellcheck', and 'shfmt' to common packages ([eb9628b](https://github.com/syselement/packertron-vms/commit/eb9628b37271e7201dabb3ac7a44b8193eb53970))
 
 
 
