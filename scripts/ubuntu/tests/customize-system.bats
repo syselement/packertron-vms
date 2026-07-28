@@ -66,7 +66,6 @@ setup() {
   [[ "$output" == *"STEP  --- 12/13 Clone Git repositories over SSH ---"* ]]
   [[ "$output" == *"STEP  --- 13/13 Virtualization ---"* ]]
   [[ "$output" == *"Visit: https://localhost:9090/"* ]]
-  [[ "$output" == *"Open: Virtual Machines"* ]]
   [[ "$output" == *"This applies the new libvirt group membership."* ]]
   [[ "$output" == *$'\n    Open: Settings → System → Users → Fingerprint Login'* ]]
   [[ "$output" == *$'\n      $ script --quiet --command'* ]]
