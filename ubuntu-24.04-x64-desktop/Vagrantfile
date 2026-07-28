@@ -59,13 +59,17 @@ Vagrant.configure("2") do |config|
       v.vmx["displayname"] = "#{description}"
     end
 
+    prov.vm.provision "file",
+      source: "../scripts/ubuntu",
+      destination: "/var/tmp/packertron-ubuntu"
+
     prov.vm.provision "shell",
-      path: "../scripts/ubuntu/02-provision-system.sh",
+      inline: "bash /var/tmp/packertron-ubuntu/02-provision-system.sh",
       privileged: true,
       run: "once"
 
     prov.vm.provision "shell",
-      path: "../scripts/ubuntu/03-customize-system.sh",
+      inline: "bash /var/tmp/packertron-ubuntu/03-customize-system.sh",
       privileged: true,
       #run: "never"
       run: "once"

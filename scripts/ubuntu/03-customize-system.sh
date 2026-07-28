@@ -124,6 +124,7 @@ readonly -a DESKTOP_PACKAGES=(
 
 readonly -a FLATPAK_PACKAGES=(
     com.bitwarden.desktop
+    de.swsnr.turnon
     io.ente.auth
     io.github.sigmasd.pingmonitor
     org.cryptomator.Cryptomator
@@ -1850,9 +1851,19 @@ install_typora_themeable() (
     set -Eeuo pipefail
 
     local installed_version release_version
+    local typora_config_directory="${TARGET_HOME}/.config/Typora"
     local marker_file="${TARGET_HOME}/.config/Typora/themes/.packertron-themeable-version"
     local theme_directory="${TARGET_HOME}/.config/Typora/themes"
     local temporary_dir
+
+    install -d \
+        -m 0755 \
+        -o "$TARGET_USER" \
+        -g "$TARGET_GROUP" \
+        "$typora_config_directory" \
+        "$theme_directory"
+    verify_target_ownership "$typora_config_directory" "Typora configuration directory"
+    verify_target_ownership "$theme_directory" "Typora theme directory"
 
     temporary_dir="$(mktemp -d)"
     trap 'rm -rf -- "$temporary_dir"' EXIT
@@ -1884,7 +1895,6 @@ install_typora_themeable() (
     info "installing Typora Themeable ${release_version}"
     validate_zip_archive "$temporary_dir/typora-themeable.zip" "Typora Themeable"
 
-    install -d -m 0755 -o "$TARGET_USER" -g "$TARGET_GROUP" "$theme_directory"
     chmod 0755 "$temporary_dir"
     chmod 0644 "$temporary_dir/typora-themeable.zip"
     run_quiet_command "Typora Themeable extraction failed" \
@@ -2417,6 +2427,8 @@ prepare_user_workspace() (
 
     group="$(id -gn "$account")"
 
+    data_dir="$home/data"
+    docker_dir="$home/docker"
     gdrive_dir="$home/gdrive"
     repos_root="$home/repos"
     obsidian_dir="$home/obsidian"
@@ -2428,6 +2440,8 @@ prepare_user_workspace() (
         -o "$account" \
         -g "$group" \
         -m 0755 \
+        "$data_dir" \
+        "$docker_dir" \
         "$gdrive_dir" \
         "$repos_root" \
         "$repos_root/github" \
@@ -2441,6 +2455,8 @@ prepare_user_workspace() (
         -m 0700 \
         "$ssh_dir"
 
+    ok "Data directory ready: ${data_dir}"
+    ok "Docker directory ready: ${docker_dir}"
     ok "Google Drive directory ready: ${gdrive_dir}"
     ok "GitHub repository directory ready: ${repos_root}/github"
     ok "GitLab repository directory ready: ${repos_root}/gitlab"
@@ -3208,7 +3224,7 @@ show_manual_setup_hints() {
     manual_item "Emote"
     manual_line "Command:"
     manual_command "/snap/bin/emote"
-    manual_line "Shortcut: Super+Period (Windows key + .)"
+    manual_line "Shortcut: Super+Comma (Windows key + ,)"
 
     manual_step "3/13 Bluetooth devices"
     manual_line "Open: Settings → Bluetooth"
