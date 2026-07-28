@@ -124,6 +124,7 @@ readonly -a DESKTOP_PACKAGES=(
 
 readonly -a FLATPAK_PACKAGES=(
     com.bitwarden.desktop
+    de.swsnr.turnon
     io.ente.auth
     io.github.sigmasd.pingmonitor
     org.cryptomator.Cryptomator
