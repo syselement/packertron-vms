@@ -98,6 +98,7 @@ readonly -a COMMON_PACKAGES=(
     unzip
     vim
     wget
+    whois
     wireguard
     zsh
 )
