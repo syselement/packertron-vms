@@ -1786,49 +1786,6 @@ install_rustdesk() {
         "RustDesk"
 }
 
-install_nomachine() (
-    set -Eeuo pipefail
-
-    local download_page="https://download.nomachine.com/download/?id=1&platform=linux"
-    local download_url installed_version package_version page_content release_series release_version
-    local temporary_dir
-
-    if [[ "$ARCH" != "amd64" ]]; then
-        warn "NoMachine Linux DEB (amd64) is not compatible with ${ARCH}; skipping"
-        return
-    fi
-
-    temporary_dir="$(mktemp -d)"
-    trap 'rm -rf -- "$temporary_dir"' EXIT
-
-    info "checking latest NoMachine Linux DEB release"
-    fetch_file "$download_page" "$temporary_dir/download-page.html" ||
-        die "failed downloading the NoMachine release page"
-    page_content="$(<"$temporary_dir/download-page.html")"
-
-    if [[ "$page_content" =~ ([0-9]+\.[0-9]+\.[0-9]+_[0-9]+) ]]; then
-        release_version="${BASH_REMATCH[1]}"
-    else
-        die "could not determine the latest NoMachine Linux DEB version"
-    fi
-    if [[ "$release_version" =~ ^([0-9]+\.[0-9]+)\. ]]; then
-        release_series="${BASH_REMATCH[1]}"
-    else
-        die "unexpected NoMachine release version: ${release_version}"
-    fi
-
-    package_version="${release_version/_/-}"
-    installed_version="$(dpkg-query -W -f='${Version}' nomachine 2>/dev/null || true)"
-    if [[ -n "$installed_version" ]] &&
-        dpkg --compare-versions "$installed_version" ge "$package_version"; then
-        info "NoMachine ${installed_version} already matches latest release ${package_version}, skipping download"
-        return
-    fi
-
-    download_url="https://download.nomachine.com/download/${release_series}/Linux/nomachine_${release_version}_amd64.deb"
-    install_downloaded_debian_package "$download_url" "nomachine" "NoMachine"
-)
-
 install_pandoc() {
     local asset_suffix
 
@@ -3376,7 +3333,6 @@ main() {
         install_package_array "Desktop" "${DESKTOP_PACKAGES[@]}"
         configure_flathub
         install_flatpak_package_array "Desktop Flatpak" "${FLATPAK_PACKAGES[@]}"
-        install_nomachine
         install_rustdesk
         install_termius
         install_termix
