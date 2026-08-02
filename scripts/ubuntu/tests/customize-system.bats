@@ -1335,12 +1335,16 @@ FAKE_BREW
   run_as_target_user() {
     HOME="$TARGET_HOME" FAKE_BREW_PREFIX="$HOMEBREW_PREFIX" "$@"
   }
+  homebrew_cpu_is_supported() {
+    return 0
+  }
 
   run install_homebrew_for_user
 
   [[ "$status" -eq 0 ]]
   [[ "$output" == *"skipping installer prerequisites"* ]]
   [[ "$output" == *"Homebrew test-version installed and verified"* ]]
+  grep -Fqx "eval \"\$(${HOMEBREW_PREFIX}/bin/brew shellenv)\"" "$TARGET_HOME/.bashrc"
   [[ "$output" != *"unexpected prerequisite installation"* ]]
   [[ "$output" != *"unexpected installer download"* ]]
 }
@@ -1392,6 +1396,9 @@ FAKE_INSTALLER
       FAKE_BREW_TEMPLATE="$brew_template" \
       "$@"
   }
+  homebrew_cpu_is_supported() {
+    return 0
+  }
 
   run install_homebrew_for_user
 
@@ -1401,6 +1408,84 @@ FAKE_INSTALLER
   [[ "$output" == *"Homebrew staged-test installed and verified"* ]]
   [[ "$output" != *"verbose Homebrew installer output"* ]]
   [[ "$output" != *"unexpected prerequisite installation"* ]]
+}
+
+@test "Homebrew skips unsupported CPUs before changing the system" {
+  TARGET_USER="$(id -un)"
+  TARGET_HOME="$BATS_TEST_TMPDIR/home"
+  TARGET_UID="$(id -u)"
+  TARGET_GROUP="$(id -gn)"
+  HOMEBREW_PREFIX="$BATS_TEST_TMPDIR/homebrew"
+
+  homebrew_cpu_is_supported() {
+    return 1
+  }
+  install_package_array() {
+    printf 'unexpected prerequisite installation\n' >&2
+    return 99
+  }
+  fetch_file() {
+    printf 'unexpected installer download\n' >&2
+    return 99
+  }
+
+  run install_homebrew_for_user
+
+  [[ "$status" -eq 0 ]]
+  [[ "$output" == *"skipping Homebrew"* ]]
+  [[ "$output" != *"unexpected prerequisite installation"* ]]
+  [[ "$output" != *"unexpected installer download"* ]]
+  [[ ! -e "$HOMEBREW_PREFIX" ]]
+}
+
+@test "incomplete Homebrew installation reruns the staged installer" {
+  local brew_template="$BATS_TEST_TMPDIR/repaired-brew"
+
+  TARGET_USER="$(id -un)"
+  TARGET_HOME="$BATS_TEST_TMPDIR/home"
+  TARGET_UID="$(id -u)"
+  TARGET_GROUP="$(id -gn)"
+  HOMEBREW_PREFIX="$BATS_TEST_TMPDIR/homebrew"
+
+  mkdir -p "$TARGET_HOME" "$HOMEBREW_PREFIX/bin"
+  printf '#!/usr/bin/env bash\nexit 1\n' >"$HOMEBREW_PREFIX/bin/brew"
+  chmod +x "$HOMEBREW_PREFIX/bin/brew"
+  cat >"$brew_template" <<'FAKE_BREW'
+#!/usr/bin/env bash
+case "$1" in
+  --prefix) printf '%s\n' "$FAKE_BREW_PREFIX" ;;
+  --version) printf 'Homebrew repaired-test\n' ;;
+  *) exit 2 ;;
+esac
+FAKE_BREW
+  chmod +x "$brew_template"
+
+  dpkg-query() {
+    printf 'install ok installed\n'
+  }
+  fetch_file() {
+    cat >"$2" <<'FAKE_INSTALLER'
+#!/usr/bin/env bash
+set -euo pipefail
+cp "$FAKE_BREW_TEMPLATE" "$FAKE_BREW_PREFIX/bin/brew"
+chmod +x "$FAKE_BREW_PREFIX/bin/brew"
+FAKE_INSTALLER
+  }
+  run_as_target_user() {
+    HOME="$TARGET_HOME" \
+      FAKE_BREW_PREFIX="$HOMEBREW_PREFIX" \
+      FAKE_BREW_TEMPLATE="$brew_template" \
+      "$@"
+  }
+  homebrew_cpu_is_supported() {
+    return 0
+  }
+
+  run install_homebrew_for_user
+
+  [[ "$status" -eq 0 ]]
+  [[ "$output" == *"installation is incomplete; rerunning the installer"* ]]
+  [[ "$output" == *"Homebrew repaired-test installed and verified"* ]]
 }
 
 @test "quiet command helper replays output only on failure" {
