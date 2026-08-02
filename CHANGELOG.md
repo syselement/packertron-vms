@@ -1,3 +1,12 @@
+# [0.49.0](https://github.com/syselement/packertron-vms/compare/v0.48.0...v0.49.0) (2026-08-02)
+
+
+### Features
+
+* refactor package management to include release-optional packages and enhance testing ([9bfe481](https://github.com/syselement/packertron-vms/commit/9bfe4819edc1b87dcaa743d5f3e6557dba7d614c))
+
+
+
 # [0.48.0](https://github.com/syselement/packertron-vms/compare/v0.47.0...v0.48.0) (2026-08-02)
 
 
@@ -47,17 +56,6 @@
 * add cockpit-machines package to virtualization host packages ([ce85059](https://github.com/syselement/packertron-vms/commit/ce850591074216e52d1b2d732f0a6b8244a43c84))
 * add virtualization support and related configuration to customization script ([2b6b52a](https://github.com/syselement/packertron-vms/commit/2b6b52ae41a487dcdabeb5254c67a27d6991e79f))
 * update manual setup instructions and enhance test cases for virtualization ([afc39b3](https://github.com/syselement/packertron-vms/commit/afc39b36b079af498f544564e37ec187c1d54615))
-
-
-
-# [0.44.0](https://github.com/syselement/packertron-vms/compare/v0.43.0...v0.44.0) (2026-07-28)
-
-
-### Features
-
-* add Cockpit socket configuration and related tests ([0259609](https://github.com/syselement/packertron-vms/commit/0259609cba6ce9e57c237d9a9219ced5f3b74374))
-* enhance logging and manual setup instructions in customization script ([4111a3d](https://github.com/syselement/packertron-vms/commit/4111a3d55b897ab9fa766f8c9a14a420cbb150d6))
-* enhance package installation logic to skip downloads for already installed versions ([bd2efb0](https://github.com/syselement/packertron-vms/commit/bd2efb017a884b94bda81ab9631b42a9064fc894))
 
 
 
