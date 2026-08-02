@@ -1,3 +1,12 @@
+# [0.52.0](https://github.com/syselement/packertron-vms/compare/v0.51.0...v0.52.0) (2026-08-02)
+
+
+### Features
+
+* enhance logging format in customization script and tests for clarity ([9a36c73](https://github.com/syselement/packertron-vms/commit/9a36c73d3b7b5c35d09f837def96efb277d10fce))
+
+
+
 # [0.51.0](https://github.com/syselement/packertron-vms/compare/v0.50.0...v0.51.0) (2026-08-02)
 
 
@@ -33,19 +42,6 @@
 
 * enhance logging and timeout settings in provisioning scripts ([85d4ba5](https://github.com/syselement/packertron-vms/commit/85d4ba546742e8bd417fece4ef0b2b7d705f2580))
 * refactor update system script and enhance guest tool installation logic ([af00cc7](https://github.com/syselement/packertron-vms/commit/af00cc76ccf3c929d189c1ddb12479688a17baeb))
-
-
-
-# [0.47.0](https://github.com/syselement/packertron-vms/compare/v0.46.0...v0.47.0) (2026-08-02)
-
-
-### Features
-
-* add alias for retrieving public IP address ([6b99d80](https://github.com/syselement/packertron-vms/commit/6b99d809dbd9e05c29eb49e2d237d2659926f4b1))
-* add whois package to common packages list ([21227d4](https://github.com/syselement/packertron-vms/commit/21227d4bba8478b11d1f29ceec72b4f57253ffc7))
-* implement APT transaction management for safer package updates and rollbacks ([117506b](https://github.com/syselement/packertron-vms/commit/117506b0d8f4c2ef4a52a3b8b96fe60132f00b66))
-* update manual setup steps and add WireGuard connection instructions ([e0f6dc0](https://github.com/syselement/packertron-vms/commit/e0f6dc0ba7d017146246ac05696ff1b3bfaec022))
-* update public IP alias to use ifconfig.me for better reliability ([a2488d3](https://github.com/syselement/packertron-vms/commit/a2488d3687d66a6d97b2518c54a3bc70d645ac7e))
 
 
 
