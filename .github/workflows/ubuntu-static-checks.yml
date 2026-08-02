@@ -1,0 +1,73 @@
+name: Ubuntu static checks
+
+on:
+  pull_request:
+    paths:
+      - "scripts/ubuntu/**"
+      - "ubuntu-24.04-x64-desktop/Vagrantfile"
+      - "ubuntu-26.04-x64-desktop/Vagrantfile"
+  push:
+    branches:
+      - main
+    paths:
+      - "scripts/ubuntu/**"
+      - "ubuntu-24.04-x64-desktop/Vagrantfile"
+      - "ubuntu-26.04-x64-desktop/Vagrantfile"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  static-checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        shell: bash
+        working-directory: scripts/ubuntu
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install test dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends bats shellcheck shfmt
+
+      - name: Validate Bash syntax
+        run: bash -n ./*.sh ./lib/*.sh
+
+      - name: Run ShellCheck
+        run: shellcheck -x ./*.sh ./lib/*.sh
+
+      - name: Check shell formatting
+        run: shfmt -d -i 4 -ci ./*.sh ./lib/*.sh
+
+      - name: Run project tests
+        run: bats tests
+
+      - name: Check whitespace errors
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          case "$GITHUB_EVENT_NAME" in
+            pull_request)
+              git diff --check "$BASE_SHA...$HEAD_SHA"
+              ;;
+            push)
+              git diff --check "$BASE_SHA" "$HEAD_SHA"
+              ;;
+            workflow_dispatch)
+              git show --check --format= "$HEAD_SHA"
+              ;;
+            *)
+              printf 'Unsupported event: %s\n' "$GITHUB_EVENT_NAME" >&2
+              exit 1
+              ;;
+          esac
