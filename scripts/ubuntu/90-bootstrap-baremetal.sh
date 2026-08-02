@@ -11,67 +11,118 @@ SCRIPT_DIR="$(
     cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd
 )"
 
-STATE_DIR="/var/lib/packertron-bootstrap"
-LOG_FILE="/var/log/packertron-bootstrap.log"
-LOCK_FILE="/run/lock/packertron-bootstrap.lock"
+STATE_DIR="${PACKERTRON_STATE_DIR:-/var/lib/packertron-bootstrap}"
+LOG_FILE="${PACKERTRON_LOG_FILE:-/var/log/packertron-bootstrap.log}"
+LOCK_FILE="${PACKERTRON_LOCK_FILE:-/run/lock/packertron-bootstrap.lock}"
+BOOTSTRAP_REVISION=""
 
-[[ "$EUID" -eq 0 ]] || {
-    echo "ERROR: run as root" >&2
+die() {
+    printf 'ERROR: %s\n' "$*" >&2
     exit 1
 }
 
-mkdir -p "$STATE_DIR"
-touch "$LOG_FILE"
-chmod 0600 "$LOG_FILE"
+resolve_bootstrap_revision() {
+    local revision="${PACKERTRON_BOOTSTRAP_REVISION:-}"
 
-exec > >(tee -a "$LOG_FILE") 2>&1
+    if [[ -z "$revision" ]]; then
+        revision="$(git -C "$SCRIPT_DIR/../.." rev-parse --verify HEAD 2>/dev/null)" ||
+            die "cannot determine bootstrap revision; set PACKERTRON_BOOTSTRAP_REVISION"
+    fi
 
-exec 9>"$LOCK_FILE"
-if ! flock -n 9; then
-    echo "Another bootstrap execution is already running"
-    exit 0
-fi
+    [[ "$revision" =~ ^[0-9a-fA-F]{40,64}$ ]] ||
+        die "invalid bootstrap revision: ${revision}"
 
-if [[ -f "$STATE_DIR/complete" ]]; then
-    echo "Bare-metal bootstrap already completed"
-    exit 0
-fi
+    printf '%s\n' "${revision,,}"
+}
+
+marker_matches_revision() {
+    local marker="$1"
+
+    [[ -f "$marker" ]] && [[ "$(<"$marker")" == "$BOOTSTRAP_REVISION" ]]
+}
+
+write_revision_marker() {
+    local marker="$1"
+    local temporary_marker="${marker}.tmp"
+
+    printf '%s\n' "$BOOTSTRAP_REVISION" >"$temporary_marker"
+    chmod 0600 "$temporary_marker"
+    mv -f -- "$temporary_marker" "$marker"
+}
 
 run_step() {
     local name="$1"
     local script="$2"
     local marker="$STATE_DIR/${name}.done"
 
-    if [[ -f "$marker" ]]; then
-        echo "SKIP: ${name} already completed"
+    if marker_matches_revision "$marker"; then
+        printf 'SKIP: %s already completed for %s\n' "$name" "$BOOTSTRAP_REVISION"
         return
     fi
 
-    echo "RUN: ${name}"
+    [[ -f "$SCRIPT_DIR/$script" ]] || die "missing bootstrap script: ${SCRIPT_DIR}/${script}"
+
+    printf 'RUN: %s (%s)\n' "$name" "$BOOTSTRAP_REVISION"
 
     REBOOT_AT_END=false \
         bash "$SCRIPT_DIR/$script"
 
-    touch "$marker"
-    echo "DONE: ${name}"
+    write_revision_marker "$marker"
+    printf 'DONE: %s (%s)\n' "$name" "$BOOTSTRAP_REVISION"
 }
 
-# Intentionally omitted:
-# 00-update-system.sh  - VMware-specific
-# 01-cleanup-system.sh - template hygiene, unsafe/unnecessary here
+schedule_reboot() {
+    sync
 
-run_step "02-provision-system" "02-provision-system.sh"
-run_step "03-customize-system" "03-customize-system.sh"
+    systemd-run \
+        --unit=packertron-bootstrap-reboot \
+        --on-active=2m \
+        /usr/bin/systemctl reboot -i ||
+        die "failed scheduling the required reboot; bootstrap remains incomplete"
+}
 
-touch "$STATE_DIR/complete"
+finalize_bootstrap() {
+    schedule_reboot || return
+    write_revision_marker "$STATE_DIR/complete"
+}
 
-echo "Bare-metal bootstrap completed successfully"
-echo "Log: $LOG_FILE"
+main() {
+    [[ "$EUID" -eq 0 ]] || die "run as root"
 
-# Return control to cloud-init, then reboot after cloud-init-final completes.
-sync
+    BOOTSTRAP_REVISION="$(resolve_bootstrap_revision)"
 
-systemd-run \
-    --unit=packertron-bootstrap-reboot \
-    --on-active=2m \
-    /usr/bin/systemctl reboot -i
+    install -d -m 0700 "$STATE_DIR"
+    install -d -m 0755 "$(dirname -- "$LOG_FILE")" "$(dirname -- "$LOCK_FILE")"
+    touch "$LOG_FILE"
+    chmod 0600 "$LOG_FILE"
+
+    exec > >(tee -a "$LOG_FILE") 2>&1
+
+    exec 9>"$LOCK_FILE"
+    if ! flock -n 9; then
+        printf 'Another bootstrap execution is already running\n'
+        return
+    fi
+
+    if marker_matches_revision "$STATE_DIR/complete"; then
+        printf 'Bare-metal bootstrap already completed for %s\n' "$BOOTSTRAP_REVISION"
+        return
+    fi
+
+    # Intentionally omitted:
+    # 00-update-system.sh  - VMware-specific
+    # 01-cleanup-system.sh - template hygiene, unsafe/unnecessary here
+    run_step "02-provision-system" "02-provision-system.sh"
+    run_step "03-customize-system" "03-customize-system.sh"
+
+    # The persistent first-boot service is ordered after cloud-final. Record
+    # completion only after systemd accepts the required reboot timer.
+    finalize_bootstrap
+
+    printf 'Bare-metal bootstrap completed successfully for %s\n' "$BOOTSTRAP_REVISION"
+    printf 'Log: %s\n' "$LOG_FILE"
+}
+
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+    main "$@"
+fi

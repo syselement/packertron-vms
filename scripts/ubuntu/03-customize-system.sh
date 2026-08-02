@@ -25,6 +25,8 @@ SCRIPT_DIR="$(
 
 # shellcheck source=lib/ubuntu-context.sh
 . "$SCRIPT_DIR/lib/ubuntu-context.sh"
+# shellcheck source=lib/apt-transaction.sh
+. "$SCRIPT_DIR/lib/apt-transaction.sh"
 
 SCRIPT_NAME="customize-system"
 LOG_PREFIX="[${SCRIPT_NAME}]"
@@ -38,6 +40,7 @@ APT_SOURCES_DIR="${PACKERTRON_APT_SOURCES_DIR:-/etc/apt/sources.list.d}"
 APT_TRUSTED_KEY_DIR="${PACKERTRON_APT_TRUSTED_KEY_DIR:-/etc/apt/trusted.gpg.d}"
 SYSTEMD_RUNTIME_DIR="${PACKERTRON_SYSTEMD_RUNTIME_DIR:-/run/systemd/system}"
 KVM_DEVICE="${PACKERTRON_KVM_DEVICE:-/dev/kvm}"
+APT_TRANSACTION_DIR="${PACKERTRON_APT_TRANSACTION_DIR:-/var/lib/packertron-apt-transactions/customize-system}"
 HOMEBREW_PREFIX="${PACKERTRON_HOMEBREW_PREFIX:-/home/linuxbrew/.linuxbrew}"
 HOMEBREW_INSTALL_URL="${HOMEBREW_INSTALL_URL:-https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh}"
 
@@ -126,6 +129,7 @@ readonly -a DESKTOP_PACKAGES=(
 
 readonly -a FLATPAK_PACKAGES=(
     com.bitwarden.desktop
+    com.obsproject.Studio
     de.swsnr.turnon
     io.ente.auth
     io.github.sigmasd.pingmonitor
@@ -855,6 +859,8 @@ write_file_if_changed() {
         return 1
     fi
 
+    apt_transaction_record_file "$destination_file"
+
     destination_directory="$(dirname -- "$destination_file")"
     install -d -m 0755 "$destination_directory"
     temporary_file="$(mktemp "${destination_file}.tmp.XXXXXX")"
@@ -1342,6 +1348,7 @@ enable_battery_health_preservation() {
 # --- Repository setup ---
 ensure_fastfetch_ppa() {
     local ppa="ppa:zhangsongcui3371/fastfetch"
+    local source_file
 
     case "$VERSION_ID" in
         24.*)
@@ -1355,6 +1362,9 @@ ensure_fastfetch_ppa() {
             fi
 
             if add-apt-repository --yes --no-update "$ppa" >/dev/null 2>&1; then
+                while IFS= read -r -d '' source_file; do
+                    apt_transaction_record_created_file "$source_file"
+                done < <(grep -RlZ -- "zhangsongcui3371/fastfetch" "$APT_SOURCES_DIR" 2>/dev/null || true)
                 APT_SOURCES_CHANGED=true
                 ok "added fastfetch PPA for Ubuntu ${VERSION_ID}"
             else
@@ -1548,6 +1558,7 @@ ensure_brave_browser_repository() (
     legacy_files=("${APT_SOURCES_DIR}"/brave-browser-*.list)
     shopt -u nullglob
     for legacy_file in "${legacy_files[@]}"; do
+        apt_transaction_record_file "$legacy_file"
         rm -f -- "$legacy_file"
         changed=true
         info "removed legacy Brave repository file: ${legacy_file}"
@@ -1681,6 +1692,7 @@ EOF
         info "Typora repository already configured"
     fi
     if [[ -e "$legacy_key_file" ]]; then
+        apt_transaction_record_file "$legacy_key_file"
         rm -f -- "$legacy_key_file"
         changed=true
         info "removed obsolete Typora repository key: ${legacy_key_file}"
@@ -3268,6 +3280,8 @@ main() {
     info "execution mode=${EXECUTION_MODE} context=${EXECUTION_CONTEXT} interactive=${EXECUTION_INTERACTIVE}"
     ok "target user=${TARGET_USER} home=${TARGET_HOME}"
 
+    apt_transaction_recover
+
     section "Connectivity"
     info "checking internet and DNS"
     if ping -c 1 -W 1 1.1.1.1 &>/dev/null || ping -c 1 -W 1 8.8.8.8 &>/dev/null || ping -c 1 -W 1 9.9.9.9 &>/dev/null; then
@@ -3309,6 +3323,7 @@ main() {
     fi
 
     section "Repositories"
+    apt_transaction_begin
     info "ensuring common repositories"
     ensure_fastfetch_ppa
     apply_repository_setup install_docker_ctop_repository
@@ -3327,10 +3342,15 @@ main() {
 
     if [[ "$APT_SOURCES_CHANGED" == true ]]; then
         info "apt update after repository changes"
-        run_apt_get update -qq
+        if ! run_apt_get update -qq; then
+            warn "APT update failed after repository changes; restoring previous repository state"
+            apt_transaction_rollback
+            die "APT repository validation failed; previous repository state restored"
+        fi
     else
         info "APT repositories unchanged; existing package cache is current"
     fi
+    apt_transaction_commit
 
     section "Packages"
     install_package_array "common" "${COMMON_PACKAGES[@]}"
