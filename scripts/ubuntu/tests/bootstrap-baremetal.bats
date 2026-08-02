@@ -66,6 +66,8 @@ EOF
         autoinstall_file="$BATS_TEST_DIRNAME/../$autoinstall_file"
 
         grep -Fq 'After=network-online.target cloud-final.service' "$autoinstall_file"
+        run grep -Fq 'ConditionPathExists=!/var/lib/packertron-bootstrap/complete' "$autoinstall_file"
+        [[ "$status" -ne 0 ]]
         grep -Fq 'Restart=on-failure' "$autoinstall_file"
         grep -Fq 'ExecStartPost=/usr/bin/systemctl disable packertron-firstboot.service' "$autoinstall_file"
         grep -Fq 'ExecStartPost=/usr/bin/rm -f /etc/systemd/system/packertron-firstboot.service' "$autoinstall_file"
