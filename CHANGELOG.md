@@ -1,3 +1,16 @@
+# [0.47.0](https://github.com/syselement/packertron-vms/compare/v0.46.0...v0.47.0) (2026-08-02)
+
+
+### Features
+
+* add alias for retrieving public IP address ([6b99d80](https://github.com/syselement/packertron-vms/commit/6b99d809dbd9e05c29eb49e2d237d2659926f4b1))
+* add whois package to common packages list ([21227d4](https://github.com/syselement/packertron-vms/commit/21227d4bba8478b11d1f29ceec72b4f57253ffc7))
+* implement APT transaction management for safer package updates and rollbacks ([117506b](https://github.com/syselement/packertron-vms/commit/117506b0d8f4c2ef4a52a3b8b96fe60132f00b66))
+* update manual setup steps and add WireGuard connection instructions ([e0f6dc0](https://github.com/syselement/packertron-vms/commit/e0f6dc0ba7d017146246ac05696ff1b3bfaec022))
+* update public IP alias to use ifconfig.me for better reliability ([a2488d3](https://github.com/syselement/packertron-vms/commit/a2488d3687d66a6d97b2518c54a3bc70d645ac7e))
+
+
+
 # [0.46.0](https://github.com/syselement/packertron-vms/compare/v0.45.0...v0.46.0) (2026-07-28)
 
 
@@ -45,15 +58,6 @@
 
 * add support for Vagrant and additional packages in provisioning scripts ([6a2ccd3](https://github.com/syselement/packertron-vms/commit/6a2ccd34399b93d701a08a7e9c410d390f4b8ab2))
 * added io.github.sigmasd.pingmonitor to Flatpak packages ([b774f34](https://github.com/syselement/packertron-vms/commit/b774f347fdced08d954e2d4f3f6fea67d5c83c1a))
-
-
-
-## [0.42.2](https://github.com/syselement/packertron-vms/compare/v0.42.1...v0.42.2) (2026-07-21)
-
-
-### Bug Fixes
-
-* update GNOME system monitor panel extension download URL and enhance autoinstall.yaml documentation ([4812989](https://github.com/syselement/packertron-vms/commit/481298914ca12b4afba34f6e73d0957cfc6f3e58))
 
 
 
