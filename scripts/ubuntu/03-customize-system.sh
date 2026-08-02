@@ -2705,7 +2705,7 @@ alias hsi='history | grep -i'
 alias ip='ip --color=auto'
 alias ipa='ip -br -c a'
 alias ports='ss -tunlp'
-alias publicip='curl ifconfig.io'
+alias publicip='curl -4 ifconfig.me && echo'
 
 # Python
 alias p3='python3'
