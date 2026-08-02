@@ -3136,9 +3136,57 @@ configure_git_for_user() {
     fi
 }
 
+homebrew_cpu_is_supported() {
+    case "$(uname -m)" in
+        x86_64 | amd64)
+            [[ -r /proc/cpuinfo ]] && grep -Eq '(^|[[:space:]])ssse3([[:space:]]|$)' /proc/cpuinfo
+            ;;
+        aarch64 | arm64)
+            return 0
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
+homebrew_is_usable() {
+    local brew_bin="$1"
+
+    [[ -x "$brew_bin" ]] || return 1
+    run_as_target_user "$brew_bin" --prefix >/dev/null 2>&1 &&
+        run_as_target_user "$brew_bin" --version >/dev/null 2>&1
+}
+
+configure_homebrew_bash() {
+    local brew_bin="$1"
+    local shellenv_line="eval \"\$(${brew_bin} shellenv)\""
+
+    run_as_target_user bash -s -- "$brew_bin" <<'TARGET_BASHRC'
+set -euo pipefail
+
+brew_bin="$1"
+rc="$HOME/.bashrc"
+line="eval \"\$(${brew_bin} shellenv)\""
+
+touch "$rc"
+
+if ! grep -Fqx "$line" "$rc"; then
+  {
+    printf "\n# Homebrew\n"
+    printf "%s\n" "$line"
+  } >> "$rc"
+fi
+TARGET_BASHRC
+
+    run_as_target_user grep -Fqx "$shellenv_line" "$TARGET_HOME/.bashrc" ||
+        die "failed to configure Homebrew in ${TARGET_HOME}/.bashrc"
+}
+
 install_homebrew_for_user() (
     set -Eeuo pipefail
 
+    local architecture
     local configured_prefix
     local installer_file
     local prefix="$HOMEBREW_PREFIX"
@@ -3146,9 +3194,23 @@ install_homebrew_for_user() (
     local temporary_dir
     local version_output
 
-    if [[ -x "$brew_bin" ]]; then
+    architecture="$(uname -m)"
+    if ! homebrew_cpu_is_supported; then
+        if [[ "$architecture" == "x86_64" || "$architecture" == "amd64" ]]; then
+            warn "Homebrew requires SSSE3 on x86_64; the current CPU flags do not expose it, skipping Homebrew"
+        else
+            warn "Homebrew does not support architecture ${architecture} in this workflow, skipping Homebrew"
+        fi
+        return 0
+    fi
+
+    if homebrew_is_usable "$brew_bin"; then
         info "Homebrew already installed; skipping installer prerequisites"
     else
+        if [[ -e "$brew_bin" ]]; then
+            warn "existing Homebrew installation is incomplete; rerunning the installer"
+        fi
+
         install_package_array "Homebrew prerequisite" \
             build-essential \
             procps \
@@ -3188,34 +3250,21 @@ install_homebrew_for_user() (
             die "Homebrew installation did not provide ${brew_bin}"
     fi
 
-    # Add Homebrew to Bash PATH idempotently.
-    run_as_target_user bash -s -- "$brew_bin" <<'TARGET_BASHRC'
-set -euo pipefail
-
-brew_bin="$1"
-rc="$HOME/.bashrc"
-line="eval \"\$(${brew_bin} shellenv)\""
-
-touch "$rc"
-
-if ! grep -Fqx "$line" "$rc"; then
-  {
-    printf "\n# Homebrew\n"
-    printf "%s\n" "$line"
-  } >> "$rc"
-fi
-TARGET_BASHRC
-
     verify_target_ownership "$prefix" "Homebrew prefix"
     verify_target_ownership "$brew_bin" "Homebrew binary"
 
-    configured_prefix="$(run_as_target_user "$brew_bin" --prefix)"
+    configured_prefix="$(run_as_target_user "$brew_bin" --prefix)" ||
+        die "Homebrew prefix verification failed"
     [[ "$configured_prefix" == "$prefix" ]] ||
         die "Homebrew reported unexpected prefix: ${configured_prefix}"
 
-    version_output="$(run_as_target_user "$brew_bin" --version)"
+    version_output="$(run_as_target_user "$brew_bin" --version)" ||
+        die "Homebrew version verification failed"
     [[ "$version_output" == Homebrew* ]] || die "Homebrew version verification failed"
+
+    configure_homebrew_bash "$brew_bin"
     ok "${version_output%%$'\n'*} installed and verified for ${TARGET_USER}"
+    info "Homebrew Bash setup is ready; start a new shell or run: source ${TARGET_HOME}/.bashrc"
 )
 
 show_manual_setup_hints() {
