@@ -28,6 +28,10 @@ SCRIPT_DIR="$(
 # shellcheck source=lib/apt-transaction.sh
 . "$SCRIPT_DIR/lib/apt-transaction.sh"
 
+# -----------------------------------------------------------------------------
+# Configuration and package manifests
+# -----------------------------------------------------------------------------
+
 SCRIPT_NAME="customize-system"
 LOG_PREFIX="[${SCRIPT_NAME}]"
 RUN_ID="$(date +%Y%m%d-%H%M%S)"
@@ -150,6 +154,10 @@ readonly -a VIRTUALIZATION_DESKTOP_PACKAGES=(
     virt-manager
 )
 
+# -----------------------------------------------------------------------------
+# Runtime and logging
+# -----------------------------------------------------------------------------
+
 require_root() {
     if [[ "${EUID}" -ne 0 ]]; then
         echo "[${SCRIPT_NAME}] ERROR must run as root (use: sudo bash $0)" >&2
@@ -212,13 +220,16 @@ log() {
 }
 section() {
     printf '\n'
-    log "STEP" "${t_cyan}${t_bold}" "--- $* ---"
+    log "STEP" "${t_cyan}${t_bold}" "==================== $* ===================="
 }
 info() { log "INFO" "$t_dim" "$@"; }
 ok() { log "OK" "${t_green}${t_bold}" "$@"; }
 warn() { log "WARN" "${t_yellow}${t_bold}" "$@"; }
 error() { log "ERROR" "${t_red}${t_bold}" "$@"; }
-manual_step() { section "$@"; }
+manual_step() {
+    printf '\n'
+    log "STEP" "${t_cyan}${t_bold}" "--- $* ---"
+}
 manual_line() { printf '    %s\n' "$*"; }
 manual_item() { printf '    • %s\n' "$*"; }
 manual_command() { printf '      $ %s\n' "$*"; }
@@ -227,7 +238,13 @@ die() {
     exit 1
 }
 
-# --- Helpers ---
+# -----------------------------------------------------------------------------
+# User context and command helpers
+# -----------------------------------------------------------------------------
+
+# Functions declared with (...) intentionally isolate traps, temporary
+# directories, working-directory changes, and local shell options.
+
 user_home() {
     local account="$1"
     getent passwd "$account" | cut -d: -f6
@@ -294,6 +311,10 @@ run_quiet_command() (
     done <"$output_file"
     return "$status"
 )
+
+# -----------------------------------------------------------------------------
+# Downloads, packages, and managed files
+# -----------------------------------------------------------------------------
 
 fetch_file() {
     local destination_file="$2"
@@ -713,6 +734,10 @@ install_available_package_array() {
     install_package_array "$description" "${available[@]}"
 }
 
+# -----------------------------------------------------------------------------
+# Virtualization and system services
+# -----------------------------------------------------------------------------
+
 virtualization_qemu_package() {
     case "$ARCH" in
         amd64) printf 'qemu-system-x86\n' ;;
@@ -876,6 +901,10 @@ install_flatpak_package_array() {
 
     ok "${description} package installation completed"
 }
+
+# -----------------------------------------------------------------------------
+# GNOME and target-user configuration
+# -----------------------------------------------------------------------------
 
 write_file_if_changed() {
     local source_file="$1"
@@ -1374,7 +1403,10 @@ enable_battery_health_preservation() {
     fi
 }
 
-# --- Repository setup ---
+# -----------------------------------------------------------------------------
+# Third-party repositories
+# -----------------------------------------------------------------------------
+
 ensure_fastfetch_ppa() {
     local ppa="ppa:zhangsongcui3371/fastfetch"
     local source_file
@@ -1730,6 +1762,10 @@ EOF
     [[ "$changed" == false ]] || return 10
 )
 
+# -----------------------------------------------------------------------------
+# Desktop applications and configuration
+# -----------------------------------------------------------------------------
+
 configure_flathub() (
     set -euo pipefail
 
@@ -1752,8 +1788,6 @@ configure_flathub() (
 
     ok "Flathub system remote configured"
 )
-
-# --- Desktop tools ---
 
 install_termix() (
     set -Eeuo pipefail
@@ -2410,7 +2444,10 @@ install_obsidian() (
     ok "Obsidian ${installed_version} installed from the official GitHub release"
 )
 
-# --- Common user tools and shell configuration ---
+# -----------------------------------------------------------------------------
+# Common user tools and shell configuration
+# -----------------------------------------------------------------------------
+
 prepare_user_workspace() (
     set -euo pipefail
 
@@ -3268,12 +3305,16 @@ install_homebrew_for_user() (
     info "Homebrew Bash setup is ready; start a new shell or run: source ${TARGET_HOME}/.bashrc"
 )
 
+# -----------------------------------------------------------------------------
+# Manual post-install instructions
+# -----------------------------------------------------------------------------
+
 show_manual_setup_hints() {
     local home
     local instruction_number=0
     home="$(user_home "$USER_NAME")"
 
-    section "Manual post-install setup"
+    section "Manual Post-Install Setup"
 
     if [[ "$UBUNTU_VARIANT" == "desktop" ]]; then
         manual_step "$((instruction_number += 1)). Fingerprint login"
@@ -3361,14 +3402,18 @@ show_manual_setup_hints() {
     manual_command "virsh --connect qemu:///system net-list --all"
 }
 
+# -----------------------------------------------------------------------------
+# Main entry point
+# -----------------------------------------------------------------------------
+
 main() {
     local end_ts elapsed start_ts
 
     initialize_runtime
 
-    section "Run context"
-    info "run_id: ${RUN_ID}"
-    info "started_at: $(date -Is)"
+    section "Run Context"
+    info "run_id=${RUN_ID}"
+    info "started_at=$(date -Is)"
     start_ts="$(date +%s)"
 
     info "distro version=${VERSION_ID} codename=${CODENAME} variant=${UBUNTU_VARIANT} variant_source=${UBUNTU_VARIANT_SOURCE} arch=${ARCH}"
@@ -3378,38 +3423,38 @@ main() {
     apt_transaction_recover
 
     section "Connectivity"
-    info "checking internet and DNS"
+    info "checking Internet connectivity and DNS resolution"
     if ping -c 1 -W 1 1.1.1.1 &>/dev/null || ping -c 1 -W 1 8.8.8.8 &>/dev/null || ping -c 1 -W 1 9.9.9.9 &>/dev/null; then
-        ok "Internet connected (ICMP ping)"
+        ok "Internet connectivity available (ICMP)"
     else
-        warn "Internet not connected (ICMP ping failed)"
+        warn "Internet connectivity unavailable over ICMP"
     fi
 
     if getent hosts ubuntu.com >/dev/null 2>&1; then
-        ok "DNS resolution OK (ubuntu.com)"
+        ok "DNS resolution available (ubuntu.com)"
     else
-        warn "DNS resolution FAILED (ubuntu.com)"
+        warn "DNS resolution unavailable (ubuntu.com)"
     fi
 
-    section "System update"
-    info "apt update/dist-upgrade"
+    section "System Update"
+    info "running APT update and dist-upgrade"
     run_apt_get update -qq
     run_apt_get dist-upgrade -y -qq
-    ok "apt update/dist-upgrade completed"
+    ok "APT update and dist-upgrade completed"
 
     if [[ "$UBUNTU_VARIANT" == "desktop" ]]; then
         if command -v snap >/dev/null 2>&1; then
-            info "snap refresh"
+            info "refreshing Snap packages"
             if timeout --foreground 15m snap refresh; then
-                ok "snap refresh completed"
+                ok "Snap refresh completed"
             else
-                warn "snap refresh failed or timed out, continuing"
+                warn "Snap refresh failed or timed out; continuing"
             fi
         else
-            warn "snap command not found, skipping snap refresh"
+            warn "Snap command unavailable; refresh skipped"
         fi
     else
-        info "server variant detected; skipping Desktop snap refresh"
+        info "Server detected; Desktop Snap refresh skipped"
     fi
 
     install_package_array "APT bootstrap" "${APT_BOOTSTRAP_PACKAGES[@]}"
@@ -3432,7 +3477,7 @@ main() {
         apply_repository_setup ensure_sublime_text_repository
         apply_repository_setup ensure_typora_repository
     else
-        info "server variant detected; skipping Desktop application repositories"
+        info "Server detected; Desktop application repositories skipped"
     fi
 
     if [[ "$APT_SOURCES_CHANGED" == true ]]; then
@@ -3446,6 +3491,7 @@ main() {
         info "APT repositories unchanged; existing package cache is current"
     fi
     apt_transaction_commit
+    ok "Repository configuration completed"
 
     section "Packages"
     install_package_array "common" "${COMMON_PACKAGES[@]}"
@@ -3461,15 +3507,17 @@ main() {
         install_termix
         install_typora_themeable
     else
-        info "server variant detected; skipping Desktop packages"
+        info "Server detected; Desktop packages skipped"
     fi
+    ok "Package installation completed"
 
     section "Virtualization"
     install_virtualization_stack
     configure_libvirt
     validate_virtualization_stack
+    ok "Virtualization configuration completed"
 
-    section "User environment"
+    section "User Environment"
     info "installing common user tools and shell configuration"
     prepare_user_workspace "$USER_NAME"
     install_starship
@@ -3484,7 +3532,7 @@ main() {
     install_homebrew_for_user
     ok "common user tools and shell configuration completed"
 
-    section "Desktop configuration"
+    section "Desktop Configuration"
     if [[ "$UBUNTU_VARIANT" == "desktop" ]]; then
         info "installing/configuring Desktop-specific tools"
         configure_desktop_wallpaper
@@ -3500,7 +3548,7 @@ main() {
         install_snap_package telegram-desktop "Telegram Desktop"
         ok "Desktop-specific tools installed/configured"
     else
-        info "server variant detected; skipping Desktop-specific tools"
+        info "Server detected; Desktop configuration skipped"
     fi
 
     info "updating locate database (best effort)"
@@ -3516,11 +3564,11 @@ main() {
         apply_gnome_preferences
         enable_battery_health_preservation
     else
-        info "server variant detected; skipping GNOME preferences"
+        info "Server detected; GNOME configuration skipped"
     fi
 
     section "Cleanup"
-    info "cleanup"
+    info "removing unused APT packages and cleaning the package cache"
     run_apt_get -y -qq autoremove --purge
     run_apt_get -y clean
     ok "cleanup completed"
@@ -3530,11 +3578,11 @@ main() {
     end_ts="$(date +%s)"
     elapsed="$((end_ts - start_ts))"
     section "Summary"
-    info "done: $(date -Is)"
-    info "elapsed: $(printf '%02d:%02d:%02d' "$((elapsed / 3600))" "$((elapsed % 3600 / 60))" "$((elapsed % 60))")"
-    info "log file: ${LOG_FILE}"
-    info "run_id: ${RUN_ID}"
-    ok "System provisioning complete"
+    info "completed_at=$(date -Is)"
+    info "elapsed=$(printf '%02d:%02d:%02d' "$((elapsed / 3600))" "$((elapsed % 3600 / 60))" "$((elapsed % 60))")"
+    info "log_file=${LOG_FILE}"
+    info "run_id=${RUN_ID}"
+    ok "System customization complete"
 
     if [[ "$REBOOT_AT_END" == "true" ]]; then
         info "rebooting in 10 seconds"
