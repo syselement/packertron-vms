@@ -1,3 +1,12 @@
+# [0.50.0](https://github.com/syselement/packertron-vms/compare/v0.49.0...v0.50.0) (2026-08-02)
+
+
+### Features
+
+* add Homebrew installation support with CPU architecture checks and test cases ([167b778](https://github.com/syselement/packertron-vms/commit/167b778f4c4214bf69d289c0153b1503effe6792))
+
+
+
 # [0.49.0](https://github.com/syselement/packertron-vms/compare/v0.48.0...v0.49.0) (2026-08-02)
 
 
@@ -45,17 +54,6 @@
 * add Docker directory creation in user workspace setup ([8ce13dc](https://github.com/syselement/packertron-vms/commit/8ce13dcc0cea3327e4afa51332390d3c0b12f494))
 * ensure Typora configuration and theme directories are created with correct ownership ([a9108b7](https://github.com/syselement/packertron-vms/commit/a9108b77792af50950642254e274ffeab1721965))
 * refactor Vagrantfile to use inline provisioning scripts and add integration tests ([891e1dc](https://github.com/syselement/packertron-vms/commit/891e1dcfc8fe939cd267b4bae5013327a920dbce))
-
-
-
-# [0.45.0](https://github.com/syselement/packertron-vms/compare/v0.44.0...v0.45.0) (2026-07-28)
-
-
-### Features
-
-* add cockpit-machines package to virtualization host packages ([ce85059](https://github.com/syselement/packertron-vms/commit/ce850591074216e52d1b2d732f0a6b8244a43c84))
-* add virtualization support and related configuration to customization script ([2b6b52a](https://github.com/syselement/packertron-vms/commit/2b6b52ae41a487dcdabeb5254c67a27d6991e79f))
-* update manual setup instructions and enhance test cases for virtualization ([afc39b3](https://github.com/syselement/packertron-vms/commit/afc39b36b079af498f544564e37ec187c1d54615))
 
 
 
