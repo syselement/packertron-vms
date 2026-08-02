@@ -183,6 +183,12 @@ The repository keeps the following logical order:
 
 `00` and `01` are template-build stages. `90` invokes `02` and `03` itself, so do not run all five sequentially on an already installed machine.
 
+### APT update behavior
+
+The repeated APT metadata refreshes in the update and provisioning phases are
+intentional. Each script is designed to remain independently executable and
+must not assume that a previous phase completed successfully.
+
 ## Validation
 
 Static and mocked tests can be run without changing the workstation:
@@ -196,3 +202,5 @@ git diff --check
 ```
 
 APT, systemd, GNOME, virtualization and reboot behavior still require a disposable Ubuntu VM for integration testing.
+
+---
