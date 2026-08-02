@@ -7,7 +7,7 @@
 # For autoinstall specific documentation see:
 # https://canonical-subiquity.readthedocs-hosted.com/en/latest/reference/autoinstall-reference.html
 #
-# This file is used by cloud-init to perform an unattended installation of Ubuntu 26.04 Desktop.
+# This file is used by cloud-init to perform an unattended installation of Ubuntu 26.04 Server.
 #
 # Customize username, password, timezone, keyboard layout, ssh authorized keys and other settings as needed.
 #
@@ -182,4 +182,4 @@ autoinstall:
 # Validate this file with
 # `sudo cloud-init schema --config-file user-data --annotate`
 # or
-# `sudo cloud-init schema --config-file autoinstall.yaml --annotate`
+# `sudo cloud-init schema --config-file autoinstall-server.yaml --annotate`

@@ -70,4 +70,4 @@ autoinstall:
 # Validate this file with
 # `sudo cloud-init schema --config-file user-data --annotate`
 # or
-# `sudo cloud-init schema --config-file autoinstall.yaml --annotate`
+# `sudo cloud-init schema --config-file autoinstall-noscripts.yaml --annotate`

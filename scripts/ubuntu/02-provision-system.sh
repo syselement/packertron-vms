@@ -496,6 +496,7 @@ main() {
     USER_NAME="$TARGET_USER"
     ARCH="$(dpkg --print-architecture)"
 
+    install -m 0600 /dev/null "$LOG_FILE"
     exec > >(tee "$LOG_FILE") 2>&1
 
     printf '%s\n' "################################"

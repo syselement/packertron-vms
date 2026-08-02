@@ -179,6 +179,7 @@ initialize_runtime() {
         t_red=$'\e[31m'
         t_reset=$'\e[0m'
     fi
+    install -m 0600 /dev/null "$LOG_FILE"
     exec > >(tee >(sed -u -r 's/\x1B\[[0-9;]*[[:alpha:]]//g' >"$LOG_FILE")) 2>&1
 
     initialize_ubuntu_context
@@ -263,6 +264,9 @@ verify_target_ownership() {
 run_apt_get() {
     DEBIAN_FRONTEND=noninteractive apt-get \
         -o DPkg::Lock::Timeout=300 \
+        -o Acquire::Retries=3 \
+        -o Acquire::http::Timeout=30 \
+        -o Acquire::https::Timeout=30 \
         "$@"
 }
 
@@ -298,6 +302,9 @@ fetch_file() {
         --silent \
         --location \
         --connect-timeout 10 \
+        --max-time 180 \
+        --speed-limit 1024 \
+        --speed-time 30 \
         --retry 2 \
         --retry-delay 2 \
         --output "$destination_file" \
@@ -2477,7 +2484,13 @@ install_fzf_for_user() {
         return
     else
         info "cloning fzf for ${account}"
-        sudo -u "$account" -H git clone --quiet --depth 1 https://github.com/junegunn/fzf.git "$home/.fzf"
+        timeout --foreground 180 \
+            sudo -u "$account" -H git \
+            -c http.lowSpeedLimit=1024 \
+            -c http.lowSpeedTime=30 \
+            clone --quiet --depth 1 \
+            https://github.com/junegunn/fzf.git "$home/.fzf" ||
+            die "fzf clone failed or timed out for ${account}"
     fi
 
     run_quiet_command \
@@ -2509,13 +2522,8 @@ install_starship() (
     trap 'rm -rf -- "$temporary_dir"' EXIT
 
     info "installing Starship"
-    curl \
-        --fail \
-        --show-error \
-        --silent \
-        --location \
-        --output "$temporary_dir/install.sh" \
-        "$STARSHIP_INSTALL_URL" || die "failed downloading the Starship installer"
+    fetch_file "$STARSHIP_INSTALL_URL" "$temporary_dir/install.sh" ||
+        die "failed downloading the Starship installer"
 
     [[ -s "$temporary_dir/install.sh" ]] || die "downloaded Starship installer is empty"
     sh -n "$temporary_dir/install.sh" || die "downloaded Starship installer is not valid shell"
@@ -2662,12 +2670,17 @@ ensure_bat_symlink_for_user() {
 configure_bash_for_user() {
     local account="$1"
     local home
+    local update_scope="system"
     home="$(user_home "$account")"
     [[ -n "$home" ]] || die "could not determine home directory for ${account}"
 
+    if [[ "$UBUNTU_VARIANT" == "desktop" && "$account" == "$TARGET_USER" ]]; then
+        update_scope="desktop-user"
+    fi
+
     ensure_bat_symlink_for_user "$account" "$home"
 
-    sudo -u "$account" -H python3 - "$home" <<'PY'
+    sudo -u "$account" -H python3 - "$home" "$update_scope" <<'PY'
 from datetime import datetime
 from pathlib import Path
 import os
@@ -2678,15 +2691,14 @@ import sys
 import tempfile
 
 home = Path(sys.argv[1])
+update_scope = sys.argv[2]
 bashrc = home / ".bashrc"
 aliases_path = home / ".bash_aliases"
 
 aliases = r'''# $HOME/.bash_aliases — centralized interactive aliases
 
 # System update
-# alias updateos='sudo sh -c "apt update && apt -y upgrade && apt -y autoremove"'
-# Comment above & Uncomment the following for full Ubuntu + Snap + Brew update
-alias updateos='sudo sh -c "apt update && apt -y upgrade && apt -y autoremove && snap refresh && flatpak update -y" && brew upgrade'
+@UPDATEOS_ALIAS@
 
 # Core utils
 alias brave='brave-browser'
@@ -2735,6 +2747,15 @@ alias sudo='sudo '
 # Ubuntu default long-running command notification
 alias alert='notify-send --urgency=low -i "$([ $? = 0 ] && echo terminal || echo error)" "$(history|tail -n1|sed -e '\''s/^\s*[0-9]\+\s*//;s/[;&|]\s*alert$//'\'')"'
 '''
+
+if update_scope == "desktop-user":
+    updateos_alias = """alias updateos='sudo sh -c \"apt update && apt -y upgrade && apt -y autoremove && snap refresh && flatpak update -y\" && brew upgrade'"""
+elif update_scope == "system":
+    updateos_alias = """alias updateos='sudo sh -c \"apt update && apt -y upgrade && apt -y autoremove\"'"""
+else:
+    raise SystemExit(f"unsupported update scope: {update_scope}")
+
+aliases = aliases.replace("@UPDATEOS_ALIAS@", updateos_alias)
 
 fzf_block = r'''# >>> fzf (managed) >>>
 export FZF_DEFAULT_OPTS='-m --height 50% --border'
@@ -3178,49 +3199,52 @@ TARGET_BASHRC
 
 show_manual_setup_hints() {
     local home
+    local instruction_number=0
     home="$(user_home "$USER_NAME")"
 
     section "Manual post-install setup"
 
-    manual_step "1/14 Fingerprint login"
-    manual_line "Open: Settings → System → Users → Fingerprint Login"
-    manual_line "Enroll at least two fingers and verify sudo authentication."
+    if [[ "$UBUNTU_VARIANT" == "desktop" ]]; then
+        manual_step "$((instruction_number += 1)). Fingerprint login"
+        manual_line "Open: Settings → System → Users → Fingerprint Login"
+        manual_line "Enroll at least two fingers and verify sudo authentication."
 
-    manual_step "2/14 Keyboard shortcuts"
-    manual_line "Open: Settings → Keyboard → View and Customize Shortcuts"
-    manual_line "Then: Custom Shortcuts → Add Shortcut"
-    manual_item "Flameshot"
-    manual_line "Command:"
-    manual_command "script --quiet --command \"/usr/bin/flameshot gui --clipboard --path ${home}/Pictures/flameshot\" /dev/null"
-    manual_line "Shortcut: Print or Shift+Alt+S"
-    manual_item "Emote"
-    manual_line "Command:"
-    manual_command "/snap/bin/emote"
-    manual_line "Shortcut: Super+Comma (Windows key + ,)"
+        manual_step "$((instruction_number += 1)). Keyboard shortcuts"
+        manual_line "Open: Settings → Keyboard → View and Customize Shortcuts"
+        manual_line "Then: Custom Shortcuts → Add Shortcut"
+        manual_item "Flameshot"
+        manual_line "Command:"
+        manual_command "script --quiet --command \"/usr/bin/flameshot gui --clipboard --path ${home}/Pictures/flameshot\" /dev/null"
+        manual_line "Shortcut: Print or Shift+Alt+S"
+        manual_item "Emote"
+        manual_line "Command:"
+        manual_command "/snap/bin/emote"
+        manual_line "Shortcut: Super+Comma (Windows key + ,)"
 
-    manual_step "3/14 Bluetooth devices"
-    manual_line "Open: Settings → Bluetooth"
-    manual_line "Pair the mouse, soundbar, and other devices."
+        manual_step "$((instruction_number += 1)). Bluetooth devices"
+        manual_line "Open: Settings → Bluetooth"
+        manual_line "Pair the mouse, soundbar, and other devices."
 
-    manual_step "4/14 Visual Studio Code"
-    manual_line "Open: VS Code → Accounts → Sign in with GitHub"
-    manual_line "Enable Settings Sync and verify restored extensions and settings."
+        manual_step "$((instruction_number += 1)). Visual Studio Code"
+        manual_line "Open: VS Code → Accounts → Sign in with GitHub"
+        manual_line "Enable Settings Sync and verify restored extensions and settings."
 
-    manual_step "5/14 Bitwarden and Ente Auth"
-    manual_line "Sign in, complete MFA, and verify vault synchronization."
+        manual_step "$((instruction_number += 1)). Bitwarden and Ente Auth"
+        manual_line "Sign in, complete MFA, and verify vault synchronization."
 
-    manual_step "6/14 Brave"
-    manual_line "Open: brave://settings/braveSync/setup"
-    manual_line "Join the existing sync chain and verify bookmarks and extensions."
+        manual_step "$((instruction_number += 1)). Brave"
+        manual_line "Open: brave://settings/braveSync/setup"
+        manual_line "Join the existing sync chain and verify bookmarks and extensions."
 
-    manual_step "7/14 Obsidian"
-    manual_line "Vault path: ${home}/obsidian"
-    manual_line "Configure Obsidian Sync, Git, or the selected backup method."
+        manual_step "$((instruction_number += 1)). Obsidian"
+        manual_line "Vault path: ${home}/obsidian"
+        manual_line "Configure Obsidian Sync, Git, or the selected backup method."
 
-    manual_step "8/14 Telegram"
-    manual_line "Sign in and verify the session."
+        manual_step "$((instruction_number += 1)). Telegram"
+        manual_line "Sign in and verify the session."
+    fi
 
-    manual_step "9/14 SSH private key"
+    manual_step "$((instruction_number += 1)). SSH private key"
     manual_line "Copy the private key from a trusted offline source or password manager:"
     manual_command "cat > ${home}/.ssh/id_ed25519"
     manual_line "Paste the key, then press Ctrl-D."
@@ -3232,19 +3256,19 @@ show_manual_setup_hints() {
     manual_command "ssh-add ${home}/.ssh/id_ed25519 || { eval \"\$(ssh-agent -s)\"; ssh-add ${home}/.ssh/id_ed25519; }"
     manual_command "ssh -T git@github.com"
 
-    manual_step "10/14 Tailscale client"
+    manual_step "$((instruction_number += 1)). Tailscale client"
     manual_command "sudo tailscale up"
     manual_line "Open the authentication URL, then verify the connection:"
     manual_command "tailscale status"
 
-    manual_step "11/14 WireGuard connection"
+    manual_step "$((instruction_number += 1)). WireGuard connection"
     manual_line "Add the WireGuard configuration to /etc/wireguard/wg0.conf, then import it:"
     manual_command "sudo nmcli connection import type wireguard file /etc/wireguard/wg0.conf"
 
-    manual_step "12/14 Cockpit web console"
+    manual_step "$((instruction_number += 1)). Cockpit web console"
     manual_line "Visit: https://localhost:9090/"
 
-    manual_step "13/14 Clone Git repositories over SSH"
+    manual_step "$((instruction_number += 1)). Clone Git repositories over SSH"
     manual_item "GitHub:  cd ${home}/repos/github"
     manual_item "GitLab:  cd ${home}/repos/gitlab"
     manual_item "Forgejo: cd ${home}/repos/forgejo"
@@ -3252,7 +3276,7 @@ show_manual_setup_hints() {
     manual_line "Verify the configured Git identity:"
     manual_command "git config list"
 
-    manual_step "14/14 Virtualization"
+    manual_step "$((instruction_number += 1)). Virtualization"
     manual_line "Log out and back in, or reboot, before managing virtual machines."
     manual_line "This applies the new libvirt group membership."
     if [[ "$UBUNTU_VARIANT" == "desktop" ]]; then
@@ -3305,10 +3329,10 @@ main() {
     if [[ "$UBUNTU_VARIANT" == "desktop" ]]; then
         if command -v snap >/dev/null 2>&1; then
             info "snap refresh"
-            if snap refresh; then
+            if timeout --foreground 15m snap refresh; then
                 ok "snap refresh completed"
             else
-                warn "snap refresh failed, continuing"
+                warn "snap refresh failed or timed out, continuing"
             fi
         else
             warn "snap command not found, skipping snap refresh"
