@@ -1,3 +1,13 @@
+# [0.48.0](https://github.com/syselement/packertron-vms/compare/v0.47.0...v0.48.0) (2026-08-02)
+
+
+### Features
+
+* enhance logging and timeout settings in provisioning scripts ([85d4ba5](https://github.com/syselement/packertron-vms/commit/85d4ba546742e8bd417fece4ef0b2b7d705f2580))
+* refactor update system script and enhance guest tool installation logic ([af00cc7](https://github.com/syselement/packertron-vms/commit/af00cc76ccf3c929d189c1ddb12479688a17baeb))
+
+
+
 # [0.47.0](https://github.com/syselement/packertron-vms/compare/v0.46.0...v0.47.0) (2026-08-02)
 
 
@@ -48,16 +58,6 @@
 * add Cockpit socket configuration and related tests ([0259609](https://github.com/syselement/packertron-vms/commit/0259609cba6ce9e57c237d9a9219ced5f3b74374))
 * enhance logging and manual setup instructions in customization script ([4111a3d](https://github.com/syselement/packertron-vms/commit/4111a3d55b897ab9fa766f8c9a14a420cbb150d6))
 * enhance package installation logic to skip downloads for already installed versions ([bd2efb0](https://github.com/syselement/packertron-vms/commit/bd2efb017a884b94bda81ab9631b42a9064fc894))
-
-
-
-# [0.43.0](https://github.com/syselement/packertron-vms/compare/v0.42.2...v0.43.0) (2026-07-27)
-
-
-### Features
-
-* add support for Vagrant and additional packages in provisioning scripts ([6a2ccd3](https://github.com/syselement/packertron-vms/commit/6a2ccd34399b93d701a08a7e9c410d390f4b8ab2))
-* added io.github.sigmasd.pingmonitor to Flatpak packages ([b774f34](https://github.com/syselement/packertron-vms/commit/b774f347fdced08d954e2d4f3f6fea67d5c83c1a))
 
 
 
