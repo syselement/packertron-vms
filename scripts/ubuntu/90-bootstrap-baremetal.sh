@@ -2,6 +2,9 @@
 #
 # First-boot orchestration for physical Ubuntu workstations.
 #
+# Manual run this script as root on a freshly installed Ubuntu system:
+# git clone https://github.com/syselement/packertron-vms.git && cd packertron-vms/scripts/ubuntu && sudo env TARGET_USER="$USER" ./90-bootstrap-baremetal.sh
+#
 
 set -Eeuo pipefail
 

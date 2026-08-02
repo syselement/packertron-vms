@@ -138,6 +138,8 @@ setup() {
 @test "requested APT and Flatpak packages remain organized by scope" {
   [[ " ${COMMON_PACKAGES[*]} " == *" cockpit "* ]]
   [[ " ${COMMON_PACKAGES[*]} " == *" tailscale "* ]]
+  [[ " ${COMMON_PACKAGES[*]} " != *" rdap "* ]]
+  [[ " ${RELEASE_OPTIONAL_PACKAGES[*]} " == *" rdap "* ]]
   [[ " ${DESKTOP_PACKAGES[*]} " == *" meld "* ]]
   [[ " ${DESKTOP_PACKAGES[*]} " == *" typora "* ]]
   [[ " ${FLATPAK_PACKAGES[*]} " == *" org.cryptomator.Cryptomator "* ]]
@@ -554,6 +556,39 @@ FAKE_GSETTINGS
   [[ "$status" -ne 0 ]]
   [[ "$output" == *"failed installing test packages: required-package"* ]]
   [[ "$output" != *"package installation completed"* ]]
+}
+
+@test "release-optional packages skip entries unavailable on Ubuntu 24.04" {
+  VERSION_ID="24.04"
+  apt-cache() {
+    return 1
+  }
+  install_package_array() {
+    printf 'unexpected package installation\n' >&2
+    return 99
+  }
+
+  run install_available_package_array "release-optional" rdap
+
+  [[ "$status" -eq 0 ]]
+  [[ "$output" == *"rdap is unavailable for Ubuntu 24.04; skipping"* ]]
+  [[ "$output" != *"unexpected package installation"* ]]
+}
+
+@test "release-optional packages install entries available on Ubuntu 26.04" {
+  local install_record="$BATS_TEST_TMPDIR/install-record"
+
+  VERSION_ID="26.04"
+  apt-cache() {
+    return 0
+  }
+  install_package_array() {
+    printf '%s\n' "$*" >"$install_record"
+  }
+
+  install_available_package_array "release-optional" rdap
+
+  [[ "$(<"$install_record")" == "release-optional rdap" ]]
 }
 
 @test "Cockpit socket helper skips an already enabled active socket" {
