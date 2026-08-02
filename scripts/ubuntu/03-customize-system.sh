@@ -1089,9 +1089,10 @@ set_gsetting org.gnome.desktop.interface text-scaling-factor "1.1"
 set_gsetting org.gnome.desktop.background picture-uri "'${wallpaper_uri}'"
 set_gsetting org.gnome.desktop.background picture-uri-dark "'${wallpaper_uri}'"
 set_gsetting org.gnome.desktop.background picture-options "'zoom'"
+set_gsetting org.gnome.mutter workspaces-only-on-primary false
 
 # Ubuntu Dock
-set_gsetting org.gnome.shell.extensions.dash-to-dock click-action "'minimize'"
+set_gsetting org.gnome.shell.extensions.dash-to-dock click-action "'minimize-or-previews'"
 set_gsetting org.gnome.shell.extensions.dash-to-dock dash-max-icon-size "34"
 # Persist this override even when the pre-login schema default already matches.
 set_gsetting org.gnome.shell.extensions.dash-to-dock dock-position "'BOTTOM'" true
