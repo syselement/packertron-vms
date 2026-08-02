@@ -61,11 +61,12 @@ setup() {
 
   [[ "$status" -eq 0 ]]
   [[ "$output" == *"STEP  --- Manual post-install setup ---"* ]]
-  [[ "$output" == *"STEP  --- 1/14 Fingerprint login ---"* ]]
-  [[ "$output" == *"STEP  --- 11/14 WireGuard connection ---"* ]]
-  [[ "$output" == *"STEP  --- 12/14 Cockpit web console ---"* ]]
-  [[ "$output" == *"STEP  --- 13/14 Clone Git repositories over SSH ---"* ]]
-  [[ "$output" == *"STEP  --- 14/14 Virtualization ---"* ]]
+  [[ "$output" == *"STEP  --- 1. Fingerprint login ---"* ]]
+  [[ "$output" == *"STEP  --- 11. WireGuard connection ---"* ]]
+  [[ "$output" == *"STEP  --- 12. Cockpit web console ---"* ]]
+  [[ "$output" == *"STEP  --- 13. Clone Git repositories over SSH ---"* ]]
+  [[ "$output" == *"STEP  --- 14. Virtualization ---"* ]]
+  [[ "$output" != *"/14"* ]]
   [[ "$output" == *"sudo nmcli connection import type wireguard file /etc/wireguard/wg0.conf"* ]]
   [[ "$output" == *"Visit: https://localhost:9090/"* ]]
   [[ "$output" == *"This applies the new libvirt group membership."* ]]
@@ -82,8 +83,56 @@ setup() {
   run show_manual_setup_hints
 
   [[ "$status" -eq 0 ]]
+  [[ "$output" == *"STEP  --- 1. SSH private key ---"* ]]
+  [[ "$output" == *"STEP  --- 6. Virtualization ---"* ]]
   [[ "$output" == *"Manage this headless host with virsh or a remote virt-manager client."* ]]
   [[ "$output" != *'$ virt-manager --connect qemu:///system'* ]]
+  [[ "$output" != *"Fingerprint login"* ]]
+  [[ "$output" != *"Keyboard shortcuts"* ]]
+  [[ "$output" != *"Brave"* ]]
+  [[ "$output" != *"Obsidian"* ]]
+  [[ "$output" != *"Telegram"* ]]
+}
+
+@test "external downloads use bounded transfer settings" {
+  local curl_record="$BATS_TEST_TMPDIR/curl-record"
+
+  curl() {
+    printf '%s\n' "$@" >"$curl_record"
+  }
+
+  fetch_file "https://example.invalid/test" "$BATS_TEST_TMPDIR/download"
+
+  grep -Fxq -- '--connect-timeout' "$curl_record"
+  grep -Fxq -- '--max-time' "$curl_record"
+  grep -Fxq -- '--speed-limit' "$curl_record"
+  grep -Fxq -- '--speed-time' "$curl_record"
+  grep -Fxq -- '--retry' "$curl_record"
+}
+
+@test "APT and Snap network operations are bounded" {
+  local apt_record="$BATS_TEST_TMPDIR/apt-record"
+
+  apt-get() {
+    printf '%s\n' "$@" >"$apt_record"
+  }
+
+  run_apt_get update
+
+  grep -Fxq 'Acquire::Retries=3' "$apt_record"
+  grep -Fxq 'Acquire::http::Timeout=30' "$apt_record"
+  grep -Fxq 'Acquire::https::Timeout=30' "$apt_record"
+  grep -Fq 'timeout --foreground 15m snap refresh' "$CUSTOMIZE_SCRIPT"
+}
+
+@test "provisioning logs enforce mode 0600 before capture" {
+  local scripts_dir="$BATS_TEST_DIRNAME/.."
+
+  grep -Fq 'install -m 0600 /dev/null "$LOG_FILE"' "$scripts_dir/02-provision-system.sh"
+  grep -Fq 'install -m 0600 /dev/null "$LOG_FILE"' "$scripts_dir/03-customize-system.sh"
+  grep -Fq 'chmod 0600 "$LOG_FILE"' "$scripts_dir/90-bootstrap-baremetal.sh"
+  grep -Fq 'chmod 0600 "$LOG_FILE"' "$scripts_dir/autoinstall-desktop.yaml"
+  grep -Fq 'chmod 0600 "$LOG_FILE"' "$scripts_dir/autoinstall-server.yaml"
 }
 
 @test "requested APT and Flatpak packages remain organized by scope" {
@@ -1009,6 +1058,91 @@ FAKE_GSETTINGS
   [[ "$output" != *"unexpected fzf mutation"* ]]
 }
 
+@test "fzf clone has total and low-speed timeouts" {
+  local test_home="$BATS_TEST_TMPDIR/home"
+  local timeout_record="$BATS_TEST_TMPDIR/timeout-record"
+
+  mkdir -p "$test_home"
+  user_home() {
+    printf '%s\n' "$test_home"
+  }
+  timeout() {
+    printf '%s\n' "$@" >"$timeout_record"
+    return 124
+  }
+
+  run install_fzf_for_user testuser
+
+  [[ "$status" -ne 0 ]]
+  [[ "$output" == *"fzf clone failed or timed out for testuser"* ]]
+  grep -Fxq -- '--foreground' "$timeout_record"
+  grep -Fxq '180' "$timeout_record"
+  grep -Fxq 'http.lowSpeedLimit=1024' "$timeout_record"
+  grep -Fxq 'http.lowSpeedTime=30' "$timeout_record"
+}
+
+@test "Desktop target receives full updateos while root receives system-only updateos" {
+  local root_home="$BATS_TEST_TMPDIR/root"
+  local target_home="$BATS_TEST_TMPDIR/desktop-user"
+
+  TARGET_USER="desktop-user"
+  UBUNTU_VARIANT="desktop"
+  mkdir -p "$root_home" "$target_home"
+
+  user_home() {
+    if [[ "$1" == "$TARGET_USER" ]]; then
+      printf '%s\n' "$target_home"
+    else
+      printf '%s\n' "$root_home"
+    fi
+  }
+  ensure_bat_symlink_for_user() { return 0; }
+  sudo() {
+    [[ "$1" == "-u" ]]
+    shift 2
+    [[ "$1" == "-H" ]]
+    shift
+    "$@"
+  }
+
+  configure_bash_for_user "$TARGET_USER"
+  configure_bash_for_user root
+
+  grep -Fq 'snap refresh && flatpak update -y" && brew upgrade' "$target_home/.bash_aliases"
+  if grep -Fq 'snap refresh' "$root_home/.bash_aliases" ||
+    grep -Fq 'flatpak update' "$root_home/.bash_aliases" ||
+    grep -Fq 'brew upgrade' "$root_home/.bash_aliases"; then
+    return 1
+  fi
+}
+
+@test "Server target receives system-only updateos" {
+  local target_home="$BATS_TEST_TMPDIR/server-user"
+
+  TARGET_USER="server-user"
+  UBUNTU_VARIANT="server"
+  mkdir -p "$target_home"
+
+  user_home() { printf '%s\n' "$target_home"; }
+  ensure_bat_symlink_for_user() { return 0; }
+  sudo() {
+    [[ "$1" == "-u" ]]
+    shift 2
+    [[ "$1" == "-H" ]]
+    shift
+    "$@"
+  }
+
+  configure_bash_for_user "$TARGET_USER"
+
+  grep -Fq 'apt update && apt -y upgrade && apt -y autoremove"' "$target_home/.bash_aliases"
+  if grep -Fq 'snap refresh' "$target_home/.bash_aliases" ||
+    grep -Fq 'flatpak update' "$target_home/.bash_aliases" ||
+    grep -Fq 'brew upgrade' "$target_home/.bash_aliases"; then
+    return 1
+  fi
+}
+
 @test "Nerd Font detection does not reinstall a matched font" {
   TARGET_USER="$(id -un)"
   TARGET_HOME="$BATS_TEST_TMPDIR/home"
@@ -1651,11 +1785,11 @@ EOF
   run show_manual_setup_hints
 
   [[ "$status" -eq 0 ]]
-  [[ "$output" == *"11/14 WireGuard connection"* ]]
+  [[ "$output" == *"11. WireGuard connection"* ]]
   [[ "$output" == *"sudo nmcli connection import type wireguard file /etc/wireguard/wg0.conf"* ]]
-  [[ "$output" == *"12/14 Cockpit web console"* ]]
+  [[ "$output" == *"12. Cockpit web console"* ]]
   [[ "$output" == *"https://localhost:9090/"* ]]
-  [[ "$output" == *"13/14 Clone Git repositories over SSH"* ]]
-  [[ "$output" == *"14/14 Virtualization"* ]]
+  [[ "$output" == *"13. Clone Git repositories over SSH"* ]]
+  [[ "$output" == *"14. Virtualization"* ]]
   [[ "$output" == *"virsh --connect qemu:///system list --all"* ]]
 }
