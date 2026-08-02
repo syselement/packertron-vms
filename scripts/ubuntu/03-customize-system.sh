@@ -86,7 +86,6 @@ readonly -a COMMON_PACKAGES=(
     openjdk-21-jre-headless
     pipx
     plocate
-    rdap
     s-tui
     shellcheck
     shfmt
@@ -105,6 +104,10 @@ readonly -a COMMON_PACKAGES=(
     whois
     wireguard
     zsh
+)
+
+readonly -a RELEASE_OPTIONAL_PACKAGES=(
+    rdap
 )
 
 readonly -a DESKTOP_PACKAGES=(
@@ -690,6 +693,24 @@ install_package_array() {
         die "failed installing ${description} packages: ${missing[*]}"
     fi
     ok "${description} package installation completed"
+}
+
+install_available_package_array() {
+    local description="$1"
+    shift
+    local package
+    local -a available=()
+
+    for package in "$@"; do
+        if apt-cache show "$package" >/dev/null 2>&1; then
+            available+=("$package")
+        else
+            info "${package} is unavailable for Ubuntu ${VERSION_ID}; skipping"
+        fi
+    done
+
+    ((${#available[@]} > 0)) || return 0
+    install_package_array "$description" "${available[@]}"
 }
 
 virtualization_qemu_package() {
@@ -3378,6 +3399,7 @@ main() {
 
     section "Packages"
     install_package_array "common" "${COMMON_PACKAGES[@]}"
+    install_available_package_array "release-optional" "${RELEASE_OPTIONAL_PACKAGES[@]}"
     configure_cockpit_socket
     install_pandoc
     if [[ "$UBUNTU_VARIANT" == "desktop" ]]; then
