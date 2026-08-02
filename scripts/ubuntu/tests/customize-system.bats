@@ -40,7 +40,7 @@ setup() {
   [[ "$output" == *' INFO  literal \n and %s content' ]]
 }
 
-@test "section logger is neutral and ANSI-free without terminal colors" {
+@test "major section logger uses a strong ANSI-free delimiter without terminal colors" {
   t_bold=""
   t_cyan=""
   t_reset=""
@@ -48,8 +48,21 @@ setup() {
   run section "Repositories"
 
   [[ "$status" -eq 0 ]]
-  [[ "$output" == *" STEP  --- Repositories ---" ]]
+  [[ "$output" == *" STEP  ==================== Repositories ====================" ]]
   [[ "$output" != *" WARN "* ]]
+  [[ "$output" != *$'\e['* ]]
+}
+
+@test "manual step logger remains visually lighter than a major section" {
+  t_bold=""
+  t_cyan=""
+  t_reset=""
+
+  run manual_step "1. SSH private key"
+
+  [[ "$status" -eq 0 ]]
+  [[ "$output" == *" STEP  --- 1. SSH private key ---" ]]
+  [[ "$output" != *"===================="* ]]
   [[ "$output" != *$'\e['* ]]
 }
 
@@ -60,7 +73,7 @@ setup() {
   run show_manual_setup_hints
 
   [[ "$status" -eq 0 ]]
-  [[ "$output" == *"STEP  --- Manual post-install setup ---"* ]]
+  [[ "$output" == *"STEP  ==================== Manual Post-Install Setup ===================="* ]]
   [[ "$output" == *"STEP  --- 1. Fingerprint login ---"* ]]
   [[ "$output" == *"STEP  --- 11. WireGuard connection ---"* ]]
   [[ "$output" == *"STEP  --- 12. Cockpit web console ---"* ]]
