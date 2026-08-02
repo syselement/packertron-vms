@@ -146,7 +146,6 @@ autoinstall:
           Description=Packertron retryable first-boot provisioning
           Wants=network-online.target
           After=network-online.target cloud-final.service
-          ConditionPathExists=!/var/lib/packertron-bootstrap/complete
           StartLimitIntervalSec=0
 
           [Service]
