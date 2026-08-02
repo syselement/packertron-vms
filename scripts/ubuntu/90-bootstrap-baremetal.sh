@@ -110,7 +110,7 @@ main() {
     fi
 
     # Intentionally omitted:
-    # 00-update-system.sh  - VMware-specific
+    # 00-update-system.sh  - VM template updates and guest agents
     # 01-cleanup-system.sh - template hygiene, unsafe/unnecessary here
     run_step "02-provision-system" "02-provision-system.sh"
     run_step "03-customize-system" "03-customize-system.sh"
