@@ -61,10 +61,12 @@ setup() {
 
   [[ "$status" -eq 0 ]]
   [[ "$output" == *"STEP  --- Manual post-install setup ---"* ]]
-  [[ "$output" == *"STEP  --- 1/13 Fingerprint login ---"* ]]
-  [[ "$output" == *"STEP  --- 11/13 Cockpit web console ---"* ]]
-  [[ "$output" == *"STEP  --- 12/13 Clone Git repositories over SSH ---"* ]]
-  [[ "$output" == *"STEP  --- 13/13 Virtualization ---"* ]]
+  [[ "$output" == *"STEP  --- 1/14 Fingerprint login ---"* ]]
+  [[ "$output" == *"STEP  --- 11/14 WireGuard connection ---"* ]]
+  [[ "$output" == *"STEP  --- 12/14 Cockpit web console ---"* ]]
+  [[ "$output" == *"STEP  --- 13/14 Clone Git repositories over SSH ---"* ]]
+  [[ "$output" == *"STEP  --- 14/14 Virtualization ---"* ]]
+  [[ "$output" == *"sudo nmcli connection import type wireguard file /etc/wireguard/wg0.conf"* ]]
   [[ "$output" == *"Visit: https://localhost:9090/"* ]]
   [[ "$output" == *"This applies the new libvirt group membership."* ]]
   [[ "$output" == *$'\n    Open: Settings → System → Users → Fingerprint Login'* ]]
@@ -1649,9 +1651,11 @@ EOF
   run show_manual_setup_hints
 
   [[ "$status" -eq 0 ]]
-  [[ "$output" == *"11/13 Cockpit web console"* ]]
+  [[ "$output" == *"11/14 WireGuard connection"* ]]
+  [[ "$output" == *"sudo nmcli connection import type wireguard file /etc/wireguard/wg0.conf"* ]]
+  [[ "$output" == *"12/14 Cockpit web console"* ]]
   [[ "$output" == *"https://localhost:9090/"* ]]
-  [[ "$output" == *"12/13 Clone Git repositories over SSH"* ]]
-  [[ "$output" == *"13/13 Virtualization"* ]]
+  [[ "$output" == *"13/14 Clone Git repositories over SSH"* ]]
+  [[ "$output" == *"14/14 Virtualization"* ]]
   [[ "$output" == *"virsh --connect qemu:///system list --all"* ]]
 }

@@ -25,6 +25,8 @@ SCRIPT_DIR="$(
 
 # shellcheck source=lib/ubuntu-context.sh
 . "$SCRIPT_DIR/lib/ubuntu-context.sh"
+# shellcheck source=lib/apt-transaction.sh
+. "$SCRIPT_DIR/lib/apt-transaction.sh"
 
 SCRIPT_NAME="customize-system"
 LOG_PREFIX="[${SCRIPT_NAME}]"
@@ -38,6 +40,7 @@ APT_SOURCES_DIR="${PACKERTRON_APT_SOURCES_DIR:-/etc/apt/sources.list.d}"
 APT_TRUSTED_KEY_DIR="${PACKERTRON_APT_TRUSTED_KEY_DIR:-/etc/apt/trusted.gpg.d}"
 SYSTEMD_RUNTIME_DIR="${PACKERTRON_SYSTEMD_RUNTIME_DIR:-/run/systemd/system}"
 KVM_DEVICE="${PACKERTRON_KVM_DEVICE:-/dev/kvm}"
+APT_TRANSACTION_DIR="${PACKERTRON_APT_TRANSACTION_DIR:-/var/lib/packertron-apt-transactions/customize-system}"
 HOMEBREW_PREFIX="${PACKERTRON_HOMEBREW_PREFIX:-/home/linuxbrew/.linuxbrew}"
 HOMEBREW_INSTALL_URL="${HOMEBREW_INSTALL_URL:-https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh}"
 
@@ -83,6 +86,7 @@ readonly -a COMMON_PACKAGES=(
     openjdk-21-jre-headless
     pipx
     plocate
+    rdap
     s-tui
     shellcheck
     shfmt
@@ -98,6 +102,7 @@ readonly -a COMMON_PACKAGES=(
     unzip
     vim
     wget
+    whois
     wireguard
     zsh
 )
@@ -124,6 +129,7 @@ readonly -a DESKTOP_PACKAGES=(
 
 readonly -a FLATPAK_PACKAGES=(
     com.bitwarden.desktop
+    com.obsproject.Studio
     de.swsnr.turnon
     io.ente.auth
     io.github.sigmasd.pingmonitor
@@ -853,6 +859,8 @@ write_file_if_changed() {
         return 1
     fi
 
+    apt_transaction_record_file "$destination_file"
+
     destination_directory="$(dirname -- "$destination_file")"
     install -d -m 0755 "$destination_directory"
     temporary_file="$(mktemp "${destination_file}.tmp.XXXXXX")"
@@ -1340,6 +1348,7 @@ enable_battery_health_preservation() {
 # --- Repository setup ---
 ensure_fastfetch_ppa() {
     local ppa="ppa:zhangsongcui3371/fastfetch"
+    local source_file
 
     case "$VERSION_ID" in
         24.*)
@@ -1353,6 +1362,9 @@ ensure_fastfetch_ppa() {
             fi
 
             if add-apt-repository --yes --no-update "$ppa" >/dev/null 2>&1; then
+                while IFS= read -r -d '' source_file; do
+                    apt_transaction_record_created_file "$source_file"
+                done < <(grep -RlZ -- "zhangsongcui3371/fastfetch" "$APT_SOURCES_DIR" 2>/dev/null || true)
                 APT_SOURCES_CHANGED=true
                 ok "added fastfetch PPA for Ubuntu ${VERSION_ID}"
             else
@@ -1546,6 +1558,7 @@ ensure_brave_browser_repository() (
     legacy_files=("${APT_SOURCES_DIR}"/brave-browser-*.list)
     shopt -u nullglob
     for legacy_file in "${legacy_files[@]}"; do
+        apt_transaction_record_file "$legacy_file"
         rm -f -- "$legacy_file"
         changed=true
         info "removed legacy Brave repository file: ${legacy_file}"
@@ -1679,6 +1692,7 @@ EOF
         info "Typora repository already configured"
     fi
     if [[ -e "$legacy_key_file" ]]; then
+        apt_transaction_record_file "$legacy_key_file"
         rm -f -- "$legacy_key_file"
         changed=true
         info "removed obsolete Typora repository key: ${legacy_key_file}"
@@ -2703,6 +2717,7 @@ alias hsi='history | grep -i'
 alias ip='ip --color=auto'
 alias ipa='ip -br -c a'
 alias ports='ss -tunlp'
+alias publicip='curl -4 ifconfig.me && echo'
 
 # Python
 alias p3='python3'
@@ -3167,11 +3182,11 @@ show_manual_setup_hints() {
 
     section "Manual post-install setup"
 
-    manual_step "1/13 Fingerprint login"
+    manual_step "1/14 Fingerprint login"
     manual_line "Open: Settings → System → Users → Fingerprint Login"
     manual_line "Enroll at least two fingers and verify sudo authentication."
 
-    manual_step "2/13 Keyboard shortcuts"
+    manual_step "2/14 Keyboard shortcuts"
     manual_line "Open: Settings → Keyboard → View and Customize Shortcuts"
     manual_line "Then: Custom Shortcuts → Add Shortcut"
     manual_item "Flameshot"
@@ -3183,29 +3198,29 @@ show_manual_setup_hints() {
     manual_command "/snap/bin/emote"
     manual_line "Shortcut: Super+Comma (Windows key + ,)"
 
-    manual_step "3/13 Bluetooth devices"
+    manual_step "3/14 Bluetooth devices"
     manual_line "Open: Settings → Bluetooth"
     manual_line "Pair the mouse, soundbar, and other devices."
 
-    manual_step "4/13 Visual Studio Code"
+    manual_step "4/14 Visual Studio Code"
     manual_line "Open: VS Code → Accounts → Sign in with GitHub"
     manual_line "Enable Settings Sync and verify restored extensions and settings."
 
-    manual_step "5/13 Bitwarden and Ente Auth"
+    manual_step "5/14 Bitwarden and Ente Auth"
     manual_line "Sign in, complete MFA, and verify vault synchronization."
 
-    manual_step "6/13 Brave"
+    manual_step "6/14 Brave"
     manual_line "Open: brave://settings/braveSync/setup"
     manual_line "Join the existing sync chain and verify bookmarks and extensions."
 
-    manual_step "7/13 Obsidian"
+    manual_step "7/14 Obsidian"
     manual_line "Vault path: ${home}/obsidian"
     manual_line "Configure Obsidian Sync, Git, or the selected backup method."
 
-    manual_step "8/13 Telegram"
+    manual_step "8/14 Telegram"
     manual_line "Sign in and verify the session."
 
-    manual_step "9/13 SSH private key"
+    manual_step "9/14 SSH private key"
     manual_line "Copy the private key from a trusted offline source or password manager:"
     manual_command "cat > ${home}/.ssh/id_ed25519"
     manual_line "Paste the key, then press Ctrl-D."
@@ -3217,15 +3232,19 @@ show_manual_setup_hints() {
     manual_command "ssh-add ${home}/.ssh/id_ed25519 || { eval \"\$(ssh-agent -s)\"; ssh-add ${home}/.ssh/id_ed25519; }"
     manual_command "ssh -T git@github.com"
 
-    manual_step "10/13 Tailscale client"
+    manual_step "10/14 Tailscale client"
     manual_command "sudo tailscale up"
     manual_line "Open the authentication URL, then verify the connection:"
     manual_command "tailscale status"
 
-    manual_step "11/13 Cockpit web console"
+    manual_step "11/14 WireGuard connection"
+    manual_line "Add the WireGuard configuration to /etc/wireguard/wg0.conf, then import it:"
+    manual_command "sudo nmcli connection import type wireguard file /etc/wireguard/wg0.conf"
+
+    manual_step "12/14 Cockpit web console"
     manual_line "Visit: https://localhost:9090/"
 
-    manual_step "12/13 Clone Git repositories over SSH"
+    manual_step "13/14 Clone Git repositories over SSH"
     manual_item "GitHub:  cd ${home}/repos/github"
     manual_item "GitLab:  cd ${home}/repos/gitlab"
     manual_item "Forgejo: cd ${home}/repos/forgejo"
@@ -3233,7 +3252,7 @@ show_manual_setup_hints() {
     manual_line "Verify the configured Git identity:"
     manual_command "git config list"
 
-    manual_step "13/13 Virtualization"
+    manual_step "14/14 Virtualization"
     manual_line "Log out and back in, or reboot, before managing virtual machines."
     manual_line "This applies the new libvirt group membership."
     if [[ "$UBUNTU_VARIANT" == "desktop" ]]; then
@@ -3260,6 +3279,8 @@ main() {
     info "distro version=${VERSION_ID} codename=${CODENAME} variant=${UBUNTU_VARIANT} variant_source=${UBUNTU_VARIANT_SOURCE} arch=${ARCH}"
     info "execution mode=${EXECUTION_MODE} context=${EXECUTION_CONTEXT} interactive=${EXECUTION_INTERACTIVE}"
     ok "target user=${TARGET_USER} home=${TARGET_HOME}"
+
+    apt_transaction_recover
 
     section "Connectivity"
     info "checking internet and DNS"
@@ -3302,6 +3323,7 @@ main() {
     fi
 
     section "Repositories"
+    apt_transaction_begin
     info "ensuring common repositories"
     ensure_fastfetch_ppa
     apply_repository_setup install_docker_ctop_repository
@@ -3320,10 +3342,15 @@ main() {
 
     if [[ "$APT_SOURCES_CHANGED" == true ]]; then
         info "apt update after repository changes"
-        run_apt_get update -qq
+        if ! run_apt_get update -qq; then
+            warn "APT update failed after repository changes; restoring previous repository state"
+            apt_transaction_rollback
+            die "APT repository validation failed; previous repository state restored"
+        fi
     else
         info "APT repositories unchanged; existing package cache is current"
     fi
+    apt_transaction_commit
 
     section "Packages"
     install_package_array "common" "${COMMON_PACKAGES[@]}"

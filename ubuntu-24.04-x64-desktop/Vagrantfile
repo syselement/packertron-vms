@@ -64,13 +64,15 @@ Vagrant.configure("2") do |config|
       destination: "/var/tmp/packertron-ubuntu"
 
     prov.vm.provision "shell",
-      inline: "bash /var/tmp/packertron-ubuntu/02-provision-system.sh",
+      inline: "env REBOOT_AT_END=false bash /var/tmp/packertron-ubuntu/02-provision-system.sh",
       privileged: true,
+      reboot: true,
       run: "once"
 
     prov.vm.provision "shell",
-      inline: "bash /var/tmp/packertron-ubuntu/03-customize-system.sh",
+      inline: "env REBOOT_AT_END=false bash /var/tmp/packertron-ubuntu/03-customize-system.sh",
       privileged: true,
+      reboot: true,
       #run: "never"
       run: "once"
   end

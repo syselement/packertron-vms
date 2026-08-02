@@ -16,6 +16,8 @@ SCRIPT_DIR="$(
 
 # shellcheck source=lib/ubuntu-context.sh
 . "$SCRIPT_DIR/lib/ubuntu-context.sh"
+# shellcheck source=lib/apt-transaction.sh
+. "$SCRIPT_DIR/lib/apt-transaction.sh"
 
 SCRIPT_NAME="provision-system"
 LOG_PREFIX="[${SCRIPT_NAME}]"
@@ -27,6 +29,7 @@ APT_KEYRING_DIR="${PACKERTRON_APT_KEYRING_DIR:-/etc/apt/keyrings}"
 SYSTEM_KEYRING_DIR="${PACKERTRON_SYSTEM_KEYRING_DIR:-/usr/share/keyrings}"
 APT_SOURCES_DIR="${PACKERTRON_APT_SOURCES_DIR:-/etc/apt/sources.list.d}"
 SYSTEMD_RUNTIME_DIR="${PACKERTRON_SYSTEMD_RUNTIME_DIR:-/run/systemd/system}"
+APT_TRANSACTION_DIR="${PACKERTRON_APT_TRANSACTION_DIR:-/var/lib/packertron-apt-transactions/provision-system}"
 ROOT_VG_NAME="${ROOT_VG_NAME:-ubuntu-vg}"
 ROOT_LV_PATH="${ROOT_LV_PATH:-/dev/ubuntu-vg/ubuntu-lv}"
 USER_NAME=""
@@ -145,6 +148,8 @@ install_file_if_changed() {
         return 0
     fi
 
+    apt_transaction_record_file "$destination_file"
+
     temporary_file="$(mktemp "${destination_file}.tmp.XXXXXX")"
     if ! install -m "$mode" "$source_file" "$temporary_file"; then
         rm -f -- "$temporary_file"
@@ -181,6 +186,7 @@ dearmor_signing_key() {
 }
 
 setup_ansible_repo() {
+    local source_file
     local ppa="ppa:ansible/ansible"
 
     if grep -Rqs -- "ansible/ansible" "$APT_SOURCES_DIR" 2>/dev/null; then
@@ -192,6 +198,10 @@ setup_ansible_repo() {
         die "add-apt-repository is required to configure ${ppa}"
     add-apt-repository --yes --no-update "$ppa" ||
         die "failed configuring ${ppa}"
+
+    while IFS= read -r -d '' source_file; do
+        apt_transaction_record_created_file "$source_file"
+    done < <(grep -RlZ -- "ansible/ansible" "$APT_SOURCES_DIR" 2>/dev/null || true)
 }
 
 setup_vscode_repo() (
@@ -498,6 +508,8 @@ main() {
     log "execution mode=${EXECUTION_MODE} context=${EXECUTION_CONTEXT} interactive=${EXECUTION_INTERACTIVE}"
     log "target user=${TARGET_USER} home=${TARGET_HOME}"
 
+    apt_transaction_recover
+
     expand_root_lvm_if_present
     update_and_upgrade_system
 
@@ -508,6 +520,7 @@ main() {
     check_docker_package_conflicts
 
     install -m 0755 -d "$APT_KEYRING_DIR" "$SYSTEM_KEYRING_DIR" "$APT_SOURCES_DIR"
+    apt_transaction_begin
 
     log "configure Ansible repository"
     setup_ansible_repo
@@ -521,7 +534,12 @@ main() {
     setup_hashicorp_repo
 
     log "apt update after repository configuration"
-    apt-get -o DPkg::Lock::Timeout=300 update -qq
+    if ! apt-get -o DPkg::Lock::Timeout=300 update -qq; then
+        warn "APT update failed after repository changes; restoring previous repository state"
+        apt_transaction_rollback
+        die "APT repository validation failed; previous repository state restored"
+    fi
+    apt_transaction_commit
 
     log "install toolchain packages (missing only)"
     install_missing_packages "${TOOLCHAIN_PACKAGES[@]}"

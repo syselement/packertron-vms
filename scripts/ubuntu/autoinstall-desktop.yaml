@@ -58,8 +58,11 @@ autoinstall:
     - ca-certificates
     - git
 
-  # user-data scripts to run after the installation during the cloud-init stage of the first boot
+  # Cloud-init configuration applied after installation during the first boot.
   user-data:
+    # Create a root-owned bootstrap runner and its systemd unit. The runner checks
+    # out one fixed repository revision, invokes 90-bootstrap-baremetal.sh, and the
+    # service retries transient failures, then removes itself after a successful run.
     write_files:
       - path: /usr/local/sbin/packertron-firstboot
         owner: root:root
@@ -71,12 +74,18 @@ autoinstall:
           REPO_URL="https://github.com/syselement/packertron-vms.git"
           REPO_BRANCH="main"
           REPO_DIR="/opt/packertron-vms"
+          STATE_DIR="/var/lib/packertron-bootstrap"
+          REVISION_FILE="$STATE_DIR/revision"
           LOG_FILE="/var/log/packertron-firstboot.log"
 
+          install -d -m 0700 "$STATE_DIR"
+          touch "$LOG_FILE"
+          chmod 0600 "$LOG_FILE"
           exec > >(tee -a "$LOG_FILE") 2>&1
 
-          if [[ -f /var/lib/packertron-bootstrap/complete ]]; then
-            echo "Packertron bootstrap already completed"
+          if [[ -s "$STATE_DIR/complete" && -s "$REVISION_FILE" ]] &&
+             [[ "$(<"$STATE_DIR/complete")" == "$(<"$REVISION_FILE")" ]]; then
+            echo "Packertron bootstrap already completed for $(<"$REVISION_FILE")"
             exit 0
           fi
 
@@ -109,14 +118,54 @@ autoinstall:
           # /opt/packertron-vms is a root-managed deployment checkout.
           # Do not store manual edits inside it.
           git -C "$REPO_DIR" fetch --prune origin
-          git -C "$REPO_DIR" checkout -B "$REPO_BRANCH" "origin/$REPO_BRANCH"
-          git -C "$REPO_DIR" reset --hard "origin/$REPO_BRANCH"
+          if [[ -s "$REVISION_FILE" ]]; then
+            REPO_COMMIT="$(<"$REVISION_FILE")"
+            [[ "$REPO_COMMIT" =~ ^[0-9a-fA-F]{40,64}$ ]] || {
+              echo "ERROR: invalid recorded bootstrap revision: $REPO_COMMIT" >&2
+              exit 1
+            }
+          else
+            REPO_COMMIT="$(git -C "$REPO_DIR" rev-parse --verify "origin/$REPO_BRANCH^{commit}")"
+            printf '%s\n' "$REPO_COMMIT" >"$REVISION_FILE.tmp"
+            chmod 0600 "$REVISION_FILE.tmp"
+            mv -f "$REVISION_FILE.tmp" "$REVISION_FILE"
+          fi
 
-          exec \
+          git -C "$REPO_DIR" cat-file -e "$REPO_COMMIT^{commit}"
+          git -C "$REPO_DIR" checkout --detach "$REPO_COMMIT"
+          git -C "$REPO_DIR" reset --hard "$REPO_COMMIT"
+
+          PACKERTRON_BOOTSTRAP_REVISION="$REPO_COMMIT" exec \
             "$REPO_DIR/scripts/ubuntu/90-bootstrap-baremetal.sh"
 
+      - path: /etc/systemd/system/packertron-firstboot.service
+        owner: root:root
+        permissions: '0644'
+        content: |
+          [Unit]
+          Description=Packertron retryable first-boot provisioning
+          Wants=network-online.target
+          After=network-online.target cloud-final.service
+          ConditionPathExists=!/var/lib/packertron-bootstrap/complete
+          StartLimitIntervalSec=0
+
+          [Service]
+          Type=oneshot
+          ExecStart=/usr/local/sbin/packertron-firstboot
+          ExecStartPost=/usr/bin/systemctl disable packertron-firstboot.service
+          ExecStartPost=/usr/bin/rm -f /etc/systemd/system/packertron-firstboot.service
+          ExecStartPost=/usr/bin/systemctl daemon-reload
+          Restart=on-failure
+          RestartSec=5min
+          TimeoutStartSec=infinity
+
+          [Install]
+          WantedBy=multi-user.target
+
     runcmd:
-      - ["/usr/local/sbin/packertron-firstboot"]
+      - [systemctl, daemon-reload]
+      - [systemctl, enable, packertron-firstboot.service]
+      - [systemctl, start, --no-block, packertron-firstboot.service]
 
   # Update the APT package database and upgrade installed packages automatically on first boot
   # package_update: true

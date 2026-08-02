@@ -15,8 +15,9 @@
 
         grep -Fq 'source: "../scripts/ubuntu"' "$vagrantfile"
         grep -Fq 'destination: "/var/tmp/packertron-ubuntu"' "$vagrantfile"
-        grep -Fq 'inline: "bash /var/tmp/packertron-ubuntu/02-provision-system.sh"' "$vagrantfile"
-        grep -Fq 'inline: "bash /var/tmp/packertron-ubuntu/03-customize-system.sh"' "$vagrantfile"
+        grep -Fq 'inline: "env REBOOT_AT_END=false bash /var/tmp/packertron-ubuntu/02-provision-system.sh"' "$vagrantfile"
+        grep -Fq 'inline: "env REBOOT_AT_END=false bash /var/tmp/packertron-ubuntu/03-customize-system.sh"' "$vagrantfile"
+        [[ "$(grep -Fc 'reboot: true' "$vagrantfile")" -eq 2 ]]
         ! grep -Fq 'path: "../scripts/ubuntu/' "$vagrantfile"
     done
 }
