@@ -973,18 +973,33 @@ set -uo pipefail
 failures=0
 wallpaper_uri="$1"
 
+gsettings_with_schema_dir() {
+  local schema_dir="$1"
+  shift
+
+  if [[ -n "$schema_dir" ]]; then
+    gsettings --schemadir "$schema_dir" "$@"
+  else
+    gsettings "$@"
+  fi
+}
+
 schema_exists() {
+  local schema="$1"
+  local schema_dir="${2:-}"
+
   # Process substitution avoids a pipefail/SIGPIPE false negative caused by
   # `gsettings list-schemas | grep -q`.
-  grep -Fx -- "$1" < <(gsettings list-schemas) >/dev/null
+  grep -Fx -- "$schema" < <(gsettings_with_schema_dir "$schema_dir" list-schemas) >/dev/null
 }
 
 key_exists() {
   local schema="$1"
   local key="$2"
+  local schema_dir="${3:-}"
 
-  schema_exists "$schema" || return 1
-  grep -Fx -- "$key" < <(gsettings list-keys "$schema") >/dev/null
+  schema_exists "$schema" "$schema_dir" || return 1
+  grep -Fx -- "$key" < <(gsettings_with_schema_dir "$schema_dir" list-keys "$schema") >/dev/null
 }
 
 gsetting_values_equal() {
@@ -1019,30 +1034,31 @@ set_gsetting() {
   local key="$2"
   local value="$3"
   local persist_value="${4:-false}"
+  local schema_dir="${5:-}"
   local actual
 
-  if ! key_exists "$schema" "$key"; then
+  if ! key_exists "$schema" "$key" "$schema_dir"; then
     printf '[gnome-settings] SKIP missing schema/key: %s %s\n' "$schema" "$key"
     return 0
   fi
 
-  if [[ "$(gsettings writable "$schema" "$key" 2>/dev/null)" != "true" ]]; then
+  if [[ "$(gsettings_with_schema_dir "$schema_dir" writable "$schema" "$key" 2>/dev/null)" != "true" ]]; then
     printf '[gnome-settings] SKIP non-writable key: %s %s\n' "$schema" "$key"
     return 0
   fi
 
-  actual="$(gsettings get "$schema" "$key")"
+  actual="$(gsettings_with_schema_dir "$schema_dir" get "$schema" "$key")"
   if [[ "$persist_value" != true ]] && gsetting_values_equal "$value" "$actual"; then
     return 0
   fi
 
-  if ! gsettings set "$schema" "$key" "$value"; then
+  if ! gsettings_with_schema_dir "$schema_dir" set "$schema" "$key" "$value"; then
     printf '[gnome-settings] ERROR failed: %s %s = %s\n' "$schema" "$key" "$value" >&2
     failures=$((failures + 1))
     return 0
   fi
 
-  actual="$(gsettings get "$schema" "$key")"
+  actual="$(gsettings_with_schema_dir "$schema_dir" get "$schema" "$key")"
 
   if ! gsetting_values_equal "$value" "$actual"; then
     printf '[gnome-settings] ERROR verify failed: %s %s; requested=%s actual=%s\n' "$schema" "$key" "$value" "$actual" >&2
@@ -1173,10 +1189,15 @@ set_gsetting org.gnome.shell favorite-apps \
 new_ext_uuid='system-monitor-panel@naimur'
 old_ext_uuid='system-monitor@gnome-shell-extensions.gcampax.github.com'
 hide_access_ext_uuid='hide-universal-access@akiirui.github.io'
+dim_background_ext_uuid='dim-background-windows@stephane-13.github.com'
+dim_background_schema='org.gnome.shell.extensions.dim-background-windows'
+dim_background_ext_dir=''
+dim_background_schema_dir=''
 
 new_ext_installed=false
 old_ext_installed=false
 hide_access_ext_installed=false
+dim_background_ext_installed=false
 
 if [[ -d "/usr/share/gnome-shell/extensions/${new_ext_uuid}" ||
       -d "$HOME/.local/share/gnome-shell/extensions/${new_ext_uuid}" ]]; then
@@ -1191,6 +1212,17 @@ fi
 if [[ -d "/usr/share/gnome-shell/extensions/${hide_access_ext_uuid}" ||
       -d "$HOME/.local/share/gnome-shell/extensions/${hide_access_ext_uuid}" ]]; then
   hide_access_ext_installed=true
+fi
+
+if [[ -d "$HOME/.local/share/gnome-shell/extensions/${dim_background_ext_uuid}" ]]; then
+  dim_background_ext_dir="$HOME/.local/share/gnome-shell/extensions/${dim_background_ext_uuid}"
+elif [[ -d "/usr/share/gnome-shell/extensions/${dim_background_ext_uuid}" ]]; then
+  dim_background_ext_dir="/usr/share/gnome-shell/extensions/${dim_background_ext_uuid}"
+fi
+
+if [[ -n "$dim_background_ext_dir" ]]; then
+  dim_background_ext_installed=true
+  dim_background_schema_dir="${dim_background_ext_dir}/schemas"
 fi
 
 if [[ "$new_ext_installed" == true ]]; then
@@ -1217,6 +1249,22 @@ if [[ "$hide_access_ext_installed" == true ]]; then
   update_string_array org.gnome.shell disabled-extensions remove "$hide_access_ext_uuid"
 else
   printf '[gnome-settings] SKIP Hide Universal Access extension is not installed\n'
+fi
+
+if [[ "$dim_background_ext_installed" == true ]]; then
+  set_gsetting org.gnome.shell disable-user-extensions "false"
+  update_string_array org.gnome.shell enabled-extensions add "$dim_background_ext_uuid"
+  update_string_array org.gnome.shell disabled-extensions remove "$dim_background_ext_uuid"
+
+  if [[ -d "$dim_background_schema_dir" ]]; then
+    set_gsetting "$dim_background_schema" brightness "0.8" false "$dim_background_schema_dir"
+    set_gsetting "$dim_background_schema" saturation "1.0" false "$dim_background_schema_dir"
+  else
+    printf '[gnome-settings] ERROR Dim Background Windows schema directory is missing: %s\n' "$dim_background_schema_dir" >&2
+    failures=$((failures + 1))
+  fi
+else
+  printf '[gnome-settings] SKIP Dim Background Windows extension is not installed\n'
 fi
 
 # Force a final read through the same backend before the process/session exits.
@@ -1286,6 +1334,74 @@ install_gnome_extension_from_zip() (
     verify_target_ownership "$metadata_file" "${display_name} extension metadata"
 
     ok "${display_name} extension installed for ${TARGET_USER}"
+)
+
+compile_gnome_extension_schemas() {
+    local display_name="$1"
+    local uuid="$2"
+    local extension_dir="${TARGET_HOME}/.local/share/gnome-shell/extensions/${uuid}"
+    local schema_dir="${extension_dir}/schemas"
+    local compiled_schema="${schema_dir}/gschemas.compiled"
+    local schema_file
+    local schemas_current=true
+    local -a schema_files=("$schema_dir"/*.gschema.xml)
+
+    [[ -f "${schema_files[0]}" ]] ||
+        die "${display_name} extension does not provide a GSettings schema"
+
+    if [[ ! -f "$compiled_schema" ]]; then
+        schemas_current=false
+    else
+        for schema_file in "${schema_files[@]}"; do
+            if [[ "$schema_file" -nt "$compiled_schema" ]]; then
+                schemas_current=false
+                break
+            fi
+        done
+    fi
+
+    if [[ "$schemas_current" == true ]]; then
+        verify_target_ownership "$compiled_schema" "${display_name} compiled schema"
+        info "${display_name} extension schemas already compiled"
+        return
+    fi
+
+    command -v glib-compile-schemas >/dev/null 2>&1 ||
+        die "glib-compile-schemas is required to configure ${display_name}"
+
+    run_as_target_user glib-compile-schemas "$schema_dir" ||
+        die "failed compiling ${display_name} extension schemas"
+    [[ -f "$compiled_schema" ]] ||
+        die "${display_name} extension schema compilation could not be verified"
+    verify_target_ownership "$compiled_schema" "${display_name} compiled schema"
+    ok "${display_name} extension schemas compiled"
+}
+
+install_dim_background_windows_extension() (
+    set -Eeuo pipefail
+
+    local account="$1"
+    local download_url="https://extensions.gnome.org/download-extension/dim-background-windows@stephane-13.github.com.shell-extension.zip?version_tag=70012"
+
+    [[ "$account" == "$TARGET_USER" ]] ||
+        die "Dim Background Windows must be installed for the resolved target user"
+
+    case "$VERSION_ID" in
+        24.* | 26.*) ;;
+        *)
+            warn "Dim Background Windows installation not configured for Ubuntu ${VERSION_ID}"
+            return
+            ;;
+    esac
+
+    install_gnome_extension_from_zip \
+        "Dim Background Windows" \
+        "dim-background-windows@stephane-13.github.com" \
+        "$download_url"
+
+    compile_gnome_extension_schemas \
+        "Dim Background Windows" \
+        "dim-background-windows@stephane-13.github.com"
 )
 
 install_hide_universal_access_extension() (
@@ -3563,8 +3679,9 @@ main() {
         # Apply now, inside this provisioning run. When GNOME is already running,
         # target its real per-user bus; during headless SSH/Vagrant provisioning,
         # use the temporary-bus fallback from run_as_gnome_user().
-        install_system_monitor_panel_extension "$USER_NAME"
+        install_dim_background_windows_extension "$USER_NAME"
         install_hide_universal_access_extension "$USER_NAME"
+        install_system_monitor_panel_extension "$USER_NAME"
         apply_gnome_preferences
         enable_battery_health_preservation
     else
