@@ -1,3 +1,12 @@
+## [0.54.1](https://github.com/syselement/packertron-vms/compare/v0.54.0...v0.54.1) (2026-08-04)
+
+
+### Bug Fixes
+
+* update manual setup hints for consistency in settings navigation ([87d2be3](https://github.com/syselement/packertron-vms/commit/87d2be3a9a6c7e8604e41b7cbe4c4217e90ad8a4))
+
+
+
 # [0.54.0](https://github.com/syselement/packertron-vms/compare/v0.53.0...v0.54.0) (2026-08-04)
 
 
@@ -32,15 +41,6 @@
 
 * remove ConditionPathExists check from autoinstall scripts and update tests ([806edbe](https://github.com/syselement/packertron-vms/commit/806edbe597023e2021e6d8c2ae8ac6e6df62b42b))
 * update GNOME settings for workspace behavior and dock action ([5df5034](https://github.com/syselement/packertron-vms/commit/5df50346b77abd7a090e06800ee2ab2d0909d4ef))
-
-
-
-# [0.50.0](https://github.com/syselement/packertron-vms/compare/v0.49.0...v0.50.0) (2026-08-02)
-
-
-### Features
-
-* add Homebrew installation support with CPU architecture checks and test cases ([167b778](https://github.com/syselement/packertron-vms/commit/167b778f4c4214bf69d289c0153b1503effe6792))
 
 
 
