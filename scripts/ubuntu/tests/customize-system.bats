@@ -347,12 +347,17 @@ setup() {
   mkdir -p \
     "$fake_bin" \
     "$settings_dir" \
+    "$BATS_TEST_TMPDIR/.local/share/gnome-shell/extensions/dim-background-windows@stephane-13.github.com/schemas" \
     "$BATS_TEST_TMPDIR/.local/share/gnome-shell/extensions/system-monitor-panel@naimur" \
     "$BATS_TEST_TMPDIR/.local/share/gnome-shell/extensions/hide-universal-access@akiirui.github.io"
 
   cat >"$fake_bin/gsettings" <<'FAKE_GSETTINGS'
 #!/usr/bin/env bash
 set -euo pipefail
+
+if [[ "$1" == "--schemadir" ]]; then
+  shift 2
+fi
 
 command="$1"
 schema="${2:-}"
@@ -374,6 +379,7 @@ case "$command" in
       org.gnome.settings-daemon.plugins.power \
       org.gnome.shell.extensions.ding \
       org.gnome.desktop.peripherals.touchpad \
+      org.gnome.shell.extensions.dim-background-windows \
       org.gnome.shell
     ;;
   list-keys)
@@ -386,7 +392,7 @@ case "$command" in
       night-light-schedule-automatic night-light-schedule-from night-light-schedule-to \
       night-light-temperature allow-volume-above-100-percent power-button-action \
       show-home natural-scroll favorite-apps disable-user-extensions \
-      enabled-extensions disabled-extensions
+      enabled-extensions disabled-extensions brightness saturation
     ;;
   writable)
     printf 'true\n'
@@ -429,6 +435,10 @@ FAKE_GSETTINGS
   [[ "$status" -eq 0 ]]
   grep -Fq $'org.gnome.shell.extensions.dash-to-dock\tdock-position\t\x27BOTTOM\x27' "$command_log"
   grep -Fq $'org.gnome.desktop.background\tpicture-uri\t\x27file://' "$command_log"
+  grep -Fq $'org.gnome.shell.extensions.dim-background-windows\tbrightness\t0.8' "$command_log"
+  grep -Fq $'org.gnome.shell.extensions.dim-background-windows\tsaturation\t1.0' "$command_log"
+  grep -Fq 'dim-background-windows@stephane-13.github.com' \
+    "$settings_dir/org.gnome.shell.enabled-extensions"
   grep -Fq 'hide-universal-access@akiirui.github.io' \
     "$settings_dir/org.gnome.shell.enabled-extensions"
 }
@@ -487,6 +497,65 @@ FAKE_GSETTINGS
   [[ "$status" -eq 0 ]]
   [[ "$output" == *"already installed and verified, skipping"* ]]
   [[ "$output" != *"unexpected extension"* ]]
+}
+
+@test "Dim Background Windows uses the pinned stable GNOME Extensions bundle" {
+  TARGET_USER="testuser"
+
+  install_gnome_extension_from_zip() {
+    printf '<%s>\n' "$@"
+  }
+  compile_gnome_extension_schemas() {
+    printf '<compile:%s>\n' "$*"
+  }
+
+  for VERSION_ID in 24.04 26.04; do
+    run install_dim_background_windows_extension "$TARGET_USER"
+
+    [[ "$status" -eq 0 ]]
+    [[ "$output" == *'<Dim Background Windows>'* ]]
+    [[ "$output" == *'<dim-background-windows@stephane-13.github.com>'* ]]
+    [[ "$output" == *'<https://extensions.gnome.org/download-extension/dim-background-windows@stephane-13.github.com.shell-extension.zip?version_tag=70012>'* ]]
+    [[ "$output" == *'<compile:Dim Background Windows dim-background-windows@stephane-13.github.com>'* ]]
+  done
+}
+
+@test "GNOME extension schemas compile once and remain target-owned" {
+  local uuid="test-extension@example.com"
+  local schema_dir
+  local compile_record="$BATS_TEST_TMPDIR/schema-compile.log"
+
+  TARGET_USER="$(id -un)"
+  TARGET_HOME="$BATS_TEST_TMPDIR/home"
+  TARGET_UID="$(id -u)"
+  TARGET_GROUP="$(id -gn)"
+  schema_dir="$TARGET_HOME/.local/share/gnome-shell/extensions/$uuid/schemas"
+
+  mkdir -p "$schema_dir"
+  printf '<schemalist/>\n' >"$schema_dir/org.example.gschema.xml"
+
+  command() {
+    if [[ "$1" == "-v" && "$2" == "glib-compile-schemas" ]]; then
+      return 0
+    fi
+    builtin command "$@"
+  }
+  run_as_target_user() {
+    printf '%s\n' "$*" >>"$compile_record"
+    touch "$schema_dir/gschemas.compiled"
+  }
+
+  run compile_gnome_extension_schemas "Test Extension" "$uuid"
+
+  [[ "$status" -eq 0 ]]
+  [[ "$output" == *"Test Extension extension schemas compiled"* ]]
+  [[ "$(<"$compile_record")" == "glib-compile-schemas $schema_dir" ]]
+
+  run compile_gnome_extension_schemas "Test Extension" "$uuid"
+
+  [[ "$status" -eq 0 ]]
+  [[ "$output" == *"schemas already compiled"* ]]
+  [[ "$(wc -l <"$compile_record")" -eq 1 ]]
 }
 
 @test "failed GNOME extension download does not invoke the target installer" {
