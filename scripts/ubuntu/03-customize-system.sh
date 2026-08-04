@@ -3438,27 +3438,29 @@ show_manual_setup_hints() {
 
     if [[ "$UBUNTU_VARIANT" == "desktop" ]]; then
         manual_step "$((instruction_number += 1)). Fingerprint login"
-        manual_line "Open: Settings → System → Users → Fingerprint Login"
+        manual_line "Open: Settings -> System -> Users -> Fingerprint Login"
         manual_line "Enroll at least two fingers and verify sudo authentication."
 
         manual_step "$((instruction_number += 1)). Keyboard shortcuts"
-        manual_line "Open: Settings → Keyboard → View and Customize Shortcuts"
-        manual_line "Then: Custom Shortcuts → Add Shortcut"
-        manual_item "Flameshot"
+        manual_line "Open: Settings -> Keyboard -> View and Customize Shortcuts"
+        manual_line "- Launchers -> click Launch terminal and Set Shortcut"
+        manual_line "Shortcut: Alt+T"
+        manual_line "- Custom Shortcuts -> click Add Shortcut"
+        manual_item "Name: Flameshot"
         manual_line "Command:"
         manual_command "script --quiet --command \"/usr/bin/flameshot gui --clipboard --path ${home}/Pictures/flameshot\" /dev/null"
         manual_line "Shortcut: Print or Shift+Alt+S"
-        manual_item "Emote"
+        manual_item "Name: Emote"
         manual_line "Command:"
         manual_command "/snap/bin/emote"
         manual_line "Shortcut: Super+Comma (Windows key + ,)"
 
         manual_step "$((instruction_number += 1)). Bluetooth devices"
-        manual_line "Open: Settings → Bluetooth"
+        manual_line "Open: Settings -> Bluetooth"
         manual_line "Pair the mouse, soundbar, and other devices."
 
         manual_step "$((instruction_number += 1)). Visual Studio Code"
-        manual_line "Open: VS Code → Accounts → Sign in with GitHub"
+        manual_line "Open: VS Code -> Accounts -> Sign in with GitHub"
         manual_line "Enable Settings Sync and verify restored extensions and settings."
 
         manual_step "$((instruction_number += 1)). Bitwarden and Ente Auth"
