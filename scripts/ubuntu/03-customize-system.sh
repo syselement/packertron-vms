@@ -1143,6 +1143,10 @@ set_gsetting org.gnome.settings-daemon.plugins.color night-light-schedule-from "
 set_gsetting org.gnome.settings-daemon.plugins.color night-light-schedule-to "8.0"
 set_gsetting org.gnome.settings-daemon.plugins.color night-light-temperature "uint32 4700"
 
+# Mouse
+set_gsetting org.gnome.desktop.peripherals.mouse accel-profile "'default'"
+set_gsetting org.gnome.desktop.peripherals.mouse speed "-0.3"
+
 # Sound
 set_gsetting org.gnome.desktop.sound allow-volume-above-100-percent "true"
 
