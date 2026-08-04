@@ -1,3 +1,12 @@
+# [0.53.0](https://github.com/syselement/packertron-vms/compare/v0.52.0...v0.53.0) (2026-08-04)
+
+
+### Features
+
+* configure mouse settings for improved user experience in GNOME ([0bdb41f](https://github.com/syselement/packertron-vms/commit/0bdb41f525ce53b652f2729ef552a349413c2fc2))
+
+
+
 # [0.52.0](https://github.com/syselement/packertron-vms/compare/v0.51.0...v0.52.0) (2026-08-02)
 
 
@@ -32,16 +41,6 @@
 ### Features
 
 * refactor package management to include release-optional packages and enhance testing ([9bfe481](https://github.com/syselement/packertron-vms/commit/9bfe4819edc1b87dcaa743d5f3e6557dba7d614c))
-
-
-
-# [0.48.0](https://github.com/syselement/packertron-vms/compare/v0.47.0...v0.48.0) (2026-08-02)
-
-
-### Features
-
-* enhance logging and timeout settings in provisioning scripts ([85d4ba5](https://github.com/syselement/packertron-vms/commit/85d4ba546742e8bd417fece4ef0b2b7d705f2580))
-* refactor update system script and enhance guest tool installation logic ([af00cc7](https://github.com/syselement/packertron-vms/commit/af00cc76ccf3c929d189c1ddb12479688a17baeb))
 
 
 
