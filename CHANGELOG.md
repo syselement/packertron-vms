@@ -1,3 +1,12 @@
+# [0.54.0](https://github.com/syselement/packertron-vms/compare/v0.53.0...v0.54.0) (2026-08-04)
+
+
+### Features
+
+* add support for Dim Background Windows GNOME extension and schema compilation ([a8c6476](https://github.com/syselement/packertron-vms/commit/a8c6476000606504eb3da71a869609b80b6c9b27))
+
+
+
 # [0.53.0](https://github.com/syselement/packertron-vms/compare/v0.52.0...v0.53.0) (2026-08-04)
 
 
@@ -32,15 +41,6 @@
 ### Features
 
 * add Homebrew installation support with CPU architecture checks and test cases ([167b778](https://github.com/syselement/packertron-vms/commit/167b778f4c4214bf69d289c0153b1503effe6792))
-
-
-
-# [0.49.0](https://github.com/syselement/packertron-vms/compare/v0.48.0...v0.49.0) (2026-08-02)
-
-
-### Features
-
-* refactor package management to include release-optional packages and enhance testing ([9bfe481](https://github.com/syselement/packertron-vms/commit/9bfe4819edc1b87dcaa743d5f3e6557dba7d614c))
 
 
 
