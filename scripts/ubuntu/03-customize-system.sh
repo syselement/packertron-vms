@@ -116,6 +116,7 @@ readonly -a RELEASE_OPTIONAL_PACKAGES=(
 
 readonly -a DESKTOP_PACKAGES=(
     brave-browser
+    claude-desktop
     dbeaver-ce
     filezilla
     flatpak
@@ -1744,6 +1745,49 @@ ensure_brave_browser_repository() (
         changed=true
         info "removed legacy Brave repository file: ${legacy_file}"
     done
+
+    [[ "$changed" == false ]] || return 10
+)
+
+ensure_claude_desktop_repository() (
+    set -Eeuo pipefail
+
+    local changed=false
+    local key_file="${SYSTEM_KEYRING_DIR}/claude-desktop-archive-keyring.asc"
+    local source_file="${APT_SOURCES_DIR}/claude-desktop.list"
+    local temporary_dir
+    temporary_dir="$(mktemp -d)"
+    trap 'rm -rf -- "$temporary_dir"' EXIT
+
+    fetch_file \
+        "https://downloads.claude.ai/claude-desktop/key.asc" \
+        "$temporary_dir/claude-desktop-archive-keyring.asc" ||
+        die "failed downloading the Claude Desktop signing key"
+    validate_openpgp_key \
+        "$temporary_dir/claude-desktop-archive-keyring.asc" \
+        "Claude Desktop" \
+        "31DDDE24DDFAB679F42D7BD2BAA929FF1A7ECACE"
+
+    cat >"$temporary_dir/claude-desktop.list" <<EOF
+deb [arch=amd64 signed-by=${key_file}] https://downloads.claude.ai/claude-desktop/apt/stable stable main
+EOF
+    validate_repository_source \
+        "$temporary_dir/claude-desktop.list" \
+        "https://downloads.claude.ai/claude-desktop/apt/stable" \
+        "$key_file"
+
+    if write_file_if_changed "$temporary_dir/claude-desktop-archive-keyring.asc" "$key_file"; then
+        changed=true
+        ok "installed Claude Desktop repository signing key"
+    else
+        info "Claude Desktop repository signing key already current"
+    fi
+    if write_file_if_changed "$temporary_dir/claude-desktop.list" "$source_file"; then
+        changed=true
+        ok "configured Claude Desktop repository"
+    else
+        info "Claude Desktop repository already configured"
+    fi
 
     [[ "$changed" == false ]] || return 10
 )
@@ -3594,6 +3638,7 @@ main() {
     if [[ "$UBUNTU_VARIANT" == "desktop" ]]; then
         info "ensuring Desktop application repositories"
         apply_repository_setup ensure_brave_browser_repository
+        apply_repository_setup ensure_claude_desktop_repository
         apply_repository_setup ensure_dbeaver_repository
         apply_repository_setup ensure_mullvad_repository
         apply_repository_setup ensure_sublime_text_repository

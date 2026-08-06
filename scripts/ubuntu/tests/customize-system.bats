@@ -83,7 +83,7 @@ setup() {
   [[ "$output" == *"sudo nmcli connection import type wireguard file /etc/wireguard/wg0.conf"* ]]
   [[ "$output" == *"Visit: https://localhost:9090/"* ]]
   [[ "$output" == *"This applies the new libvirt group membership."* ]]
-  [[ "$output" == *$'\n    Open: Settings → System → Users → Fingerprint Login'* ]]
+  [[ "$output" == *$'\n    Open: Settings -> System -> Users -> Fingerprint Login'* ]]
   [[ "$output" == *$'\n      $ script --quiet --command'* ]]
   [[ "$output" != *" INFO  "* ]]
   [[ "$output" != *" WARN "* ]]
@@ -153,6 +153,7 @@ setup() {
   [[ " ${COMMON_PACKAGES[*]} " == *" tailscale "* ]]
   [[ " ${COMMON_PACKAGES[*]} " != *" rdap "* ]]
   [[ " ${RELEASE_OPTIONAL_PACKAGES[*]} " == *" rdap "* ]]
+  [[ " ${DESKTOP_PACKAGES[*]} " == *" claude-desktop "* ]]
   [[ " ${DESKTOP_PACKAGES[*]} " == *" meld "* ]]
   [[ " ${DESKTOP_PACKAGES[*]} " == *" typora "* ]]
   [[ " ${FLATPAK_PACKAGES[*]} " == *" org.cryptomator.Cryptomator "* ]]
@@ -1925,10 +1926,30 @@ EOF
   [[ "$(<"$validation_record")" == 'AZLux|98B824A5FA7D3A10FDB225B7CA548A0A0312D8E6' ]]
 }
 
+@test "Claude Desktop repository uses the official fingerprint and amd64 architecture" {
+  local validation_record="$BATS_TEST_TMPDIR/claude-validation"
+
+  fetch_file() {
+    printf 'Claude Desktop test key\n' >"$2"
+  }
+  validate_openpgp_key() {
+    printf '%s|%s\n' "$2" "$3" >"$validation_record"
+  }
+
+  apply_repository_setup ensure_claude_desktop_repository
+
+  [[ "$APT_SOURCES_CHANGED" == true ]]
+  grep -Fqx \
+    "deb [arch=amd64 signed-by=${SYSTEM_KEYRING_DIR}/claude-desktop-archive-keyring.asc] https://downloads.claude.ai/claude-desktop/apt/stable stable main" \
+    "$APT_SOURCES_DIR/claude-desktop.list"
+  [[ "$(<"$validation_record")" == 'Claude Desktop|31DDDE24DDFAB679F42D7BD2BAA929FF1A7ECACE' ]]
+}
+
 @test "Desktop repositories are repeatable and reference their scoped keys" {
   local setup_function
   local -a setup_functions=(
     ensure_brave_browser_repository
+    ensure_claude_desktop_repository
     ensure_dbeaver_repository
     ensure_mullvad_repository
     ensure_typora_repository
@@ -1966,6 +1987,8 @@ EOF
 
   grep -Fq "$SYSTEM_KEYRING_DIR/brave-browser-archive-keyring.gpg" \
     "$APT_SOURCES_DIR/brave-browser-release.sources"
+  grep -Fq "$SYSTEM_KEYRING_DIR/claude-desktop-archive-keyring.asc" \
+    "$APT_SOURCES_DIR/claude-desktop.list"
   grep -Fq "$SYSTEM_KEYRING_DIR/dbeaver.gpg.key" "$APT_SOURCES_DIR/dbeaver.list"
   grep -Fq "$SYSTEM_KEYRING_DIR/mullvad-keyring.asc" "$APT_SOURCES_DIR/mullvad.list"
   grep -Fq "$SYSTEM_KEYRING_DIR/typora.gpg" "$APT_SOURCES_DIR/typora.list"
