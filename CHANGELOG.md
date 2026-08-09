@@ -1,3 +1,19 @@
+# [0.55.0](https://github.com/syselement/packertron-vms/compare/v0.54.1...v0.55.0) (2026-08-09)
+
+
+### Bug Fixes
+
+* update Claude Desktop repository test to specify amd64 architecture ([1be2f86](https://github.com/syselement/packertron-vms/commit/1be2f8620f861c6b8bcd4b276f34722330f80144))
+
+
+### Features
+
+* add Claude Desktop repository and corresponding tests ([020a11d](https://github.com/syselement/packertron-vms/commit/020a11d1033d439fbe4b6ec5576b5507dcace622))
+* add manual setup hints for Claude new chat and corresponding tests ([5c0b0a5](https://github.com/syselement/packertron-vms/commit/5c0b0a5b2d491673a8ed28b4413ff150f097df49))
+* configure Cockpit to listen on port 9443 and update manual setup instructions ([a553c3c](https://github.com/syselement/packertron-vms/commit/a553c3cfef2ee9b64ba9647aad9e40d2c15b7454))
+
+
+
 ## [0.54.1](https://github.com/syselement/packertron-vms/compare/v0.54.0...v0.54.1) (2026-08-04)
 
 
@@ -31,16 +47,6 @@
 ### Features
 
 * enhance logging format in customization script and tests for clarity ([9a36c73](https://github.com/syselement/packertron-vms/commit/9a36c73d3b7b5c35d09f837def96efb277d10fce))
-
-
-
-# [0.51.0](https://github.com/syselement/packertron-vms/compare/v0.50.0...v0.51.0) (2026-08-02)
-
-
-### Features
-
-* remove ConditionPathExists check from autoinstall scripts and update tests ([806edbe](https://github.com/syselement/packertron-vms/commit/806edbe597023e2021e6d8c2ae8ac6e6df62b42b))
-* update GNOME settings for workspace behavior and dock action ([5df5034](https://github.com/syselement/packertron-vms/commit/5df50346b77abd7a090e06800ee2ab2d0909d4ef))
 
 
 
