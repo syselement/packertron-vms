@@ -97,6 +97,7 @@ readonly -a COMMON_PACKAGES=(
     speedtest-cli
     sshpass
     stress
+    syncthing
     sysstat
     tailscale
     tmux
@@ -817,6 +818,36 @@ EOF
             die "failed restarting Cockpit socket"
         ok "Cockpit configured to listen on port 9443"
     fi
+}
+
+target_user_systemd_available() {
+    [[ -S "/run/user/${TARGET_UID}/bus" ]]
+}
+
+run_target_user_systemctl() {
+    local runtime_directory="/run/user/${TARGET_UID}"
+
+    run_as_target_user env \
+        XDG_RUNTIME_DIR="$runtime_directory" \
+        DBUS_SESSION_BUS_ADDRESS="unix:path=${runtime_directory}/bus" \
+        systemctl --user "$@"
+}
+
+configure_syncthing_service() {
+    command -v systemctl >/dev/null 2>&1 ||
+        die "systemctl is required to configure Syncthing"
+
+    run_target_user_systemctl enable syncthing.service ||
+        die "failed enabling Syncthing service for ${TARGET_USER}"
+
+    if ! target_user_systemd_available; then
+        warn "target user systemd manager is not running; Syncthing startup is deferred until login"
+        return
+    fi
+
+    run_target_user_systemctl start syncthing.service ||
+        die "failed starting Syncthing service for ${TARGET_USER}"
+    ok "Syncthing service enabled and started for ${TARGET_USER}"
 }
 
 configure_libvirt() {
@@ -1581,7 +1612,7 @@ ensure_fastfetch_ppa() {
     esac
 }
 
-install_docker_ctop_repository() (
+ensure_docker_ctop_repository() (
     set -Eeuo pipefail
 
     local changed=false
@@ -1671,6 +1702,48 @@ EOF
         ok "configured Tailscale repository"
     else
         info "Tailscale repository already configured"
+    fi
+
+    [[ "$changed" == false ]] || return 10
+)
+
+ensure_syncthing_repository() (
+    set -Eeuo pipefail
+
+    local changed=false
+    local key_file="${SYSTEM_KEYRING_DIR}/syncthing-archive-keyring.gpg"
+    local source_file="${APT_SOURCES_DIR}/syncthing.list"
+    local temporary_dir
+    temporary_dir="$(mktemp -d)"
+    trap 'rm -rf -- "$temporary_dir"' EXIT
+
+    fetch_file \
+        "https://syncthing.net/release-key.gpg" \
+        "$temporary_dir/syncthing-archive-keyring.gpg" ||
+        die "failed downloading the Syncthing signing key"
+    validate_openpgp_key \
+        "$temporary_dir/syncthing-archive-keyring.gpg" \
+        "Syncthing"
+
+    cat >"$temporary_dir/syncthing.list" <<EOF
+deb [signed-by=${key_file}] https://apt.syncthing.net/ syncthing stable-v2
+EOF
+    validate_repository_source \
+        "$temporary_dir/syncthing.list" \
+        "https://apt.syncthing.net/" \
+        "$key_file"
+
+    if write_file_if_changed "$temporary_dir/syncthing-archive-keyring.gpg" "$key_file"; then
+        changed=true
+        ok "installed Syncthing repository signing key"
+    else
+        info "Syncthing repository signing key already current"
+    fi
+    if write_file_if_changed "$temporary_dir/syncthing.list" "$source_file"; then
+        changed=true
+        ok "configured Syncthing stable-v2 repository"
+    else
+        info "Syncthing stable-v2 repository already configured"
     fi
 
     [[ "$changed" == false ]] || return 10
@@ -3589,6 +3662,11 @@ show_manual_setup_hints() {
     manual_line "Verify the local system connection and network state:"
     manual_command "virsh --connect qemu:///system list --all"
     manual_command "virsh --connect qemu:///system net-list --all"
+
+    manual_step "$((instruction_number += 1)). Syncthing"
+    manual_line "Open the Syncthing Web GUI: http://127.0.0.1:8384/"
+    manual_line "Check the user service status:"
+    manual_command "systemctl --user status syncthing.service"
 }
 
 # -----------------------------------------------------------------------------
@@ -3655,7 +3733,8 @@ main() {
     apt_transaction_begin
     info "ensuring common repositories"
     ensure_fastfetch_ppa
-    apply_repository_setup install_docker_ctop_repository
+    apply_repository_setup ensure_docker_ctop_repository
+    apply_repository_setup ensure_syncthing_repository
     apply_repository_setup ensure_tailscale_repository
 
     if [[ "$UBUNTU_VARIANT" == "desktop" ]]; then
@@ -3687,6 +3766,7 @@ main() {
     install_package_array "common" "${COMMON_PACKAGES[@]}"
     install_available_package_array "release-optional" "${RELEASE_OPTIONAL_PACKAGES[@]}"
     configure_cockpit_socket
+    configure_syncthing_service
     install_pandoc
     if [[ "$UBUNTU_VARIANT" == "desktop" ]]; then
         install_package_array "Desktop" "${DESKTOP_PACKAGES[@]}"

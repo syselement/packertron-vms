@@ -80,10 +80,13 @@ setup() {
   [[ "$output" == *"STEP  --- 12. Cockpit web console ---"* ]]
   [[ "$output" == *"STEP  --- 13. Clone Git repositories over SSH ---"* ]]
   [[ "$output" == *"STEP  --- 14. Virtualization ---"* ]]
-  [[ "$output" != *"/14"* ]]
+  [[ "$output" == *"STEP  --- 15. Syncthing ---"* ]]
+  [[ "$output" != *"/15"* ]]
   [[ "$output" == *"sudo nmcli connection import type wireguard file /etc/wireguard/wg0.conf"* ]]
   [[ "$output" == *"Visit: https://localhost:9443/"* ]]
   [[ "$output" == *"This applies the new libvirt group membership."* ]]
+  [[ "$output" == *"http://127.0.0.1:8384/"* ]]
+  [[ "$output" == *"systemctl --user status syncthing.service"* ]]
   [[ "$output" == *$'\n    Open: Settings -> System -> Users -> Fingerprint Login'* ]]
   [[ "$output" == *$'\n    • Name: Claude new chat'* ]]
   [[ "$output" == *$'\n      $ claude-desktop claude://claude.ai/new'* ]]
@@ -102,6 +105,7 @@ setup() {
   [[ "$status" -eq 0 ]]
   [[ "$output" == *"STEP  --- 1. SSH private key ---"* ]]
   [[ "$output" == *"STEP  --- 6. Virtualization ---"* ]]
+  [[ "$output" == *"STEP  --- 7. Syncthing ---"* ]]
   [[ "$output" == *"Manage this headless host with virsh or a remote virt-manager client."* ]]
   [[ "$output" != *'$ virt-manager --connect qemu:///system'* ]]
   [[ "$output" != *"Fingerprint login"* ]]
@@ -154,6 +158,7 @@ setup() {
 
 @test "requested APT and Flatpak packages remain organized by scope" {
   [[ " ${COMMON_PACKAGES[*]} " == *" cockpit "* ]]
+  [[ " ${COMMON_PACKAGES[*]} " == *" syncthing "* ]]
   [[ " ${COMMON_PACKAGES[*]} " == *" tailscale "* ]]
   [[ " ${COMMON_PACKAGES[*]} " != *" rdap "* ]]
   [[ " ${RELEASE_OPTIONAL_PACKAGES[*]} " == *" rdap "* ]]
@@ -742,6 +747,50 @@ FAKE_GSETTINGS
   [[ "$(<"$SYSTEMD_CONFIG_DIR/cockpit.socket.d/listen.conf")" == $'[Socket]\nListenStream=\nListenStream=9443' ]]
   grep -Fqx 'enable cockpit.socket' "$command_record"
   ! grep -Fq 'start cockpit.socket' "$command_record"
+}
+
+@test "Syncthing user service is enabled and started when the user manager is available" {
+  local command_record="$BATS_TEST_TMPDIR/syncthing-systemctl-record"
+  TARGET_USER="testuser"
+  TARGET_UID="1000"
+
+  command() {
+    [[ "$1" == "-v" && "$2" == "systemctl" ]]
+  }
+  target_user_systemd_available() {
+    return 0
+  }
+  run_as_target_user() {
+    printf '%s\n' "$*" >>"$command_record"
+  }
+
+  configure_syncthing_service
+
+  grep -Fq 'systemctl --user enable syncthing.service' "$command_record"
+  grep -Fq 'systemctl --user start syncthing.service' "$command_record"
+}
+
+@test "Syncthing user service defers startup when the user manager is unavailable" {
+  local command_record="$BATS_TEST_TMPDIR/syncthing-deferred-record"
+  TARGET_USER="testuser"
+  TARGET_UID="1000"
+
+  command() {
+    [[ "$1" == "-v" && "$2" == "systemctl" ]]
+  }
+  target_user_systemd_available() {
+    return 1
+  }
+  run_as_target_user() {
+    printf '%s\n' "$*" >>"$command_record"
+  }
+
+  run configure_syncthing_service
+
+  [[ "$status" -eq 0 ]]
+  [[ "$output" == *"startup is deferred until login"* ]]
+  grep -Fq 'systemctl --user enable syncthing.service' "$command_record"
+  ! grep -Fq 'systemctl --user start syncthing.service' "$command_record"
 }
 
 @test "Libvirt configuration skips existing access and active socket state" {
@@ -1891,6 +1940,30 @@ EOF
     "$APT_SOURCES_DIR/tailscale.list"
 }
 
+@test "Syncthing repository is repeatable and uses the stable-v2 channel" {
+  local validation_record="$BATS_TEST_TMPDIR/syncthing-validation"
+
+  fetch_file() {
+    [[ "$1" == "https://syncthing.net/release-key.gpg" ]]
+    printf 'Syncthing test key\n' >"$2"
+  }
+  validate_openpgp_key() {
+    printf '%s\n' "$2" >"$validation_record"
+  }
+
+  apply_repository_setup ensure_syncthing_repository
+  [[ "$APT_SOURCES_CHANGED" == true ]]
+
+  APT_SOURCES_CHANGED=false
+  apply_repository_setup ensure_syncthing_repository
+
+  [[ "$APT_SOURCES_CHANGED" == false ]]
+  [[ "$(<"$validation_record")" == "Syncthing" ]]
+  grep -Fqx \
+    "deb [signed-by=${SYSTEM_KEYRING_DIR}/syncthing-archive-keyring.gpg] https://apt.syncthing.net/ syncthing stable-v2" \
+    "$APT_SOURCES_DIR/syncthing.list"
+}
+
 @test "Typora repository removes its obsolete key and is repeatable" {
   printf 'obsolete key\n' >"$APT_TRUSTED_KEY_DIR/typora.asc"
 
@@ -1927,7 +2000,7 @@ EOF
     printf '%s|%s\n' "$2" "$3" >"$validation_record"
   }
 
-  apply_repository_setup install_docker_ctop_repository
+  apply_repository_setup ensure_docker_ctop_repository
 
   [[ "$APT_SOURCES_CHANGED" == true ]]
   grep -Fqx 'URIs: https://packages.azlux.fr/debian/' "$APT_SOURCES_DIR/azlux.sources"
@@ -2025,4 +2098,7 @@ EOF
   [[ "$output" == *"13. Clone Git repositories over SSH"* ]]
   [[ "$output" == *"14. Virtualization"* ]]
   [[ "$output" == *"virsh --connect qemu:///system list --all"* ]]
+  [[ "$output" == *"15. Syncthing"* ]]
+  [[ "$output" == *"http://127.0.0.1:8384/"* ]]
+  [[ "$output" == *"systemctl --user status syncthing.service"* ]]
 }
