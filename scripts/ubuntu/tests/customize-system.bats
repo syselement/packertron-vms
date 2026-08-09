@@ -10,6 +10,7 @@ setup() {
   APT_SOURCES_DIR="$BATS_TEST_TMPDIR/etc/apt/sources.list.d"
   APT_TRUSTED_KEY_DIR="$BATS_TEST_TMPDIR/etc/apt/trusted.gpg.d"
   SYSTEMD_RUNTIME_DIR="$BATS_TEST_TMPDIR/run/systemd/system"
+  SYSTEMD_CONFIG_DIR="$BATS_TEST_TMPDIR/etc/systemd/system"
   mkdir -p "$SYSTEM_KEYRING_DIR" "$APT_SOURCES_DIR" "$APT_TRUSTED_KEY_DIR"
 
   info() {
@@ -81,7 +82,7 @@ setup() {
   [[ "$output" == *"STEP  --- 14. Virtualization ---"* ]]
   [[ "$output" != *"/14"* ]]
   [[ "$output" == *"sudo nmcli connection import type wireguard file /etc/wireguard/wg0.conf"* ]]
-  [[ "$output" == *"Visit: https://localhost:9090/"* ]]
+  [[ "$output" == *"Visit: https://localhost:9443/"* ]]
   [[ "$output" == *"This applies the new libvirt group membership."* ]]
   [[ "$output" == *$'\n    Open: Settings -> System -> Users -> Fingerprint Login'* ]]
   [[ "$output" == *$'\n    • Name: Claude new chat'* ]]
@@ -677,13 +678,13 @@ FAKE_GSETTINGS
   [[ "$(<"$install_record")" == "release-optional rdap" ]]
 }
 
-@test "Cockpit socket helper skips an already enabled active socket" {
+@test "Cockpit socket helper configures and restarts an already active socket" {
   mkdir -p "$SYSTEMD_RUNTIME_DIR"
 
   systemctl() {
     case "$1" in
       cat) return 0 ;;
-      is-enabled | is-active) return 0 ;;
+      is-enabled | is-active | daemon-reload | restart) return 0 ;;
       *)
         printf 'unexpected Cockpit socket mutation: %s\n' "$*" >&2
         return 99
@@ -694,7 +695,8 @@ FAKE_GSETTINGS
   run configure_cockpit_socket
 
   [[ "$status" -eq 0 ]]
-  [[ "$output" == *"Cockpit socket already enabled and active"* ]]
+  [[ "$(<"$SYSTEMD_CONFIG_DIR/cockpit.socket.d/listen.conf")" == $'[Socket]\nListenStream=\nListenStream=9443' ]]
+  [[ "$output" == *"Cockpit configured to listen on port 9443"* ]]
   [[ "$output" != *"unexpected Cockpit socket mutation"* ]]
 }
 
@@ -705,7 +707,7 @@ FAKE_GSETTINGS
   systemctl() {
     printf '%s\n' "$*" >>"$command_record"
     case "$1" in
-      cat | enable | start) return 0 ;;
+      cat | enable | start | daemon-reload | restart) return 0 ;;
       is-enabled | is-active) return 1 ;;
       *) return 2 ;;
     esac
@@ -717,6 +719,8 @@ FAKE_GSETTINGS
   [[ "$output" == *"Cockpit socket enabled and active"* ]]
   grep -Fqx 'enable cockpit.socket' "$command_record"
   grep -Fqx 'start cockpit.socket' "$command_record"
+  grep -Fqx 'daemon-reload' "$command_record"
+  grep -Fqx 'restart cockpit.socket' "$command_record"
 }
 
 @test "Cockpit socket activation is deferred when systemd is not running" {
@@ -735,6 +739,7 @@ FAKE_GSETTINGS
 
   [[ "$status" -eq 0 ]]
   [[ "$output" == *"Cockpit socket activation is deferred until boot"* ]]
+  [[ "$(<"$SYSTEMD_CONFIG_DIR/cockpit.socket.d/listen.conf")" == $'[Socket]\nListenStream=\nListenStream=9443' ]]
   grep -Fqx 'enable cockpit.socket' "$command_record"
   ! grep -Fq 'start cockpit.socket' "$command_record"
 }
@@ -1929,7 +1934,7 @@ EOF
   [[ "$(<"$validation_record")" == 'AZLux|98B824A5FA7D3A10FDB225B7CA548A0A0312D8E6' ]]
 }
 
-@test "Claude Desktop repository uses the official fingerprint and amd64 architecture" {
+@test "Claude Desktop repository uses the official fingerprint and supported architectures" {
   local validation_record="$BATS_TEST_TMPDIR/claude-validation"
 
   fetch_file() {
@@ -1943,7 +1948,7 @@ EOF
 
   [[ "$APT_SOURCES_CHANGED" == true ]]
   grep -Fqx \
-    "deb [arch=amd64 signed-by=${SYSTEM_KEYRING_DIR}/claude-desktop-archive-keyring.asc] https://downloads.claude.ai/claude-desktop/apt/stable stable main" \
+    "deb [arch=amd64,arm64 signed-by=${SYSTEM_KEYRING_DIR}/claude-desktop-archive-keyring.asc] https://downloads.claude.ai/claude-desktop/apt/stable stable main" \
     "$APT_SOURCES_DIR/claude-desktop.list"
   [[ "$(<"$validation_record")" == 'Claude Desktop|31DDDE24DDFAB679F42D7BD2BAA929FF1A7ECACE' ]]
 }
@@ -2016,7 +2021,7 @@ EOF
   [[ "$output" == *"11. WireGuard connection"* ]]
   [[ "$output" == *"sudo nmcli connection import type wireguard file /etc/wireguard/wg0.conf"* ]]
   [[ "$output" == *"12. Cockpit web console"* ]]
-  [[ "$output" == *"https://localhost:9090/"* ]]
+  [[ "$output" == *"https://localhost:9443/"* ]]
   [[ "$output" == *"13. Clone Git repositories over SSH"* ]]
   [[ "$output" == *"14. Virtualization"* ]]
   [[ "$output" == *"virsh --connect qemu:///system list --all"* ]]

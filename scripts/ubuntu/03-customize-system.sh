@@ -43,6 +43,7 @@ SYSTEM_KEYRING_DIR="${PACKERTRON_SYSTEM_KEYRING_DIR:-/usr/share/keyrings}"
 APT_SOURCES_DIR="${PACKERTRON_APT_SOURCES_DIR:-/etc/apt/sources.list.d}"
 APT_TRUSTED_KEY_DIR="${PACKERTRON_APT_TRUSTED_KEY_DIR:-/etc/apt/trusted.gpg.d}"
 SYSTEMD_RUNTIME_DIR="${PACKERTRON_SYSTEMD_RUNTIME_DIR:-/run/systemd/system}"
+SYSTEMD_CONFIG_DIR="${PACKERTRON_SYSTEMD_CONFIG_DIR:-/etc/systemd/system}"
 KVM_DEVICE="${PACKERTRON_KVM_DEVICE:-/dev/kvm}"
 APT_TRANSACTION_DIR="${PACKERTRON_APT_TRANSACTION_DIR:-/var/lib/packertron-apt-transactions/customize-system}"
 HOMEBREW_PREFIX="${PACKERTRON_HOMEBREW_PREFIX:-/home/linuxbrew/.linuxbrew}"
@@ -797,7 +798,25 @@ configure_system_socket() {
 }
 
 configure_cockpit_socket() {
+    local override_directory="${SYSTEMD_CONFIG_DIR}/cockpit.socket.d"
+    local override_file="${override_directory}/listen.conf"
+
+    install -d -m 0755 "$override_directory"
+    cat >"$override_file" <<'EOF'
+[Socket]
+ListenStream=
+ListenStream=9443
+EOF
+
     configure_system_socket "cockpit.socket" "Cockpit"
+
+    if [[ -d "$SYSTEMD_RUNTIME_DIR" ]]; then
+        systemctl daemon-reload ||
+            die "failed reloading systemd after configuring Cockpit port"
+        systemctl restart cockpit.socket ||
+            die "failed restarting Cockpit socket"
+        ok "Cockpit configured to listen on port 9443"
+    fi
 }
 
 configure_libvirt() {
@@ -3548,7 +3567,7 @@ show_manual_setup_hints() {
     manual_command "sudo nmcli connection import type wireguard file /etc/wireguard/wg0.conf"
 
     manual_step "$((instruction_number += 1)). Cockpit web console"
-    manual_line "Visit: https://localhost:9090/"
+    manual_line "Visit: https://localhost:9443/"
 
     manual_step "$((instruction_number += 1)). Clone Git repositories over SSH"
     manual_item "GitHub:  cd ${home}/repos/github"
