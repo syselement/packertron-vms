@@ -1934,7 +1934,7 @@ EOF
   [[ "$(<"$validation_record")" == 'AZLux|98B824A5FA7D3A10FDB225B7CA548A0A0312D8E6' ]]
 }
 
-@test "Claude Desktop repository uses the official fingerprint and supported architectures" {
+@test "Claude Desktop repository uses the official fingerprint and amd64 architecture" {
   local validation_record="$BATS_TEST_TMPDIR/claude-validation"
 
   fetch_file() {
@@ -1948,7 +1948,7 @@ EOF
 
   [[ "$APT_SOURCES_CHANGED" == true ]]
   grep -Fqx \
-    "deb [arch=amd64,arm64 signed-by=${SYSTEM_KEYRING_DIR}/claude-desktop-archive-keyring.asc] https://downloads.claude.ai/claude-desktop/apt/stable stable main" \
+    "deb [arch=amd64 signed-by=${SYSTEM_KEYRING_DIR}/claude-desktop-archive-keyring.asc] https://downloads.claude.ai/claude-desktop/apt/stable stable main" \
     "$APT_SOURCES_DIR/claude-desktop.list"
   [[ "$(<"$validation_record")" == 'Claude Desktop|31DDDE24DDFAB679F42D7BD2BAA929FF1A7ECACE' ]]
 }
