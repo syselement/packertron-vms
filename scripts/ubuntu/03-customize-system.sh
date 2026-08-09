@@ -1143,8 +1143,8 @@ PYTHON_ARRAY
 
 # Appearance
 set_gsetting org.gnome.desktop.interface color-scheme "'prefer-dark'"
-set_gsetting org.gnome.desktop.interface document-font-name "'JetBrainsMono Nerd Font 11'"
-set_gsetting org.gnome.desktop.interface font-name "'JetBrainsMono Nerd Font 11'"
+set_gsetting org.gnome.desktop.interface document-font-name "'Adwaita Sans 11'"
+set_gsetting org.gnome.desktop.interface font-name "'Adwaita Sans 11'"
 set_gsetting org.gnome.desktop.interface gtk-theme "'Yaru-yellow-dark'"
 set_gsetting org.gnome.desktop.interface monospace-font-name "'JetBrainsMono Nerd Font Mono 11'"
 set_gsetting org.gnome.desktop.interface show-battery-percentage "true"
