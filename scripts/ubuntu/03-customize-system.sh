@@ -43,6 +43,7 @@ SYSTEM_KEYRING_DIR="${PACKERTRON_SYSTEM_KEYRING_DIR:-/usr/share/keyrings}"
 APT_SOURCES_DIR="${PACKERTRON_APT_SOURCES_DIR:-/etc/apt/sources.list.d}"
 APT_TRUSTED_KEY_DIR="${PACKERTRON_APT_TRUSTED_KEY_DIR:-/etc/apt/trusted.gpg.d}"
 SYSTEMD_RUNTIME_DIR="${PACKERTRON_SYSTEMD_RUNTIME_DIR:-/run/systemd/system}"
+SYSTEMD_CONFIG_DIR="${PACKERTRON_SYSTEMD_CONFIG_DIR:-/etc/systemd/system}"
 KVM_DEVICE="${PACKERTRON_KVM_DEVICE:-/dev/kvm}"
 APT_TRANSACTION_DIR="${PACKERTRON_APT_TRANSACTION_DIR:-/var/lib/packertron-apt-transactions/customize-system}"
 HOMEBREW_PREFIX="${PACKERTRON_HOMEBREW_PREFIX:-/home/linuxbrew/.linuxbrew}"
@@ -116,6 +117,7 @@ readonly -a RELEASE_OPTIONAL_PACKAGES=(
 
 readonly -a DESKTOP_PACKAGES=(
     brave-browser
+    claude-desktop
     dbeaver-ce
     filezilla
     flatpak
@@ -796,7 +798,25 @@ configure_system_socket() {
 }
 
 configure_cockpit_socket() {
+    local override_directory="${SYSTEMD_CONFIG_DIR}/cockpit.socket.d"
+    local override_file="${override_directory}/listen.conf"
+
+    install -d -m 0755 "$override_directory"
+    cat >"$override_file" <<'EOF'
+[Socket]
+ListenStream=
+ListenStream=9443
+EOF
+
     configure_system_socket "cockpit.socket" "Cockpit"
+
+    if [[ -d "$SYSTEMD_RUNTIME_DIR" ]]; then
+        systemctl daemon-reload ||
+            die "failed reloading systemd after configuring Cockpit port"
+        systemctl restart cockpit.socket ||
+            die "failed restarting Cockpit socket"
+        ok "Cockpit configured to listen on port 9443"
+    fi
 }
 
 configure_libvirt() {
@@ -1744,6 +1764,49 @@ ensure_brave_browser_repository() (
         changed=true
         info "removed legacy Brave repository file: ${legacy_file}"
     done
+
+    [[ "$changed" == false ]] || return 10
+)
+
+ensure_claude_desktop_repository() (
+    set -Eeuo pipefail
+
+    local changed=false
+    local key_file="${SYSTEM_KEYRING_DIR}/claude-desktop-archive-keyring.asc"
+    local source_file="${APT_SOURCES_DIR}/claude-desktop.list"
+    local temporary_dir
+    temporary_dir="$(mktemp -d)"
+    trap 'rm -rf -- "$temporary_dir"' EXIT
+
+    fetch_file \
+        "https://downloads.claude.ai/claude-desktop/key.asc" \
+        "$temporary_dir/claude-desktop-archive-keyring.asc" ||
+        die "failed downloading the Claude Desktop signing key"
+    validate_openpgp_key \
+        "$temporary_dir/claude-desktop-archive-keyring.asc" \
+        "Claude Desktop" \
+        "31DDDE24DDFAB679F42D7BD2BAA929FF1A7ECACE"
+
+    cat >"$temporary_dir/claude-desktop.list" <<EOF
+deb [arch=amd64 signed-by=${key_file}] https://downloads.claude.ai/claude-desktop/apt/stable stable main
+EOF
+    validate_repository_source \
+        "$temporary_dir/claude-desktop.list" \
+        "https://downloads.claude.ai/claude-desktop/apt/stable" \
+        "$key_file"
+
+    if write_file_if_changed "$temporary_dir/claude-desktop-archive-keyring.asc" "$key_file"; then
+        changed=true
+        ok "installed Claude Desktop repository signing key"
+    else
+        info "Claude Desktop repository signing key already current"
+    fi
+    if write_file_if_changed "$temporary_dir/claude-desktop.list" "$source_file"; then
+        changed=true
+        ok "configured Claude Desktop repository"
+    else
+        info "Claude Desktop repository already configured"
+    fi
 
     [[ "$changed" == false ]] || return 10
 )
@@ -3446,6 +3509,10 @@ show_manual_setup_hints() {
         manual_line "- Launchers -> click Launch terminal and Set Shortcut"
         manual_line "Shortcut: Alt+T"
         manual_line "- Custom Shortcuts -> click Add Shortcut"
+        manual_item "Name: Claude new chat"
+        manual_line "Command:"
+        manual_command "claude-desktop claude://claude.ai/new"
+        manual_line "Shortcut: Ctrl+Alt+Space"
         manual_item "Name: Flameshot"
         manual_line "Command:"
         manual_command "script --quiet --command \"/usr/bin/flameshot gui --clipboard --path ${home}/Pictures/flameshot\" /dev/null"
@@ -3500,7 +3567,7 @@ show_manual_setup_hints() {
     manual_command "sudo nmcli connection import type wireguard file /etc/wireguard/wg0.conf"
 
     manual_step "$((instruction_number += 1)). Cockpit web console"
-    manual_line "Visit: https://localhost:9090/"
+    manual_line "Visit: https://localhost:9443/"
 
     manual_step "$((instruction_number += 1)). Clone Git repositories over SSH"
     manual_item "GitHub:  cd ${home}/repos/github"
@@ -3594,6 +3661,7 @@ main() {
     if [[ "$UBUNTU_VARIANT" == "desktop" ]]; then
         info "ensuring Desktop application repositories"
         apply_repository_setup ensure_brave_browser_repository
+        apply_repository_setup ensure_claude_desktop_repository
         apply_repository_setup ensure_dbeaver_repository
         apply_repository_setup ensure_mullvad_repository
         apply_repository_setup ensure_sublime_text_repository
