@@ -1,3 +1,12 @@
+# [0.56.0](https://github.com/syselement/packertron-vms/compare/v0.55.0...v0.56.0) (2026-08-09)
+
+
+### Features
+
+* update GNOME interface font settings to use Adwaita Sans ([e01f54c](https://github.com/syselement/packertron-vms/commit/e01f54c43b6587ab37943cb6dc662178c1c058f3))
+
+
+
 # [0.55.0](https://github.com/syselement/packertron-vms/compare/v0.54.1...v0.55.0) (2026-08-09)
 
 
@@ -38,15 +47,6 @@
 ### Features
 
 * configure mouse settings for improved user experience in GNOME ([0bdb41f](https://github.com/syselement/packertron-vms/commit/0bdb41f525ce53b652f2729ef552a349413c2fc2))
-
-
-
-# [0.52.0](https://github.com/syselement/packertron-vms/compare/v0.51.0...v0.52.0) (2026-08-02)
-
-
-### Features
-
-* enhance logging format in customization script and tests for clarity ([9a36c73](https://github.com/syselement/packertron-vms/commit/9a36c73d3b7b5c35d09f837def96efb277d10fce))
 
 
 
