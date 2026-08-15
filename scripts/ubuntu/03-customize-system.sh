@@ -59,6 +59,7 @@ readonly -a APT_BOOTSTRAP_PACKAGES=(
 readonly -a COMMON_PACKAGES=(
     7zip
     7zip-rar
+    apparmor-utils
     aptitude
     arp-scan
     bash-completion
@@ -102,6 +103,7 @@ readonly -a COMMON_PACKAGES=(
     tailscale
     tmux
     tor
+    traceroute
     tree
     ugrep
     unzip
