@@ -44,6 +44,7 @@ APT_SOURCES_DIR="${PACKERTRON_APT_SOURCES_DIR:-/etc/apt/sources.list.d}"
 APT_TRUSTED_KEY_DIR="${PACKERTRON_APT_TRUSTED_KEY_DIR:-/etc/apt/trusted.gpg.d}"
 SYSTEMD_RUNTIME_DIR="${PACKERTRON_SYSTEMD_RUNTIME_DIR:-/run/systemd/system}"
 SYSTEMD_CONFIG_DIR="${PACKERTRON_SYSTEMD_CONFIG_DIR:-/etc/systemd/system}"
+APPARMOR_PROFILE_DIR="${PACKERTRON_APPARMOR_PROFILE_DIR:-/etc/apparmor.d}"
 KVM_DEVICE="${PACKERTRON_KVM_DEVICE:-/dev/kvm}"
 APT_TRANSACTION_DIR="${PACKERTRON_APT_TRANSACTION_DIR:-/var/lib/packertron-apt-transactions/customize-system}"
 HOMEBREW_PREFIX="${PACKERTRON_HOMEBREW_PREFIX:-/home/linuxbrew/.linuxbrew}"
@@ -853,6 +854,41 @@ configure_syncthing_service() {
         die "failed starting Syncthing service for ${TARGET_USER}"
     ok "Syncthing service enabled and started for ${TARGET_USER}"
 }
+
+configure_cryptomator_fuse_access() (
+    set -Eeuo pipefail
+
+    local profile_file="${APPARMOR_PROFILE_DIR}/fusermount3"
+    local local_directory="${APPARMOR_PROFILE_DIR}/local"
+    local local_file="${local_directory}/fusermount3"
+    local temporary_file
+
+    install -d -m 0755 "$local_directory"
+    temporary_file="$(mktemp)"
+    trap 'rm -f -- "$temporary_file"' EXIT
+
+    cat >"$temporary_file" <<'EOF'
+unix (receive, send) type=stream peer=(label=bwrap),
+unix (receive, send) type=stream peer=(label=unpriv_bwrap),
+EOF
+
+    if [[ ! -f "$local_file" ]] || ! cmp -s "$temporary_file" "$local_file"; then
+        install -m 0644 "$temporary_file" "$local_file"
+        ok "configured Cryptomator FUSE access in the local AppArmor profile"
+    else
+        info "Cryptomator FUSE AppArmor rules already configured"
+    fi
+
+    if [[ -f "$profile_file" ]]; then
+        command -v apparmor_parser >/dev/null 2>&1 ||
+            die "apparmor_parser is required to reload the fusermount3 profile"
+        apparmor_parser -r "$profile_file" ||
+            die "failed reloading the fusermount3 AppArmor profile"
+        ok "reloaded the fusermount3 AppArmor profile"
+    else
+        warn "fusermount3 parent profile is unavailable; local Cryptomator rules are ready for the next AppArmor profile load"
+    fi
+)
 
 configure_libvirt() {
     local user_groups
@@ -3956,6 +3992,7 @@ main() {
         install_package_array "Desktop" "${DESKTOP_PACKAGES[@]}"
         configure_flathub
         install_flatpak_package_array "Desktop Flatpak" "${FLATPAK_PACKAGES[@]}"
+        configure_cryptomator_fuse_access
         install_rustdesk
         install_termius
         install_termix

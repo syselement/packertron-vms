@@ -854,6 +854,47 @@ FAKE_GSETTINGS
   ! grep -Fq 'systemctl --user start syncthing.service' "$command_record"
 }
 
+@test "Cryptomator FUSE configuration writes only the required rules and reloads AppArmor" {
+  local parser_record="$BATS_TEST_TMPDIR/apparmor-parser-record"
+  APPARMOR_PROFILE_DIR="$BATS_TEST_TMPDIR/etc/apparmor.d"
+  mkdir -p "$APPARMOR_PROFILE_DIR/local"
+  printf '# fusermount3 profile\n' >"$APPARMOR_PROFILE_DIR/fusermount3"
+  printf '# preserve existing local rule\n' >"$APPARMOR_PROFILE_DIR/local/fusermount3"
+
+  apparmor_parser() {
+    printf '%s\n' "$*" >>"$parser_record"
+  }
+
+  configure_cryptomator_fuse_access
+  configure_cryptomator_fuse_access
+
+  [[ "$(wc -l <"$APPARMOR_PROFILE_DIR/local/fusermount3")" -eq 2 ]]
+  ! grep -Fq '# preserve existing local rule' "$APPARMOR_PROFILE_DIR/local/fusermount3"
+  [[ "$(grep -Fxc 'unix (receive, send) type=stream peer=(label=bwrap),' "$APPARMOR_PROFILE_DIR/local/fusermount3")" -eq 1 ]]
+  [[ "$(grep -Fxc 'unix (receive, send) type=stream peer=(label=unpriv_bwrap),' "$APPARMOR_PROFILE_DIR/local/fusermount3")" -eq 1 ]]
+  [[ "$(grep -Fxc -- "-r $APPARMOR_PROFILE_DIR/fusermount3" "$parser_record")" -eq 2 ]]
+}
+
+@test "Cryptomator FUSE configuration creates only the local file when the parent profile is missing" {
+  local parser_record="$BATS_TEST_TMPDIR/apparmor-missing-profile-record"
+  APPARMOR_PROFILE_DIR="$BATS_TEST_TMPDIR/etc/apparmor.d"
+  mkdir -p "$APPARMOR_PROFILE_DIR"
+
+  apparmor_parser() {
+    printf 'unexpected parser call: %s\n' "$*" >"$parser_record"
+    return 99
+  }
+
+  run configure_cryptomator_fuse_access
+
+  [[ "$status" -eq 0 ]]
+  [[ "$output" == *"parent profile is unavailable"* ]]
+  [[ ! -e "$APPARMOR_PROFILE_DIR/fusermount3" ]]
+  grep -Fqx 'unix (receive, send) type=stream peer=(label=bwrap),' "$APPARMOR_PROFILE_DIR/local/fusermount3"
+  grep -Fqx 'unix (receive, send) type=stream peer=(label=unpriv_bwrap),' "$APPARMOR_PROFILE_DIR/local/fusermount3"
+  [[ ! -e "$parser_record" ]]
+}
+
 @test "Libvirt configuration skips existing access and active socket state" {
   TARGET_USER="testuser"
   mkdir -p "$SYSTEMD_RUNTIME_DIR"
