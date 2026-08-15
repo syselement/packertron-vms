@@ -77,6 +77,7 @@ readonly -a COMMON_PACKAGES=(
     gdu
     git
     gping
+    grc
     htop
     iftop
     imagemagick
@@ -233,6 +234,7 @@ warn() { log "WARN" "${t_yellow}${t_bold}" "$@"; }
 error() { log "ERROR" "${t_red}${t_bold}" "$@"; }
 manual_step() {
     printf '\n'
+    printf '    %s\n' "------------------------------------------------------------"
     log "STEP" "${t_cyan}${t_bold}" "--- $* ---"
 }
 manual_line() { printf '    %s\n' "$*"; }
@@ -1174,6 +1176,156 @@ PYTHON_ARRAY
   printf '[gnome-settings] SET %s %s = %s\n' "$schema" "$key" "$actual"
 }
 
+gvariant_quote_string() {
+  python3 - "$1" <<'PYTHON_STRING'
+import sys
+
+print(repr(sys.argv[1]))
+PYTHON_STRING
+}
+
+gvariant_read_string() {
+  python3 - "$1" <<'PYTHON_STRING'
+import ast
+import sys
+
+print(ast.literal_eval(sys.argv[1]))
+PYTHON_STRING
+}
+
+string_array_lines() {
+  python3 - "$1" <<'PYTHON_ARRAY'
+import ast
+import sys
+
+raw = sys.argv[1]
+if raw.startswith("@as "):
+    raw = raw[4:]
+for value in ast.literal_eval(raw):
+    print(value)
+PYTHON_ARRAY
+}
+
+custom_keybinding_value() {
+  local path="$1"
+  local key="$2"
+  local schema="org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:${path}"
+
+  gsettings get "$schema" "$key" 2>/dev/null || printf "''\n"
+}
+
+find_custom_keybinding_by_name() {
+  local desired_name="$1"
+  local paths_raw path name_raw name
+
+  paths_raw="$(gsettings get org.gnome.settings-daemon.plugins.media-keys custom-keybindings)" || return 1
+  while IFS= read -r path; do
+    [[ -n "$path" ]] || continue
+    name_raw="$(custom_keybinding_value "$path" name)"
+    name="$(gvariant_read_string "$name_raw" 2>/dev/null || true)"
+    if [[ "$name" == "$desired_name" ]]; then
+      printf '%s\n' "$path"
+      return 0
+    fi
+  done < <(string_array_lines "$paths_raw")
+
+  return 1
+}
+
+next_custom_keybinding_path() {
+  local base='/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings'
+  local paths_raw path candidate name_raw command_raw binding_raw occupied
+  local index=0
+  local -a paths=()
+
+  paths_raw="$(gsettings get org.gnome.settings-daemon.plugins.media-keys custom-keybindings)" || return 1
+  mapfile -t paths < <(string_array_lines "$paths_raw")
+
+  while true; do
+    candidate="${base}/custom${index}/"
+    occupied=false
+    for path in "${paths[@]}"; do
+      if [[ "$path" == "$candidate" ]]; then
+        occupied=true
+        break
+      fi
+    done
+
+    if [[ "$occupied" == false ]]; then
+      name_raw="$(custom_keybinding_value "$candidate" name)"
+      command_raw="$(custom_keybinding_value "$candidate" command)"
+      binding_raw="$(custom_keybinding_value "$candidate" binding)"
+      if [[ "$name_raw" == "''" && "$command_raw" == "''" && "$binding_raw" == "''" ]]; then
+        printf '%s\n' "$candidate"
+        return 0
+      fi
+    fi
+    index=$((index + 1))
+  done
+}
+
+set_custom_keybinding_value() {
+  local path="$1"
+  local key="$2"
+  local value="$3"
+  local schema="org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:${path}"
+  local expected actual
+
+  expected="$(gvariant_quote_string "$value")"
+  actual="$(gsettings get "$schema" "$key")"
+  [[ "$actual" != "$expected" ]] || return 0
+
+  if ! gsettings set "$schema" "$key" "$expected"; then
+    printf '[gnome-settings] ERROR failed custom shortcut: %s %s = %s\n' "$path" "$key" "$expected" >&2
+    failures=$((failures + 1))
+    return 0
+  fi
+
+  actual="$(gsettings get "$schema" "$key")"
+  if [[ "$actual" != "$expected" ]]; then
+    printf '[gnome-settings] ERROR verify failed custom shortcut: %s %s; requested=%s actual=%s\n' \
+      "$path" "$key" "$expected" "$actual" >&2
+    failures=$((failures + 1))
+    return 0
+  fi
+  printf '[gnome-settings] SET custom shortcut %s %s = %s\n' "$path" "$key" "$actual"
+}
+
+ensure_custom_keyboard_shortcut() {
+  local name="$1"
+  local command="$2"
+  local binding="$3"
+  local path
+
+  if ! path="$(find_custom_keybinding_by_name "$name")"; then
+    path="$(next_custom_keybinding_path)" || {
+      printf '[gnome-settings] ERROR cannot allocate custom shortcut path for %s\n' "$name" >&2
+      failures=$((failures + 1))
+      return 0
+    }
+    update_string_array \
+      org.gnome.settings-daemon.plugins.media-keys \
+      custom-keybindings add "$path"
+  fi
+
+  set_custom_keybinding_value "$path" name "$name"
+  set_custom_keybinding_value "$path" command "$command"
+  set_custom_keybinding_value "$path" binding "$binding"
+}
+
+verify_custom_keyboard_shortcut() {
+  local name="$1"
+  local path command binding
+
+  if ! path="$(find_custom_keybinding_by_name "$name")"; then
+    printf '[gnome-settings] VERIFY shortcut missing: %s\n' "$name"
+    return
+  fi
+  command="$(gvariant_read_string "$(custom_keybinding_value "$path" command)")"
+  binding="$(gvariant_read_string "$(custom_keybinding_value "$path" binding)")"
+  printf '[gnome-settings] VERIFY shortcut name=%s command=%s binding=%s\n' "$name" "$command" "$binding"
+}
+
 # Appearance
 set_gsetting org.gnome.desktop.interface color-scheme "'prefer-dark'"
 set_gsetting org.gnome.desktop.interface document-font-name "'Adwaita Sans 11'"
@@ -1236,6 +1388,32 @@ set_gsetting org.gnome.desktop.peripherals.touchpad natural-scroll "false"
 # Dock favorites
 set_gsetting org.gnome.shell favorite-apps \
   "['org.gnome.Nautilus.desktop', 'brave-browser.desktop', 'terminator.desktop', 'sublime_text.desktop', 'obsidian.desktop', 'code.desktop']"
+
+# Custom keyboard shortcuts. Existing entries are matched by name so their
+# customN paths may change without creating duplicates.
+set_gsetting org.gnome.settings-daemon.plugins.media-keys home "['<Super>e']"
+set_gsetting org.gnome.settings-daemon.plugins.media-keys terminal "['<Alt>t']"
+set_gsetting org.freedesktop.ibus.panel.emoji hotkey "@as []"
+ensure_custom_keyboard_shortcut \
+  "Flameshot" \
+  "script --quiet --command \"/usr/bin/flameshot gui --clipboard --path ${HOME}/Pictures/flameshot\" /dev/null" \
+  "<Shift><Alt>s"
+ensure_custom_keyboard_shortcut "Emote" "/snap/bin/emote" "<Super>period"
+ensure_custom_keyboard_shortcut \
+  "Claude new chat" \
+  "claude-desktop claude://claude.ai/new" \
+  "<Control><Alt>space"
+
+printf '[gnome-settings] VERIFY custom keyboard shortcuts\n'
+printf '[gnome-settings] VERIFY launcher Home folder binding=%s\n' \
+  "$(gsettings get org.gnome.settings-daemon.plugins.media-keys home)"
+printf '[gnome-settings] VERIFY launcher Launch terminal binding=%s\n' \
+  "$(gsettings get org.gnome.settings-daemon.plugins.media-keys terminal)"
+verify_custom_keyboard_shortcut "Flameshot"
+verify_custom_keyboard_shortcut "Emote"
+verify_custom_keyboard_shortcut "Claude new chat"
+printf '[gnome-settings] VERIFY IBus emoji hotkey=%s\n' \
+  "$(gsettings get org.freedesktop.ibus.panel.emoji hotkey)"
 
 # Enable System Monitor Panel on Ubuntu 26.04.
 # Fall back to the packaged System Monitor extension on Ubuntu 24.04.
@@ -3047,6 +3225,7 @@ alias ip='ip --color=auto'
 alias ipa='ip -br -c a'
 alias ports='ss -tunlp'
 alias publicip='curl -4 ifconfig.me && echo'
+alias tcpdump='/usr/bin/stdbuf -o0 /usr/bin/grc --colour=auto tcpdump'
 
 # Python
 alias p3='python3'
@@ -3580,22 +3759,25 @@ show_manual_setup_hints() {
         manual_line "Enroll at least two fingers and verify sudo authentication."
 
         manual_step "$((instruction_number += 1)). Keyboard shortcuts"
-        manual_line "Open: Settings -> Keyboard -> View and Customize Shortcuts"
-        manual_line "- Launchers -> click Launch terminal and Set Shortcut"
+        manual_item "Name: Home folder"
+        manual_line "Command: GNOME built-in launcher"
+        manual_line "Shortcut: Super+E"
+        manual_line "----------------------------------------"
+        manual_item "Name: Launch terminal"
+        manual_line "Command: GNOME built-in launcher"
         manual_line "Shortcut: Alt+T"
-        manual_line "- Custom Shortcuts -> click Add Shortcut"
-        manual_item "Name: Claude new chat"
-        manual_line "Command:"
-        manual_command "claude-desktop claude://claude.ai/new"
-        manual_line "Shortcut: Ctrl+Alt+Space"
+        manual_line "----------------------------------------"
         manual_item "Name: Flameshot"
-        manual_line "Command:"
-        manual_command "script --quiet --command \"/usr/bin/flameshot gui --clipboard --path ${home}/Pictures/flameshot\" /dev/null"
-        manual_line "Shortcut: Print or Shift+Alt+S"
+        manual_line "Command: script --quiet --command \"/usr/bin/flameshot gui --clipboard --path ${home}/Pictures/flameshot\" /dev/null"
+        manual_line "Shortcut: Shift+Alt+S"
+        manual_line "----------------------------------------"
         manual_item "Name: Emote"
-        manual_line "Command:"
-        manual_command "/snap/bin/emote"
-        manual_line "Shortcut: Super+Comma (Windows key + ,)"
+        manual_line "Command: /snap/bin/emote"
+        manual_line "Shortcut: Super+."
+        manual_line "----------------------------------------"
+        manual_item "Name: Claude new chat"
+        manual_line "Command: claude-desktop claude://claude.ai/new"
+        manual_line "Shortcut: Ctrl+Alt+Space"
 
         manual_step "$((instruction_number += 1)). Bluetooth devices"
         manual_line "Open: Settings -> Bluetooth"

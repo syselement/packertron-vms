@@ -63,6 +63,7 @@ setup() {
 
   [[ "$status" -eq 0 ]]
   [[ "$output" == *" STEP  --- 1. SSH private key ---" ]]
+  [[ "$output" == *$'\n    ------------------------------------------------------------\n'* ]]
   [[ "$output" != *"===================="* ]]
   [[ "$output" != *$'\e['* ]]
 }
@@ -81,6 +82,7 @@ setup() {
   [[ "$output" == *"STEP  --- 13. Clone Git repositories over SSH ---"* ]]
   [[ "$output" == *"STEP  --- 14. Virtualization ---"* ]]
   [[ "$output" == *"STEP  --- 15. Syncthing ---"* ]]
+  [[ "$(grep -c '^    ------------------------------------------------------------$' <<<"$output")" -eq 15 ]]
   [[ "$output" != *"/15"* ]]
   [[ "$output" == *"sudo nmcli connection import type wireguard file /etc/wireguard/wg0.conf"* ]]
   [[ "$output" == *"Visit: https://localhost:9443/"* ]]
@@ -88,10 +90,17 @@ setup() {
   [[ "$output" == *"http://127.0.0.1:8384/"* ]]
   [[ "$output" == *"systemctl --user status syncthing.service"* ]]
   [[ "$output" == *$'\n    Open: Settings -> System -> Users -> Fingerprint Login'* ]]
+  [[ "$output" == *$'\n    • Name: Home folder\n    Command: GNOME built-in launcher\n    Shortcut: Super+E'* ]]
+  [[ "$output" == *$'\n    • Name: Launch terminal\n    Command: GNOME built-in launcher\n    Shortcut: Alt+T'* ]]
+  [[ "$output" == *$'\n    • Name: Flameshot\n    Command: script --quiet --command'* ]]
+  [[ "$output" == *$'\n    Shortcut: Shift+Alt+S'* ]]
+  [[ "$output" == *$'\n    • Name: Emote\n    Command: /snap/bin/emote\n    Shortcut: Super+.'* ]]
   [[ "$output" == *$'\n    • Name: Claude new chat'* ]]
-  [[ "$output" == *$'\n      $ claude-desktop claude://claude.ai/new'* ]]
+  [[ "$(grep -c '^    ----------------------------------------$' <<<"$output")" -eq 4 ]]
+  [[ "$output" == *$'\n    Command: claude-desktop claude://claude.ai/new'* ]]
   [[ "$output" == *$'\n    Shortcut: Ctrl+Alt+Space'* ]]
-  [[ "$output" == *$'\n      $ script --quiet --command'* ]]
+  [[ "$output" != *"Print or Shift+Alt+S"* ]]
+  [[ "$output" != *"Super+Comma"* ]]
   [[ "$output" != *" INFO  "* ]]
   [[ "$output" != *" WARN "* ]]
 }
@@ -372,7 +381,9 @@ fi
 command="$1"
 schema="${2:-}"
 key="${3:-}"
-state_file="${FAKE_SETTINGS_DIR}/${schema}.${key}"
+safe_schema="${schema//\//_}"
+safe_schema="${safe_schema//:/_}"
+state_file="${FAKE_SETTINGS_DIR}/${safe_schema}.${key}"
 
 case "$command" in
   list-schemas)
@@ -387,6 +398,8 @@ case "$command" in
       org.gnome.settings-daemon.plugins.color \
       org.gnome.desktop.sound \
       org.gnome.settings-daemon.plugins.power \
+      org.gnome.settings-daemon.plugins.media-keys \
+      org.freedesktop.ibus.panel.emoji \
       org.gnome.shell.extensions.ding \
       org.gnome.desktop.peripherals.touchpad \
       org.gnome.shell.extensions.dim-background-windows \
@@ -402,7 +415,8 @@ case "$command" in
       night-light-schedule-automatic night-light-schedule-from night-light-schedule-to \
       night-light-temperature allow-volume-above-100-percent power-button-action \
       show-home natural-scroll favorite-apps disable-user-extensions \
-      enabled-extensions disabled-extensions brightness saturation
+      enabled-extensions disabled-extensions brightness saturation \
+      custom-keybindings hotkey home terminal name command binding
     ;;
   writable)
     printf 'true\n'
@@ -414,6 +428,24 @@ case "$command" in
       printf "'BOTTOM'\n"
     elif [[ "$key" == "enabled-extensions" || "$key" == "disabled-extensions" ]]; then
       printf '@as []\n'
+    elif [[ "$schema" == "org.gnome.settings-daemon.plugins.media-keys" && "$key" == "custom-keybindings" ]]; then
+      printf "['/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom2/', '/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom7/']\n"
+    elif [[ "$schema" == "org.freedesktop.ibus.panel.emoji" && "$key" == "hotkey" ]]; then
+      printf "['<Super>period', '<Super>semicolon']\n"
+    elif [[ "$schema" == *"custom2/" && "$key" == "name" ]]; then
+      printf "'Unrelated shortcut'\n"
+    elif [[ "$schema" == *"custom2/" && "$key" == "command" ]]; then
+      printf "'leave-me-alone'\n"
+    elif [[ "$schema" == *"custom2/" && "$key" == "binding" ]]; then
+      printf "'<Alt>u'\n"
+    elif [[ "$schema" == *"custom7/" && "$key" == "name" ]]; then
+      printf "'Flameshot'\n"
+    elif [[ "$schema" == *"custom7/" && "$key" == "command" ]]; then
+      printf "'stale-flameshot-command'\n"
+    elif [[ "$schema" == *"custom7/" && "$key" == "binding" ]]; then
+      printf "'<Alt>f'\n"
+    elif [[ "$schema" == org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:* ]]; then
+      printf "''\n"
     else
       printf 'false\n'
     fi
@@ -451,6 +483,35 @@ FAKE_GSETTINGS
     "$settings_dir/org.gnome.shell.enabled-extensions"
   grep -Fq 'hide-universal-access@akiirui.github.io' \
     "$settings_dir/org.gnome.shell.enabled-extensions"
+  grep -Fq $'org.gnome.settings-daemon.plugins.media-keys\thome\t[\x27<Super>e\x27]' "$command_log"
+  grep -Fq $'org.gnome.settings-daemon.plugins.media-keys\tterminal\t[\x27<Alt>t\x27]' "$command_log"
+  grep -Fq $'org.freedesktop.ibus.panel.emoji\thotkey\t@as []' "$command_log"
+  grep -Fq $'custom7/\tcommand\t\x27script --quiet --command "/usr/bin/flameshot gui --clipboard --path ' "$command_log"
+  grep -Fq $'custom7/\tbinding\t\x27<Shift><Alt>s\x27' "$command_log"
+  grep -Fq $'custom0/\tname\t\x27Emote\x27' "$command_log"
+  grep -Fq $'custom0/\tbinding\t\x27<Super>period\x27' "$command_log"
+  grep -Fq $'custom1/\tname\t\x27Claude new chat\x27' "$command_log"
+  grep -Fq $'custom1/\tbinding\t\x27<Control><Alt>space\x27' "$command_log"
+  ! grep -Fq $'custom2/\t' "$command_log"
+  [[ "$output" == *"VERIFY shortcut name=Flameshot"* ]]
+  [[ "$output" == *"VERIFY shortcut name=Emote command=/snap/bin/emote binding=<Super>period"* ]]
+  [[ "$output" == *"VERIFY shortcut name=Claude new chat command=claude-desktop claude://claude.ai/new binding=<Control><Alt>space"* ]]
+  [[ "$output" == *"VERIFY launcher Home folder binding=['<Super>e']"* ]]
+  [[ "$output" == *"VERIFY launcher Launch terminal binding=['<Alt>t']"* ]]
+  [[ "$output" == *"VERIFY IBus emoji hotkey=@as []"* ]]
+
+  local custom_paths_file="$settings_dir/org.gnome.settings-daemon.plugins.media-keys.custom-keybindings"
+  local custom_paths_before
+  custom_paths_before="$(<"$custom_paths_file")"
+  [[ "$custom_paths_before" == "['/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom2/', '/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom7/', '/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom0/', '/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom1/']" ]]
+
+  : >"$command_log"
+  run apply_gnome_preferences
+
+  [[ "$status" -eq 0 ]]
+  [[ "$(<"$custom_paths_file")" == "$custom_paths_before" ]]
+  ! grep -Fq 'org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:' "$command_log"
+  ! grep -Fq $'org.freedesktop.ibus.panel.emoji\thotkey\t' "$command_log"
 }
 
 @test "GNOME extension download is staged, validated, and installed as the target user" {
