@@ -1,3 +1,18 @@
+# [0.57.0](https://github.com/syselement/packertron-vms/compare/v0.56.0...v0.57.0) (2026-08-16)
+
+
+### Features
+
+* add apparmor-utils and traceroute to common packages ([e7b2d72](https://github.com/syselement/packertron-vms/commit/e7b2d72fa24d36cf7d8b0b6378a8f03af8382df6))
+* add Claude Code installation and verification to customization script ([1197831](https://github.com/syselement/packertron-vms/commit/1197831e2c86bb4d66e433786d27de556e62cca6))
+* add Cryptomator FUSE access configuration and AppArmor profile management ([e2edf05](https://github.com/syselement/packertron-vms/commit/e2edf05f0e17c9f44a1c3af325548163e7f6d342))
+* add custom keyboard shortcuts for Flameshot, Emote, and Claude new chat ([948b106](https://github.com/syselement/packertron-vms/commit/948b10644df3d804a6dcaf69faf8c553c2f0e54a))
+* add documentation links to manual setup hints in customization script ([4a506f8](https://github.com/syselement/packertron-vms/commit/4a506f8a365908b1573da096fec774513284a8e4))
+* add iximiuz Labs control (labctl) installation and verification to customization script ([468cdd5](https://github.com/syselement/packertron-vms/commit/468cdd554c91e2588185c1787e0db0d0e564611b))
+* add Syncthing service configuration and repository setup ([5e7d0ab](https://github.com/syselement/packertron-vms/commit/5e7d0ab0ea52a85ad5ed67bd40d3d3610381b094))
+
+
+
 # [0.56.0](https://github.com/syselement/packertron-vms/compare/v0.55.0...v0.56.0) (2026-08-09)
 
 
@@ -38,15 +53,6 @@
 ### Features
 
 * add support for Dim Background Windows GNOME extension and schema compilation ([a8c6476](https://github.com/syselement/packertron-vms/commit/a8c6476000606504eb3da71a869609b80b6c9b27))
-
-
-
-# [0.53.0](https://github.com/syselement/packertron-vms/compare/v0.52.0...v0.53.0) (2026-08-04)
-
-
-### Features
-
-* configure mouse settings for improved user experience in GNOME ([0bdb41f](https://github.com/syselement/packertron-vms/commit/0bdb41f525ce53b652f2729ef552a349413c2fc2))
 
 
 
