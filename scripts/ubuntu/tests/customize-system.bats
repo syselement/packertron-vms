@@ -11,6 +11,7 @@ setup() {
   APT_TRUSTED_KEY_DIR="$BATS_TEST_TMPDIR/etc/apt/trusted.gpg.d"
   SYSTEMD_RUNTIME_DIR="$BATS_TEST_TMPDIR/run/systemd/system"
   SYSTEMD_CONFIG_DIR="$BATS_TEST_TMPDIR/etc/systemd/system"
+  LOCAL_BIN_DIR="$BATS_TEST_TMPDIR/usr/local/bin"
   mkdir -p "$SYSTEM_KEYRING_DIR" "$APT_SOURCES_DIR" "$APT_TRUSTED_KEY_DIR"
 
   info() {
@@ -81,12 +82,13 @@ setup() {
   [[ "$output" == *"STEP  --- 12. Cockpit web console ---"* ]]
   [[ "$output" == *"STEP  --- 13. Clone Git repositories over SSH ---"* ]]
   [[ "$output" == *"STEP  --- 14. Virtualization ---"* ]]
-  [[ "$output" == *"STEP  --- 15. Syncthing ---"* ]]
-  [[ "$output" == *"STEP  --- 16. Claude Code ---"* ]]
-  [[ "$output" == *"STEP  --- 17. iximiuz Labs control (labctl) ---"* ]]
-  [[ "$(grep -c '^    ------------------------------------------------------------$' <<<"$output")" -eq 17 ]]
-  [[ "$(grep -ci '^    .*documentation: https://' <<<"$output")" -eq 18 ]]
-  [[ "$output" != *"/17"* ]]
+  [[ "$output" == *"STEP  --- 15. Kubernetes command-line tools ---"* ]]
+  [[ "$output" == *"STEP  --- 16. Syncthing ---"* ]]
+  [[ "$output" == *"STEP  --- 17. Claude Code ---"* ]]
+  [[ "$output" == *"STEP  --- 18. iximiuz Labs control (labctl) ---"* ]]
+  [[ "$(grep -c '^    ------------------------------------------------------------$' <<<"$output")" -eq 18 ]]
+  [[ "$(grep -ci '^    .*documentation: https://' <<<"$output")" -eq 22 ]]
+  [[ "$output" != *"/18"* ]]
   [[ "$output" == *"sudo nmcli connection import type wireguard file /etc/wireguard/wg0.conf"* ]]
   [[ "$output" == *"Visit: https://localhost:9443/"* ]]
   [[ "$output" == *"This applies the new libvirt group membership."* ]]
@@ -96,6 +98,11 @@ setup() {
   [[ "$output" == *'$ claude /config'* ]]
   [[ "$output" == *'$ labctl --version'* ]]
   [[ "$output" == *'$ labctl auth login'* ]]
+  [[ "$output" == *'$ kubectl version --client'* ]]
+  [[ "$output" == *'$ helm version'* ]]
+  [[ "$output" == *'$ k9s version'* ]]
+  [[ "$output" == *'$ kubectx --help'* ]]
+  [[ "$output" == *'$ kubens --help'* ]]
   [[ "$output" == *"https://github.com/iximiuz/labctl"* ]]
   [[ "$output" == *"https://code.visualstudio.com/docs/configure/settings-sync"* ]]
   [[ "$output" == *"https://cockpit-project.org/running.html"* ]]
@@ -126,9 +133,10 @@ setup() {
   [[ "$status" -eq 0 ]]
   [[ "$output" == *"STEP  --- 1. SSH private key ---"* ]]
   [[ "$output" == *"STEP  --- 6. Virtualization ---"* ]]
-  [[ "$output" == *"STEP  --- 7. Syncthing ---"* ]]
-  [[ "$output" == *"STEP  --- 8. Claude Code ---"* ]]
-  [[ "$output" == *"STEP  --- 9. iximiuz Labs control (labctl) ---"* ]]
+  [[ "$output" == *"STEP  --- 7. Kubernetes command-line tools ---"* ]]
+  [[ "$output" == *"STEP  --- 8. Syncthing ---"* ]]
+  [[ "$output" == *"STEP  --- 9. Claude Code ---"* ]]
+  [[ "$output" == *"STEP  --- 10. iximiuz Labs control (labctl) ---"* ]]
   [[ "$output" == *'$ claude /config'* ]]
   [[ "$output" == *'$ labctl auth login'* ]]
   [[ "$output" == *"Manage this headless host with virsh or a remote virt-manager client."* ]]
@@ -156,7 +164,7 @@ setup() {
   grep -Fxq -- '--retry' "$curl_record"
 }
 
-@test "APT and Snap network operations are bounded" {
+@test "APT, Snap, and Homebrew network operations are bounded" {
   local apt_record="$BATS_TEST_TMPDIR/apt-record"
 
   apt-get() {
@@ -169,6 +177,7 @@ setup() {
   grep -Fxq 'Acquire::http::Timeout=30' "$apt_record"
   grep -Fxq 'Acquire::https::Timeout=30' "$apt_record"
   grep -Fq 'timeout --foreground 15m snap refresh' "$CUSTOMIZE_SCRIPT"
+  grep -Fq 'timeout --foreground --kill-after=10s 15m' "$CUSTOMIZE_SCRIPT"
 }
 
 @test "provisioning logs enforce mode 0600 before capture" {
@@ -183,6 +192,11 @@ setup() {
 
 @test "requested APT and Flatpak packages remain organized by scope" {
   [[ " ${COMMON_PACKAGES[*]} " == *" cockpit "* ]]
+  [[ " ${COMMON_PACKAGES[*]} " != *" helm "* ]]
+  [[ " ${COMMON_PACKAGES[*]} " != *" kubectx "* ]]
+  [[ " ${KUBERNETES_APT_PACKAGES[*]} " == *" helm "* ]]
+  [[ " ${KUBERNETES_APT_PACKAGES[*]} " == *" kubectx "* ]]
+  [[ " ${HOMEBREW_PACKAGES[*]} " == *" derailed/k9s/k9s "* ]]
   [[ " ${COMMON_PACKAGES[*]} " == *" syncthing "* ]]
   [[ " ${COMMON_PACKAGES[*]} " == *" tailscale "* ]]
   [[ " ${COMMON_PACKAGES[*]} " != *" rdap "* ]]
@@ -197,6 +211,61 @@ setup() {
   [[ " ${VIRTUALIZATION_DESKTOP_PACKAGES[*]} " == *" virt-manager "* ]]
   [[ " ${VIRTUALIZATION_DESKTOP_PACKAGES[*]} " != *" cockpit-machines "* ]]
   [[ " ${VIRTUALIZATION_HOST_PACKAGES[*]} " != *" qemu-kvm "* ]]
+}
+
+@test "kubectl installs the checksum-verified stable binary and skips an identical rerun" {
+  local download_record="$BATS_TEST_TMPDIR/kubectl-downloads"
+
+  fetch_file() {
+    printf '%s\n' "$1" >>"$download_record"
+    case "$1" in
+      "$KUBECTL_STABLE_URL")
+        printf 'v1.36.2\n' >"$2"
+        ;;
+      */kubectl)
+        cat >"$2" <<'KUBECTL'
+#!/usr/bin/env bash
+printf '{"clientVersion":{"gitVersion":"v1.36.2"}}\n'
+KUBECTL
+        ;;
+      */kubectl.sha256)
+        sha256sum "${2%.sha256}" | awk '{print $1}' >"$2"
+        ;;
+      *)
+        return 2
+        ;;
+    esac
+  }
+
+  run install_kubectl
+
+  [[ "$status" -eq 0 ]]
+  [[ "$output" == *"kubectl v1.36.2 installed"* ]]
+  [[ -x "$LOCAL_BIN_DIR/kubectl" ]]
+
+  run install_kubectl
+
+  [[ "$status" -eq 0 ]]
+  [[ "$output" == *"kubectl v1.36.2 already installed, skipping"* ]]
+  [[ "$(grep -c '/kubectl$' "$download_record")" -eq 1 ]]
+  [[ "$(grep -c '/kubectl.sha256$' "$download_record")" -eq 1 ]]
+}
+
+@test "kubectl rejects a binary that does not match the published checksum" {
+  fetch_file() {
+    case "$1" in
+      "$KUBECTL_STABLE_URL") printf 'v1.36.2\n' >"$2" ;;
+      */kubectl) printf 'invalid binary\n' >"$2" ;;
+      */kubectl.sha256) printf '%064d\n' 0 >"$2" ;;
+      *) return 2 ;;
+    esac
+  }
+
+  run install_kubectl
+
+  [[ "$status" -ne 0 ]]
+  [[ "$output" == *"SHA-256 verification failed for kubectl v1.36.2"* ]]
+  [[ ! -e "$LOCAL_BIN_DIR/kubectl" ]]
 }
 
 @test "Desktop virtualization installs the native QEMU host and virt-manager" {
@@ -1881,6 +1950,53 @@ FAKE_INSTALLER
   [[ "$output" == *"Homebrew repaired-test installed and verified"* ]]
 }
 
+@test "Homebrew package workflow installs K9s once after Homebrew is available" {
+  local brew_record="$BATS_TEST_TMPDIR/brew-packages"
+  local brew_state="$BATS_TEST_TMPDIR/k9s-installed"
+  TARGET_USER="$(id -un)"
+  TARGET_HOME="$BATS_TEST_TMPDIR/home"
+  TARGET_UID="$(id -u)"
+  TARGET_GROUP="$(id -gn)"
+  HOMEBREW_PREFIX="$BATS_TEST_TMPDIR/homebrew"
+
+  mkdir -p "$TARGET_HOME" "$HOMEBREW_PREFIX/bin"
+  cat >"$HOMEBREW_PREFIX/bin/brew" <<'FAKE_BREW'
+#!/usr/bin/env bash
+case "$1" in
+  --prefix) printf '%s\n' "$FAKE_BREW_PREFIX" ;;
+  --version) printf 'Homebrew test-version\n' ;;
+  list) [[ -f "$FAKE_BREW_STATE" ]] ;;
+  install)
+    [[ "$2" == "derailed/k9s/k9s" ]]
+    printf '%s\n' "$2" >>"$FAKE_BREW_RECORD"
+    touch "$FAKE_BREW_STATE"
+    ;;
+  *) exit 2 ;;
+esac
+FAKE_BREW
+  chmod +x "$HOMEBREW_PREFIX/bin/brew"
+
+  run_as_target_user() {
+    HOME="$TARGET_HOME" \
+      FAKE_BREW_PREFIX="$HOMEBREW_PREFIX" \
+      FAKE_BREW_RECORD="$brew_record" \
+      FAKE_BREW_STATE="$brew_state" \
+      "$@"
+  }
+
+  run install_homebrew_package_array "managed" "${HOMEBREW_PACKAGES[@]}"
+
+  [[ "$status" -eq 0 ]]
+  [[ "$output" == *"Homebrew package derailed/k9s/k9s installed"* ]]
+  [[ "$(<"$brew_record")" == "derailed/k9s/k9s" ]]
+
+  run install_homebrew_package_array "managed" "${HOMEBREW_PACKAGES[@]}"
+
+  [[ "$status" -eq 0 ]]
+  [[ "$output" == *"Homebrew package derailed/k9s/k9s already installed, skipping"* ]]
+  [[ "$(wc -l <"$brew_record")" -eq 1 ]]
+}
+
 @test "quiet command helper replays output only on failure" {
   noisy_success() {
     printf 'successful noise\n'
@@ -2217,6 +2333,31 @@ EOF
     "$APT_SOURCES_DIR/syncthing.list"
 }
 
+@test "Helm repository is repeatable and validates the official signing key" {
+  local validation_record="$BATS_TEST_TMPDIR/helm-validation"
+
+  fetch_file() {
+    [[ "$1" == "https://packages.buildkite.com/helm-linux/helm-debian/gpgkey" ]]
+    printf 'Helm test key\n' >"$2"
+  }
+  dearmor_openpgp_key() {
+    cp "$1" "$2"
+  }
+  validate_openpgp_key() {
+    printf '%s|%s\n' "$2" "$3" >"$validation_record"
+  }
+
+  apply_repository_setup ensure_helm_repository
+  [[ "$APT_SOURCES_CHANGED" == true ]]
+
+  APT_SOURCES_CHANGED=false
+  apply_repository_setup ensure_helm_repository
+
+  [[ "$APT_SOURCES_CHANGED" == false ]]
+  [[ "$(<"$validation_record")" == 'Helm|DDF78C3E6EBB2D2CC223C95C62BA89D07698DBC6' ]]
+  grep -Fqx "deb [arch=amd64 signed-by=${SYSTEM_KEYRING_DIR}/helm.gpg] https://packages.buildkite.com/helm-linux/helm-debian/any/ any main" "$APT_SOURCES_DIR/helm-stable-debian.list"
+}
+
 @test "Typora repository removes its obsolete key and is repeatable" {
   printf 'obsolete key\n' >"$APT_TRUSTED_KEY_DIR/typora.asc"
 
@@ -2351,12 +2492,13 @@ EOF
   [[ "$output" == *"13. Clone Git repositories over SSH"* ]]
   [[ "$output" == *"14. Virtualization"* ]]
   [[ "$output" == *"virsh --connect qemu:///system list --all"* ]]
-  [[ "$output" == *"15. Syncthing"* ]]
+  [[ "$output" == *"15. Kubernetes command-line tools"* ]]
+  [[ "$output" == *"16. Syncthing"* ]]
   [[ "$output" == *"http://127.0.0.1:8384/"* ]]
   [[ "$output" == *"systemctl --user status syncthing.service"* ]]
-  [[ "$output" == *"16. Claude Code"* ]]
+  [[ "$output" == *"17. Claude Code"* ]]
   [[ "$output" == *"claude /config"* ]]
-  [[ "$output" == *"17. iximiuz Labs control (labctl)"* ]]
+  [[ "$output" == *"18. iximiuz Labs control (labctl)"* ]]
   [[ "$output" == *"labctl --version"* ]]
   [[ "$output" == *"labctl auth login"* ]]
   [[ "$output" == *"https://github.com/iximiuz/labctl"* ]]

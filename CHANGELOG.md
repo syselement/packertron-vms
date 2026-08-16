@@ -1,59 +1,58 @@
-# [0.46.0](https://github.com/syselement/packertron-vms/compare/v0.45.0...v0.46.0) (2026-07-28)
+# [0.58.0](https://github.com/syselement/packertron-vms/compare/v0.57.0...v0.58.0) (2026-08-16)
+
+
+### Features
+
+* add Kubernetes CLI tools installation and Helm repository setup ([8acc829](https://github.com/syselement/packertron-vms/commit/8acc829dce777056c057fc3bf8b02a4e09914660))
+
+
+
+# [0.57.0](https://github.com/syselement/packertron-vms/compare/v0.56.0...v0.57.0) (2026-08-16)
+
+
+### Features
+
+* add apparmor-utils and traceroute to common packages ([e7b2d72](https://github.com/syselement/packertron-vms/commit/e7b2d72fa24d36cf7d8b0b6378a8f03af8382df6))
+* add Claude Code installation and verification to customization script ([1197831](https://github.com/syselement/packertron-vms/commit/1197831e2c86bb4d66e433786d27de556e62cca6))
+* add Cryptomator FUSE access configuration and AppArmor profile management ([e2edf05](https://github.com/syselement/packertron-vms/commit/e2edf05f0e17c9f44a1c3af325548163e7f6d342))
+* add custom keyboard shortcuts for Flameshot, Emote, and Claude new chat ([948b106](https://github.com/syselement/packertron-vms/commit/948b10644df3d804a6dcaf69faf8c553c2f0e54a))
+* add documentation links to manual setup hints in customization script ([4a506f8](https://github.com/syselement/packertron-vms/commit/4a506f8a365908b1573da096fec774513284a8e4))
+* add iximiuz Labs control (labctl) installation and verification to customization script ([468cdd5](https://github.com/syselement/packertron-vms/commit/468cdd554c91e2588185c1787e0db0d0e564611b))
+* add Syncthing service configuration and repository setup ([5e7d0ab](https://github.com/syselement/packertron-vms/commit/5e7d0ab0ea52a85ad5ed67bd40d3d3610381b094))
+
+
+
+# [0.56.0](https://github.com/syselement/packertron-vms/compare/v0.55.0...v0.56.0) (2026-08-09)
+
+
+### Features
+
+* update GNOME interface font settings to use Adwaita Sans ([e01f54c](https://github.com/syselement/packertron-vms/commit/e01f54c43b6587ab37943cb6dc662178c1c058f3))
+
+
+
+# [0.55.0](https://github.com/syselement/packertron-vms/compare/v0.54.1...v0.55.0) (2026-08-09)
 
 
 ### Bug Fixes
 
-* update shortcut for Emote command in manual setup hints ([e60071c](https://github.com/syselement/packertron-vms/commit/e60071cb61252c3867268ec3ff71ea228443ad93))
+* update Claude Desktop repository test to specify amd64 architecture ([1be2f86](https://github.com/syselement/packertron-vms/commit/1be2f8620f861c6b8bcd4b276f34722330f80144))
 
 
 ### Features
 
-* add data directory creation in user workspace setup ([4aa688f](https://github.com/syselement/packertron-vms/commit/4aa688f83031b1eac20736b7272b7e3e1455094f))
-* add de.swsnr.turnon Flatpak package to desktop environment setup ([d15f67d](https://github.com/syselement/packertron-vms/commit/d15f67df2f7aea5bf7833274f22fcebfaa64eebf))
-* add Docker directory creation in user workspace setup ([8ce13dc](https://github.com/syselement/packertron-vms/commit/8ce13dcc0cea3327e4afa51332390d3c0b12f494))
-* ensure Typora configuration and theme directories are created with correct ownership ([a9108b7](https://github.com/syselement/packertron-vms/commit/a9108b77792af50950642254e274ffeab1721965))
-* refactor Vagrantfile to use inline provisioning scripts and add integration tests ([891e1dc](https://github.com/syselement/packertron-vms/commit/891e1dcfc8fe939cd267b4bae5013327a920dbce))
+* add Claude Desktop repository and corresponding tests ([020a11d](https://github.com/syselement/packertron-vms/commit/020a11d1033d439fbe4b6ec5576b5507dcace622))
+* add manual setup hints for Claude new chat and corresponding tests ([5c0b0a5](https://github.com/syselement/packertron-vms/commit/5c0b0a5b2d491673a8ed28b4413ff150f097df49))
+* configure Cockpit to listen on port 9443 and update manual setup instructions ([a553c3c](https://github.com/syselement/packertron-vms/commit/a553c3cfef2ee9b64ba9647aad9e40d2c15b7454))
 
 
 
-# [0.45.0](https://github.com/syselement/packertron-vms/compare/v0.44.0...v0.45.0) (2026-07-28)
-
-
-### Features
-
-* add cockpit-machines package to virtualization host packages ([ce85059](https://github.com/syselement/packertron-vms/commit/ce850591074216e52d1b2d732f0a6b8244a43c84))
-* add virtualization support and related configuration to customization script ([2b6b52a](https://github.com/syselement/packertron-vms/commit/2b6b52ae41a487dcdabeb5254c67a27d6991e79f))
-* update manual setup instructions and enhance test cases for virtualization ([afc39b3](https://github.com/syselement/packertron-vms/commit/afc39b36b079af498f544564e37ec187c1d54615))
-
-
-
-# [0.44.0](https://github.com/syselement/packertron-vms/compare/v0.43.0...v0.44.0) (2026-07-28)
-
-
-### Features
-
-* add Cockpit socket configuration and related tests ([0259609](https://github.com/syselement/packertron-vms/commit/0259609cba6ce9e57c237d9a9219ced5f3b74374))
-* enhance logging and manual setup instructions in customization script ([4111a3d](https://github.com/syselement/packertron-vms/commit/4111a3d55b897ab9fa766f8c9a14a420cbb150d6))
-* enhance package installation logic to skip downloads for already installed versions ([bd2efb0](https://github.com/syselement/packertron-vms/commit/bd2efb017a884b94bda81ab9631b42a9064fc894))
-
-
-
-# [0.43.0](https://github.com/syselement/packertron-vms/compare/v0.42.2...v0.43.0) (2026-07-27)
-
-
-### Features
-
-* add support for Vagrant and additional packages in provisioning scripts ([6a2ccd3](https://github.com/syselement/packertron-vms/commit/6a2ccd34399b93d701a08a7e9c410d390f4b8ab2))
-* added io.github.sigmasd.pingmonitor to Flatpak packages ([b774f34](https://github.com/syselement/packertron-vms/commit/b774f347fdced08d954e2d4f3f6fea67d5c83c1a))
-
-
-
-## [0.42.2](https://github.com/syselement/packertron-vms/compare/v0.42.1...v0.42.2) (2026-07-21)
+## [0.54.1](https://github.com/syselement/packertron-vms/compare/v0.54.0...v0.54.1) (2026-08-04)
 
 
 ### Bug Fixes
 
-* update GNOME system monitor panel extension download URL and enhance autoinstall.yaml documentation ([4812989](https://github.com/syselement/packertron-vms/commit/481298914ca12b4afba34f6e73d0957cfc6f3e58))
+* update manual setup hints for consistency in settings navigation ([87d2be3](https://github.com/syselement/packertron-vms/commit/87d2be3a9a6c7e8604e41b7cbe4c4217e90ad8a4))
 
 
 

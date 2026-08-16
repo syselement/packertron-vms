@@ -41,11 +41,13 @@ APT_SOURCES_CHANGED=false
 STARSHIP_INSTALL_URL="${STARSHIP_INSTALL_URL:-https://starship.rs/install.sh}"
 CLAUDE_CODE_INSTALL_URL="${CLAUDE_CODE_INSTALL_URL:-https://claude.ai/install.sh}"
 LABCTL_INSTALL_URL="${LABCTL_INSTALL_URL:-https://labs.iximiuz.com/cli/install.sh}"
+KUBECTL_STABLE_URL="${KUBECTL_STABLE_URL:-https://dl.k8s.io/release/stable.txt}"
 SYSTEM_KEYRING_DIR="${PACKERTRON_SYSTEM_KEYRING_DIR:-/usr/share/keyrings}"
 APT_SOURCES_DIR="${PACKERTRON_APT_SOURCES_DIR:-/etc/apt/sources.list.d}"
 APT_TRUSTED_KEY_DIR="${PACKERTRON_APT_TRUSTED_KEY_DIR:-/etc/apt/trusted.gpg.d}"
 SYSTEMD_RUNTIME_DIR="${PACKERTRON_SYSTEMD_RUNTIME_DIR:-/run/systemd/system}"
 SYSTEMD_CONFIG_DIR="${PACKERTRON_SYSTEMD_CONFIG_DIR:-/etc/systemd/system}"
+LOCAL_BIN_DIR="${PACKERTRON_LOCAL_BIN_DIR:-/usr/local/bin}"
 APPARMOR_PROFILE_DIR="${PACKERTRON_APPARMOR_PROFILE_DIR:-/etc/apparmor.d}"
 KVM_DEVICE="${PACKERTRON_KVM_DEVICE:-/dev/kvm}"
 APT_TRANSACTION_DIR="${PACKERTRON_APT_TRANSACTION_DIR:-/var/lib/packertron-apt-transactions/customize-system}"
@@ -53,6 +55,7 @@ HOMEBREW_PREFIX="${PACKERTRON_HOMEBREW_PREFIX:-/home/linuxbrew/.linuxbrew}"
 HOMEBREW_INSTALL_URL="${HOMEBREW_INSTALL_URL:-https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh}"
 
 readonly -a APT_BOOTSTRAP_PACKAGES=(
+    apt-transport-https
     ca-certificates
     curl
     gnupg
@@ -120,6 +123,15 @@ readonly -a COMMON_PACKAGES=(
 
 readonly -a RELEASE_OPTIONAL_PACKAGES=(
     rdap
+)
+
+readonly -a KUBERNETES_APT_PACKAGES=(
+    helm
+    kubectx
+)
+
+readonly -a HOMEBREW_PACKAGES=(
+    derailed/k9s/k9s
 )
 
 readonly -a DESKTOP_PACKAGES=(
@@ -564,6 +576,63 @@ install_latest_github_debian_package() (
         "$temporary_dir/release.json" \
         "${description} package"
     install_debian_package "$temporary_dir/package.deb" "$package_name" "$description"
+)
+
+install_kubectl() (
+    set -Eeuo pipefail
+
+    local kubectl_bin="${LOCAL_BIN_DIR}/kubectl"
+    local installed_version=""
+    local published_checksum
+    local stable_version
+    local temporary_dir
+
+    temporary_dir="$(mktemp -d)"
+    trap 'rm -rf -- "$temporary_dir"' EXIT
+
+    info "checking the latest stable kubectl release"
+    fetch_file "$KUBECTL_STABLE_URL" "$temporary_dir/stable.txt" ||
+        die "failed downloading the stable kubectl version"
+    stable_version="$(tr -d '\r\n' <"$temporary_dir/stable.txt")"
+    [[ "$stable_version" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] ||
+        die "unexpected stable kubectl version: ${stable_version:-missing}"
+
+    if [[ -x "$kubectl_bin" && ! -L "$kubectl_bin" ]]; then
+        installed_version="$("$kubectl_bin" version --client --output=json 2>/dev/null |
+            jq -r '.clientVersion.gitVersion // empty' 2>/dev/null || true)"
+    fi
+    if [[ "$installed_version" == "$stable_version" ]]; then
+        info "kubectl ${installed_version} already installed, skipping"
+        return
+    fi
+
+    info "downloading kubectl ${stable_version} for linux/amd64"
+    fetch_file \
+        "https://dl.k8s.io/release/${stable_version}/bin/linux/amd64/kubectl" \
+        "$temporary_dir/kubectl" ||
+        die "failed downloading kubectl ${stable_version}"
+    fetch_file \
+        "https://dl.k8s.io/release/${stable_version}/bin/linux/amd64/kubectl.sha256" \
+        "$temporary_dir/kubectl.sha256" ||
+        die "failed downloading the kubectl ${stable_version} checksum"
+
+    published_checksum="$(tr -d '[:space:]' <"$temporary_dir/kubectl.sha256")"
+    [[ "$published_checksum" =~ ^[[:xdigit:]]{64}$ ]] ||
+        die "invalid published checksum for kubectl ${stable_version}"
+    printf '%s  %s\n' "${published_checksum,,}" "$temporary_dir/kubectl" |
+        sha256sum --check --status ||
+        die "SHA-256 verification failed for kubectl ${stable_version}"
+
+    [[ ! -L "$kubectl_bin" ]] ||
+        die "refusing to replace symlinked kubectl binary: ${kubectl_bin}"
+    install -d -m 0755 "$LOCAL_BIN_DIR"
+    install -m 0755 "$temporary_dir/kubectl" "$kubectl_bin"
+
+    installed_version="$("$kubectl_bin" version --client --output=json 2>/dev/null |
+        jq -r '.clientVersion.gitVersion // empty' 2>/dev/null || true)"
+    [[ "$installed_version" == "$stable_version" ]] ||
+        die "kubectl ${stable_version} installation could not be verified"
+    ok "kubectl ${installed_version} installed"
 )
 
 install_target_config_file() {
@@ -1962,6 +2031,51 @@ EOF
         ok "configured Syncthing stable-v2 repository"
     else
         info "Syncthing stable-v2 repository already configured"
+    fi
+
+    [[ "$changed" == false ]] || return 10
+)
+
+ensure_helm_repository() (
+    set -Eeuo pipefail
+
+    local changed=false
+    local key_file="${SYSTEM_KEYRING_DIR}/helm.gpg"
+    local source_file="${APT_SOURCES_DIR}/helm-stable-debian.list"
+    local temporary_dir
+
+    temporary_dir="$(mktemp -d)"
+    trap 'rm -rf -- "$temporary_dir"' EXIT
+
+    fetch_file \
+        "https://packages.buildkite.com/helm-linux/helm-debian/gpgkey" \
+        "$temporary_dir/helm.asc" ||
+        die "failed downloading the Helm repository signing key"
+    dearmor_openpgp_key "$temporary_dir/helm.asc" "$temporary_dir/helm.gpg" "Helm"
+    validate_openpgp_key \
+        "$temporary_dir/helm.gpg" \
+        "Helm" \
+        "DDF78C3E6EBB2D2CC223C95C62BA89D07698DBC6"
+
+    cat >"$temporary_dir/helm-stable-debian.list" <<EOF
+deb [arch=amd64 signed-by=${key_file}] https://packages.buildkite.com/helm-linux/helm-debian/any/ any main
+EOF
+    validate_repository_source \
+        "$temporary_dir/helm-stable-debian.list" \
+        "https://packages.buildkite.com/helm-linux/helm-debian/any/" \
+        "$key_file"
+
+    if write_file_if_changed "$temporary_dir/helm.gpg" "$key_file"; then
+        changed=true
+        ok "installed Helm repository signing key"
+    else
+        info "Helm repository signing key already current"
+    fi
+    if write_file_if_changed "$temporary_dir/helm-stable-debian.list" "$source_file"; then
+        changed=true
+        ok "configured Helm repository"
+    else
+        info "Helm repository already configured"
     fi
 
     [[ "$changed" == false ]] || return 10
@@ -3909,6 +4023,40 @@ install_homebrew_for_user() (
     info "Homebrew Bash setup is ready; start a new shell or run: source ${TARGET_HOME}/.bashrc"
 )
 
+install_homebrew_package_array() {
+    local description="$1"
+    shift
+    local brew_bin="${HOMEBREW_PREFIX}/bin/brew"
+    local package
+    local -a packages=("$@")
+
+    ((${#packages[@]} > 0)) || return 0
+    if ! homebrew_is_usable "$brew_bin"; then
+        warn "Homebrew is unavailable; skipping ${description} packages"
+        return 0
+    fi
+
+    for package in "${packages[@]}"; do
+        if run_as_target_user "$brew_bin" list --formula "$package" >/dev/null 2>&1; then
+            info "Homebrew package ${package} already installed, skipping"
+            continue
+        fi
+
+        info "installing Homebrew package ${package}"
+        if ! run_as_target_user env \
+            HOMEBREW_NO_ASK=1 \
+            HOMEBREW_NO_AUTO_UPDATE=1 \
+            HOMEBREW_NO_ENV_HINTS=1 \
+            timeout --foreground --kill-after=10s 15m \
+            "$brew_bin" install "$package" </dev/null; then
+            die "Homebrew package ${package} installation failed or timed out"
+        fi
+        run_as_target_user "$brew_bin" list --formula "$package" >/dev/null 2>&1 ||
+            die "Homebrew package ${package} installation could not be verified"
+        ok "Homebrew package ${package} installed"
+    done
+}
+
 # -----------------------------------------------------------------------------
 # Manual post-install instructions
 # -----------------------------------------------------------------------------
@@ -4029,6 +4177,18 @@ show_manual_setup_hints() {
     manual_command "virsh --connect qemu:///system net-list --all"
     manual_line "Documentation: https://libvirt.org/manpages/virsh.html"
 
+    manual_step "$((instruction_number += 1)). Kubernetes command-line tools"
+    manual_line "Open a new terminal, then verify the installed Kubernetes tools:"
+    manual_command "kubectl version --client"
+    manual_command "helm version"
+    manual_command "k9s version"
+    manual_command "kubectx --help"
+    manual_command "kubens --help"
+    manual_line "kubectl documentation: https://kubernetes.io/docs/reference/kubectl/"
+    manual_line "Helm documentation: https://helm.sh/docs/"
+    manual_line "K9s documentation: https://k9scli.io/topics/install/"
+    manual_line "kubectx and kubens documentation: https://github.com/ahmetb/kubectx"
+
     manual_step "$((instruction_number += 1)). Syncthing"
     manual_line "Open the Syncthing Web GUI: http://127.0.0.1:8384/"
     manual_line "Check the user service status:"
@@ -4113,6 +4273,7 @@ main() {
     info "ensuring common repositories"
     ensure_fastfetch_ppa
     apply_repository_setup ensure_docker_ctop_repository
+    apply_repository_setup ensure_helm_repository
     apply_repository_setup ensure_syncthing_repository
     apply_repository_setup ensure_tailscale_repository
 
@@ -4144,6 +4305,8 @@ main() {
     section "Packages"
     install_package_array "common" "${COMMON_PACKAGES[@]}"
     install_available_package_array "release-optional" "${RELEASE_OPTIONAL_PACKAGES[@]}"
+    install_package_array "Kubernetes" "${KUBERNETES_APT_PACKAGES[@]}"
+    install_kubectl
     configure_cockpit_socket
     configure_syncthing_service
     install_pandoc
@@ -4182,6 +4345,7 @@ main() {
     install_tldr_pipx
     configure_git_for_user "$USER_NAME"
     install_homebrew_for_user
+    install_homebrew_package_array "managed" "${HOMEBREW_PACKAGES[@]}"
     ok "common user tools and shell configuration completed"
 
     section "Desktop Configuration"
