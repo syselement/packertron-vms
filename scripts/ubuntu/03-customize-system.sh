@@ -40,6 +40,7 @@ LOG_FILE="/var/log/${SCRIPT_NAME}-${RUN_ID}.log"
 APT_SOURCES_CHANGED=false
 STARSHIP_INSTALL_URL="${STARSHIP_INSTALL_URL:-https://starship.rs/install.sh}"
 CLAUDE_CODE_INSTALL_URL="${CLAUDE_CODE_INSTALL_URL:-https://claude.ai/install.sh}"
+LABCTL_INSTALL_URL="${LABCTL_INSTALL_URL:-https://labs.iximiuz.com/cli/install.sh}"
 SYSTEM_KEYRING_DIR="${PACKERTRON_SYSTEM_KEYRING_DIR:-/usr/share/keyrings}"
 APT_SOURCES_DIR="${PACKERTRON_APT_SOURCES_DIR:-/etc/apt/sources.list.d}"
 APT_TRUSTED_KEY_DIR="${PACKERTRON_APT_TRUSTED_KEY_DIR:-/etc/apt/trusted.gpg.d}"
@@ -3135,6 +3136,62 @@ install_claude_code() (
     ok "Claude Code ${version_output%%$'\n'*} installed for ${TARGET_USER}"
 )
 
+install_labctl() (
+    set -Eeuo pipefail
+
+    local install_root="${TARGET_HOME}/.iximiuz/labctl"
+    local labctl_bin="${TARGET_HOME}/.iximiuz/labctl/bin/labctl"
+    local temporary_dir version_output
+
+    if [[ -x "$labctl_bin" ]]; then
+        version_output="$(run_as_target_user "$labctl_bin" --version)" ||
+            die "existing labctl installation is not usable"
+        [[ -n "$version_output" ]] ||
+            die "existing labctl version could not be verified"
+        info "${version_output%%$'\n'*} already installed, skipping"
+        return
+    fi
+
+    temporary_dir="$(mktemp -d)"
+    trap 'rm -rf -- "$temporary_dir"' EXIT
+
+    info "installing iximiuz Labs control (labctl) for ${TARGET_USER}"
+    fetch_file "$LABCTL_INSTALL_URL" "$temporary_dir/install.sh" ||
+        die "failed downloading the labctl installer"
+    [[ -s "$temporary_dir/install.sh" ]] ||
+        die "downloaded labctl installer is empty"
+    bash -n "$temporary_dir/install.sh" ||
+        die "downloaded labctl installer is not valid Bash"
+    chmod 0755 "$temporary_dir"
+    chmod 0644 "$temporary_dir/install.sh"
+
+    [[ ! -L "${TARGET_HOME}/.iximiuz" ]] ||
+        die "refusing symlinked iximiuz configuration directory: ${TARGET_HOME}/.iximiuz"
+    [[ ! -L "$install_root" ]] ||
+        die "refusing symlinked labctl installation directory: ${install_root}"
+    if [[ ! -d "${TARGET_HOME}/.iximiuz" ]]; then
+        install -d -m 0700 -o "$TARGET_USER" -g "$TARGET_GROUP" "${TARGET_HOME}/.iximiuz"
+    fi
+    if [[ ! -d "$install_root" ]]; then
+        install -d -m 0755 -o "$TARGET_USER" -g "$TARGET_GROUP" "$install_root"
+    fi
+    chown -R -- "$TARGET_USER:$TARGET_GROUP" "$install_root"
+
+    if ! run_as_target_user bash -c \
+        'cd "$HOME" && exec timeout --foreground --kill-after=10s 10m bash "$1"' \
+        bash "$temporary_dir/install.sh" </dev/null; then
+        die "labctl installation failed or timed out"
+    fi
+
+    [[ -x "$labctl_bin" ]] ||
+        die "labctl installation did not provide ${labctl_bin}"
+    version_output="$(run_as_target_user "$labctl_bin" --version)" ||
+        die "labctl installation could not be verified"
+    [[ -n "$version_output" ]] ||
+        die "labctl installation returned an empty version"
+    ok "${version_output%%$'\n'*} installed for ${TARGET_USER}"
+)
+
 install_jetbrainsmono_nerd_font_for_user() (
     set -Eeuo pipefail
 
@@ -3379,6 +3436,15 @@ else
 fi
 # <<< starship (managed) <<<'''
 
+labctl_block = r'''# >>> labctl (managed) >>>
+if [ -d "$HOME/.iximiuz/labctl/bin" ]; then
+  export PATH="$PATH:$HOME/.iximiuz/labctl/bin"
+fi
+if command -v labctl >/dev/null 2>&1; then
+  source <(labctl completion bash)
+fi
+# <<< labctl (managed) <<<'''
+
 dotfiles_hook = r'''# >>> future dotfiles hook (disabled) >>>
 # DOTFILES_REPO_URL="https://github.com/<owner>/<dotfiles-repository>.git"
 # DOTFILES_DIR="$HOME/.local/share/dotfiles"
@@ -3462,7 +3528,7 @@ source = set_line(source, r'^[ \t]*#?[ \t]*shopt -s checkwinsize.*$', 'shopt -s 
 source = set_line(source, r'^[ \t]*#?[ \t]*shopt -s globstar.*$', 'shopt -s globstar 2>/dev/null')
 source = re.sub(r'^[ \t]*#?[ \t]*set -o vi[ \t]*\n?', '', source, flags=re.M)
 
-for name in ("fzf", "fastfetch", "starship", "future dotfiles hook"):
+for name in ("fzf", "fastfetch", "starship", "labctl", "future dotfiles hook"):
     source = re.sub(
         rf'\n?# >>> {re.escape(name)} \((?:managed|disabled)\) >>>.*?# <<< {re.escape(name)} \((?:managed|disabled)\) <<<\n?',
         '\n',
@@ -3486,7 +3552,7 @@ if [ -f "$HOME/.bash_aliases" ]; then
 fi
 '''
 
-source = source.rstrip() + "\n\n" + fzf_block + "\n\n" + fastfetch_block + "\n\n" + starship_block + "\n\n" + dotfiles_hook + "\n"
+source = source.rstrip() + "\n\n" + fzf_block + "\n\n" + fastfetch_block + "\n\n" + starship_block + "\n\n" + labctl_block + "\n\n" + dotfiles_hook + "\n"
 
 install_if_changed(aliases_path, aliases)
 install_if_changed(bashrc, source)
@@ -3957,6 +4023,12 @@ show_manual_setup_hints() {
     manual_line "Start a new shell so ~/.local/bin is available, then open Claude Code configuration:"
     manual_command "claude /config"
     manual_line "Sign in if prompted, then review and save the preferred settings."
+
+    manual_step "$((instruction_number += 1)). iximiuz Labs control (labctl)"
+    manual_line "Open a new terminal, then verify labctl and sign in:"
+    manual_command "labctl --version"
+    manual_command "labctl auth login"
+    manual_line "Project: https://github.com/iximiuz/labctl"
 }
 
 # -----------------------------------------------------------------------------
@@ -4082,6 +4154,7 @@ main() {
     info "installing common user tools and shell configuration"
     prepare_user_workspace "$USER_NAME"
     install_claude_code
+    install_labctl
     install_starship
     for account in "$USER_NAME" root; do
         install_fzf_for_user "$account"

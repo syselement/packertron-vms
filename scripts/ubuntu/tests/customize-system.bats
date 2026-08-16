@@ -83,8 +83,9 @@ setup() {
   [[ "$output" == *"STEP  --- 14. Virtualization ---"* ]]
   [[ "$output" == *"STEP  --- 15. Syncthing ---"* ]]
   [[ "$output" == *"STEP  --- 16. Claude Code ---"* ]]
-  [[ "$(grep -c '^    ------------------------------------------------------------$' <<<"$output")" -eq 16 ]]
-  [[ "$output" != *"/16"* ]]
+  [[ "$output" == *"STEP  --- 17. iximiuz Labs control (labctl) ---"* ]]
+  [[ "$(grep -c '^    ------------------------------------------------------------$' <<<"$output")" -eq 17 ]]
+  [[ "$output" != *"/17"* ]]
   [[ "$output" == *"sudo nmcli connection import type wireguard file /etc/wireguard/wg0.conf"* ]]
   [[ "$output" == *"Visit: https://localhost:9443/"* ]]
   [[ "$output" == *"This applies the new libvirt group membership."* ]]
@@ -92,6 +93,9 @@ setup() {
   [[ "$output" == *"systemctl --user status syncthing.service"* ]]
   [[ "$output" == *"Start a new shell so ~/.local/bin is available"* ]]
   [[ "$output" == *'$ claude /config'* ]]
+  [[ "$output" == *'$ labctl --version'* ]]
+  [[ "$output" == *'$ labctl auth login'* ]]
+  [[ "$output" == *"https://github.com/iximiuz/labctl"* ]]
   [[ "$output" == *$'\n    Open: Settings -> System -> Users -> Fingerprint Login'* ]]
   [[ "$output" == *$'\n    • Name: Home folder\n    Command: GNOME built-in launcher\n    Shortcut: Super+E'* ]]
   [[ "$output" == *$'\n    • Name: Launch terminal\n    Command: GNOME built-in launcher\n    Shortcut: Alt+T'* ]]
@@ -119,7 +123,9 @@ setup() {
   [[ "$output" == *"STEP  --- 6. Virtualization ---"* ]]
   [[ "$output" == *"STEP  --- 7. Syncthing ---"* ]]
   [[ "$output" == *"STEP  --- 8. Claude Code ---"* ]]
+  [[ "$output" == *"STEP  --- 9. iximiuz Labs control (labctl) ---"* ]]
   [[ "$output" == *'$ claude /config'* ]]
+  [[ "$output" == *'$ labctl auth login'* ]]
   [[ "$output" == *"Manage this headless host with virsh or a remote virt-manager client."* ]]
   [[ "$output" != *'$ virt-manager --connect qemu:///system'* ]]
   [[ "$output" != *"Fingerprint login"* ]]
@@ -280,10 +286,10 @@ setup() {
 }
 
 @test "target-user helper provides the resolved identity and home" {
-  TARGET_USER="$(id -un)"
+  TARGET_USER="testuser"
   TARGET_HOME="/home/testuser"
   TARGET_UID="1234"
-  TARGET_GROUP="$(id -gn)"
+  TARGET_GROUP="testgroup"
 
   sudo() {
     printf '<%s>\n' "$@"
@@ -1376,6 +1382,66 @@ CLAUDE
   [[ "$output" != *"unexpected Claude Code installer download"* ]]
 }
 
+@test "labctl installer runs as the target user from its home and verifies the binary" {
+  TARGET_USER="$(id -un)"
+  TARGET_HOME="$BATS_TEST_TMPDIR/home/$TARGET_USER"
+  TARGET_UID="$(id -u)"
+  TARGET_GROUP="$(id -gn)"
+  mkdir -p "$TARGET_HOME"
+
+  fetch_file() {
+    [[ "$1" == "https://labs.iximiuz.com/cli/install.sh" ]]
+    cat >"$2" <<'INSTALLER'
+#!/usr/bin/env bash
+set -euo pipefail
+printf '%s\n' "$PWD" >"$HOME/labctl-installer-pwd"
+mkdir -p "$HOME/.iximiuz/labctl/bin"
+cat >"$HOME/.iximiuz/labctl/bin/labctl" <<'LABCTL'
+#!/usr/bin/env bash
+printf 'labctl test-version\n'
+LABCTL
+chmod +x "$HOME/.iximiuz/labctl/bin/labctl"
+INSTALLER
+  }
+  run_as_target_user() {
+    HOME="$TARGET_HOME" USER="$TARGET_USER" LOGNAME="$TARGET_USER" "$@"
+  }
+
+  run install_labctl
+
+  [[ "$status" -eq 0 ]]
+  [[ "$output" == *"labctl test-version installed for ${TARGET_USER}"* ]]
+  [[ -x "$TARGET_HOME/.iximiuz/labctl/bin/labctl" ]]
+  [[ "$(<"$TARGET_HOME/labctl-installer-pwd")" == "$TARGET_HOME" ]]
+}
+
+@test "existing labctl installation skips the installer" {
+  TARGET_USER="testuser"
+  TARGET_HOME="$BATS_TEST_TMPDIR/home/testuser"
+  TARGET_UID="1000"
+  TARGET_GROUP="testgroup"
+  mkdir -p "$TARGET_HOME/.iximiuz/labctl/bin"
+  cat >"$TARGET_HOME/.iximiuz/labctl/bin/labctl" <<'LABCTL'
+#!/usr/bin/env bash
+printf 'labctl existing-version\n'
+LABCTL
+  chmod +x "$TARGET_HOME/.iximiuz/labctl/bin/labctl"
+
+  fetch_file() {
+    printf 'unexpected labctl installer download\n' >&2
+    return 99
+  }
+  run_as_target_user() {
+    HOME="$TARGET_HOME" USER="$TARGET_USER" LOGNAME="$TARGET_USER" "$@"
+  }
+
+  run install_labctl
+
+  [[ "$status" -eq 0 ]]
+  [[ "$output" == *"labctl existing-version already installed, skipping"* ]]
+  [[ "$output" != *"unexpected labctl installer download"* ]]
+}
+
 @test "installed tldr skips pipx mutation" {
   run_as_target_user() {
     if [[ "$*" == "pipx list --short" ]]; then
@@ -1466,6 +1532,8 @@ CLAUDE
   configure_bash_for_user root
 
   grep -Fq 'snap refresh && flatpak update -y" && brew upgrade' "$target_home/.bash_aliases"
+  grep -Fq 'export PATH="$PATH:$HOME/.iximiuz/labctl/bin"' "$target_home/.bashrc"
+  grep -Fq 'source <(labctl completion bash)' "$target_home/.bashrc"
   if grep -Fq 'snap refresh' "$root_home/.bash_aliases" ||
     grep -Fq 'flatpak update' "$root_home/.bash_aliases" ||
     grep -Fq 'brew upgrade' "$root_home/.bash_aliases"; then
@@ -2285,4 +2353,8 @@ EOF
   [[ "$output" == *"systemctl --user status syncthing.service"* ]]
   [[ "$output" == *"16. Claude Code"* ]]
   [[ "$output" == *"claude /config"* ]]
+  [[ "$output" == *"17. iximiuz Labs control (labctl)"* ]]
+  [[ "$output" == *"labctl --version"* ]]
+  [[ "$output" == *"labctl auth login"* ]]
+  [[ "$output" == *"https://github.com/iximiuz/labctl"* ]]
 }
