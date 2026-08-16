@@ -3924,6 +3924,7 @@ show_manual_setup_hints() {
         manual_step "$((instruction_number += 1)). Fingerprint login"
         manual_line "Open: Settings -> System -> Users -> Fingerprint Login"
         manual_line "Enroll at least two fingers and verify sudo authentication."
+        manual_line "Documentation: https://help.gnome.org/users/gnome-help/stable/session-fingerprint.html.en"
 
         manual_step "$((instruction_number += 1)). Keyboard shortcuts"
         manual_item "Name: Home folder"
@@ -3945,28 +3946,36 @@ show_manual_setup_hints() {
         manual_item "Name: Claude new chat"
         manual_line "Command: claude-desktop claude://claude.ai/new"
         manual_line "Shortcut: Ctrl+Alt+Space"
+        manual_line "Documentation: https://help.gnome.org/users/gnome-help/stable/keyboard-shortcuts-set.html.en"
 
         manual_step "$((instruction_number += 1)). Bluetooth devices"
         manual_line "Open: Settings -> Bluetooth"
         manual_line "Pair the mouse, soundbar, and other devices."
+        manual_line "Documentation: https://help.gnome.org/users/gnome-help/stable/bluetooth.html.en"
 
         manual_step "$((instruction_number += 1)). Visual Studio Code"
         manual_line "Open: VS Code -> Accounts -> Sign in with GitHub"
         manual_line "Enable Settings Sync and verify restored extensions and settings."
+        manual_line "Documentation: https://code.visualstudio.com/docs/configure/settings-sync"
 
         manual_step "$((instruction_number += 1)). Bitwarden and Ente Auth"
         manual_line "Sign in, complete MFA, and verify vault synchronization."
+        manual_line "Bitwarden documentation: https://bitwarden.com/help/"
+        manual_line "Ente Auth documentation: https://ente.com/help/auth/"
 
         manual_step "$((instruction_number += 1)). Brave"
         manual_line "Open: brave://settings/braveSync/setup"
         manual_line "Join the existing sync chain and verify bookmarks and extensions."
+        manual_line "Documentation: https://support.brave.com/hc/en-us/articles/360021218111-How-do-I-set-up-Sync"
 
         manual_step "$((instruction_number += 1)). Obsidian"
         manual_line "Vault path: ${home}/obsidian"
         manual_line "Configure Obsidian Sync, Git, or the selected backup method."
+        manual_line "Documentation: https://obsidian.md/help/sync"
 
         manual_step "$((instruction_number += 1)). Telegram"
         manual_line "Sign in and verify the session."
+        manual_line "Documentation: https://telegram.org/faq"
     fi
 
     manual_step "$((instruction_number += 1)). SSH private key"
@@ -3980,18 +3989,22 @@ show_manual_setup_hints() {
     manual_line "Load and test the key:"
     manual_command "ssh-add ${home}/.ssh/id_ed25519 || { eval \"\$(ssh-agent -s)\"; ssh-add ${home}/.ssh/id_ed25519; }"
     manual_command "ssh -T git@github.com"
+    manual_line "Documentation: https://www.openssh.org/manual.html"
 
     manual_step "$((instruction_number += 1)). Tailscale client"
     manual_command "sudo tailscale up"
     manual_line "Open the authentication URL, then verify the connection:"
     manual_command "tailscale status"
+    manual_line "Documentation: https://tailscale.com/docs/how-to/quickstart"
 
     manual_step "$((instruction_number += 1)). WireGuard connection"
     manual_line "Add the WireGuard configuration to /etc/wireguard/wg0.conf, then import it:"
     manual_command "sudo nmcli connection import type wireguard file /etc/wireguard/wg0.conf"
+    manual_line "Documentation: https://www.wireguard.com/quickstart/"
 
     manual_step "$((instruction_number += 1)). Cockpit web console"
     manual_line "Visit: https://localhost:9443/"
+    manual_line "Documentation: https://cockpit-project.org/running.html"
 
     manual_step "$((instruction_number += 1)). Clone Git repositories over SSH"
     manual_item "GitHub:  cd ${home}/repos/github"
@@ -4000,6 +4013,7 @@ show_manual_setup_hints() {
     manual_command "git clone git@github.com:syselement/<repository>.git"
     manual_line "Verify the configured Git identity:"
     manual_command "git config list"
+    manual_line "Documentation: https://git-scm.com/docs/git-clone"
 
     manual_step "$((instruction_number += 1)). Virtualization"
     manual_line "Log out and back in, or reboot, before managing virtual machines."
@@ -4013,22 +4027,25 @@ show_manual_setup_hints() {
     manual_line "Verify the local system connection and network state:"
     manual_command "virsh --connect qemu:///system list --all"
     manual_command "virsh --connect qemu:///system net-list --all"
+    manual_line "Documentation: https://libvirt.org/manpages/virsh.html"
 
     manual_step "$((instruction_number += 1)). Syncthing"
     manual_line "Open the Syncthing Web GUI: http://127.0.0.1:8384/"
     manual_line "Check the user service status:"
     manual_command "systemctl --user status syncthing.service"
+    manual_line "Documentation: https://docs.syncthing.net/"
 
     manual_step "$((instruction_number += 1)). Claude Code"
     manual_line "Start a new shell so ~/.local/bin is available, then open Claude Code configuration:"
     manual_command "claude /config"
     manual_line "Sign in if prompted, then review and save the preferred settings."
+    manual_line "Documentation: https://code.claude.com/docs/en/overview"
 
     manual_step "$((instruction_number += 1)). iximiuz Labs control (labctl)"
     manual_line "Open a new terminal, then verify labctl and sign in:"
     manual_command "labctl --version"
     manual_command "labctl auth login"
-    manual_line "Project: https://github.com/iximiuz/labctl"
+    manual_line "Documentation: https://github.com/iximiuz/labctl"
 }
 
 # -----------------------------------------------------------------------------
