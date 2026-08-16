@@ -161,6 +161,7 @@ readonly -a FLATPAK_PACKAGES=(
     de.swsnr.turnon
     io.ente.auth
     io.github.sigmasd.pingmonitor
+    it.mijorus.smile
     org.cryptomator.Cryptomator
     org.gnome.Boxes
 )
@@ -1505,7 +1506,7 @@ ensure_custom_keyboard_shortcut \
   "Flameshot" \
   "script --quiet --command \"/usr/bin/flameshot gui --clipboard --path ${HOME}/Pictures/flameshot\" /dev/null" \
   "<Shift><Alt>s"
-ensure_custom_keyboard_shortcut "Emote" "/snap/bin/emote" "<Super>period"
+ensure_custom_keyboard_shortcut "Smile" "flatpak run it.mijorus.smile" "<Super>period"
 ensure_custom_keyboard_shortcut \
   "Claude new chat" \
   "claude-desktop claude://claude.ai/new" \
@@ -1517,7 +1518,7 @@ printf '[gnome-settings] VERIFY launcher Home folder binding=%s\n' \
 printf '[gnome-settings] VERIFY launcher Launch terminal binding=%s\n' \
   "$(gsettings get org.gnome.settings-daemon.plugins.media-keys terminal)"
 verify_custom_keyboard_shortcut "Flameshot"
-verify_custom_keyboard_shortcut "Emote"
+verify_custom_keyboard_shortcut "Smile"
 verify_custom_keyboard_shortcut "Claude new chat"
 printf '[gnome-settings] VERIFY IBus emoji hotkey=%s\n' \
   "$(gsettings get org.freedesktop.ibus.panel.emoji hotkey)"
@@ -1527,6 +1528,7 @@ printf '[gnome-settings] VERIFY IBus emoji hotkey=%s\n' \
 new_ext_uuid='system-monitor-panel@naimur'
 old_ext_uuid='system-monitor@gnome-shell-extensions.gcampax.github.com'
 hide_access_ext_uuid='hide-universal-access@akiirui.github.io'
+smile_ext_uuid='smile-extension@mijorus.it'
 dim_background_ext_uuid='dim-background-windows@stephane-13.github.com'
 dim_background_schema='org.gnome.shell.extensions.dim-background-windows'
 dim_background_ext_dir=''
@@ -1535,6 +1537,7 @@ dim_background_schema_dir=''
 new_ext_installed=false
 old_ext_installed=false
 hide_access_ext_installed=false
+smile_ext_installed=false
 dim_background_ext_installed=false
 
 if [[ -d "/usr/share/gnome-shell/extensions/${new_ext_uuid}" ||
@@ -1550,6 +1553,11 @@ fi
 if [[ -d "/usr/share/gnome-shell/extensions/${hide_access_ext_uuid}" ||
       -d "$HOME/.local/share/gnome-shell/extensions/${hide_access_ext_uuid}" ]]; then
   hide_access_ext_installed=true
+fi
+
+if [[ -d "/usr/share/gnome-shell/extensions/${smile_ext_uuid}" ||
+      -d "$HOME/.local/share/gnome-shell/extensions/${smile_ext_uuid}" ]]; then
+  smile_ext_installed=true
 fi
 
 if [[ -d "$HOME/.local/share/gnome-shell/extensions/${dim_background_ext_uuid}" ]]; then
@@ -1587,6 +1595,14 @@ if [[ "$hide_access_ext_installed" == true ]]; then
   update_string_array org.gnome.shell disabled-extensions remove "$hide_access_ext_uuid"
 else
   printf '[gnome-settings] SKIP Hide Universal Access extension is not installed\n'
+fi
+
+if [[ "$smile_ext_installed" == true ]]; then
+  set_gsetting org.gnome.shell disable-user-extensions "false"
+  update_string_array org.gnome.shell enabled-extensions add "$smile_ext_uuid"
+  update_string_array org.gnome.shell disabled-extensions remove "$smile_ext_uuid"
+else
+  printf '[gnome-settings] SKIP Smile complementary extension is not installed\n'
 fi
 
 if [[ "$dim_background_ext_installed" == true ]]; then
@@ -1767,6 +1783,29 @@ install_hide_universal_access_extension() (
     install_gnome_extension_from_zip \
         "Hide Universal Access" \
         "hide-universal-access@akiirui.github.io" \
+        "$download_url"
+)
+
+install_smile_complementary_extension() (
+    set -Eeuo pipefail
+
+    local account="$1"
+    local download_url="https://extensions.gnome.org/review/download/70078.shell-extension.zip"
+
+    [[ "$account" == "$TARGET_USER" ]] ||
+        die "Smile complementary extension must be installed for the resolved target user"
+
+    case "$VERSION_ID" in
+        24.* | 26.*) ;;
+        *)
+            warn "Smile complementary extension installation not configured for Ubuntu ${VERSION_ID}"
+            return
+            ;;
+    esac
+
+    install_gnome_extension_from_zip \
+        "Smile complementary" \
+        "smile-extension@mijorus.it" \
         "$download_url"
 )
 
@@ -4087,14 +4126,15 @@ show_manual_setup_hints() {
         manual_line "Command: script --quiet --command \"/usr/bin/flameshot gui --clipboard --path ${home}/Pictures/flameshot\" /dev/null"
         manual_line "Shortcut: Shift+Alt+S"
         manual_line "----------------------------------------"
-        manual_item "Name: Emote"
-        manual_line "Command: /snap/bin/emote"
+        manual_item "Name: Smile"
+        manual_line "Command: flatpak run it.mijorus.smile"
         manual_line "Shortcut: Super+."
         manual_line "----------------------------------------"
         manual_item "Name: Claude new chat"
         manual_line "Command: claude-desktop claude://claude.ai/new"
         manual_line "Shortcut: Ctrl+Alt+Space"
         manual_line "Documentation: https://help.gnome.org/users/gnome-help/stable/keyboard-shortcuts-set.html.en"
+        manual_line "Smile documentation: https://github.com/mijorus/smile"
 
         manual_step "$((instruction_number += 1)). Bluetooth devices"
         manual_line "Open: Settings -> Bluetooth"
@@ -4359,7 +4399,6 @@ main() {
         configure_terminator_as_default "$USER_NAME"
         install_snap_package discord "Discord"
         connect_snap_interface discord:system-observe "Discord system-observe"
-        install_snap_package emote "Emote"
         install_snap_package postman "Postman"
         install_snap_package telegram-desktop "Telegram Desktop"
         ok "Desktop-specific tools installed/configured"
@@ -4377,6 +4416,7 @@ main() {
         # use the temporary-bus fallback from run_as_gnome_user().
         install_dim_background_windows_extension "$USER_NAME"
         install_hide_universal_access_extension "$USER_NAME"
+        install_smile_complementary_extension "$USER_NAME"
         install_system_monitor_panel_extension "$USER_NAME"
         apply_gnome_preferences
         enable_battery_health_preservation
