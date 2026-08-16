@@ -3177,8 +3177,8 @@ install_labctl() (
     fi
     chown -R -- "$TARGET_USER:$TARGET_GROUP" "$install_root"
 
-    if ! run_as_target_user bash -c \
-        'cd "$HOME" && exec timeout --foreground --kill-after=10s 10m bash "$1"' \
+    if ! run_as_target_user \
+        timeout --foreground --kill-after=10s 10m \
         bash "$temporary_dir/install.sh" </dev/null; then
         die "labctl installation failed or timed out"
     fi
