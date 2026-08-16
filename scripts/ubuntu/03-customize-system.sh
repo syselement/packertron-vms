@@ -39,11 +39,14 @@ REBOOT_AT_END="${REBOOT_AT_END:-true}"
 LOG_FILE="/var/log/${SCRIPT_NAME}-${RUN_ID}.log"
 APT_SOURCES_CHANGED=false
 STARSHIP_INSTALL_URL="${STARSHIP_INSTALL_URL:-https://starship.rs/install.sh}"
+CLAUDE_CODE_INSTALL_URL="${CLAUDE_CODE_INSTALL_URL:-https://claude.ai/install.sh}"
+LABCTL_INSTALL_URL="${LABCTL_INSTALL_URL:-https://labs.iximiuz.com/cli/install.sh}"
 SYSTEM_KEYRING_DIR="${PACKERTRON_SYSTEM_KEYRING_DIR:-/usr/share/keyrings}"
 APT_SOURCES_DIR="${PACKERTRON_APT_SOURCES_DIR:-/etc/apt/sources.list.d}"
 APT_TRUSTED_KEY_DIR="${PACKERTRON_APT_TRUSTED_KEY_DIR:-/etc/apt/trusted.gpg.d}"
 SYSTEMD_RUNTIME_DIR="${PACKERTRON_SYSTEMD_RUNTIME_DIR:-/run/systemd/system}"
 SYSTEMD_CONFIG_DIR="${PACKERTRON_SYSTEMD_CONFIG_DIR:-/etc/systemd/system}"
+APPARMOR_PROFILE_DIR="${PACKERTRON_APPARMOR_PROFILE_DIR:-/etc/apparmor.d}"
 KVM_DEVICE="${PACKERTRON_KVM_DEVICE:-/dev/kvm}"
 APT_TRANSACTION_DIR="${PACKERTRON_APT_TRANSACTION_DIR:-/var/lib/packertron-apt-transactions/customize-system}"
 HOMEBREW_PREFIX="${PACKERTRON_HOMEBREW_PREFIX:-/home/linuxbrew/.linuxbrew}"
@@ -59,6 +62,7 @@ readonly -a APT_BOOTSTRAP_PACKAGES=(
 readonly -a COMMON_PACKAGES=(
     7zip
     7zip-rar
+    apparmor-utils
     aptitude
     arp-scan
     bash-completion
@@ -76,6 +80,7 @@ readonly -a COMMON_PACKAGES=(
     gdu
     git
     gping
+    grc
     htop
     iftop
     imagemagick
@@ -97,10 +102,12 @@ readonly -a COMMON_PACKAGES=(
     speedtest-cli
     sshpass
     stress
+    syncthing
     sysstat
     tailscale
     tmux
     tor
+    traceroute
     tree
     ugrep
     unzip
@@ -230,6 +237,7 @@ warn() { log "WARN" "${t_yellow}${t_bold}" "$@"; }
 error() { log "ERROR" "${t_red}${t_bold}" "$@"; }
 manual_step() {
     printf '\n'
+    printf '    %s\n' "------------------------------------------------------------"
     log "STEP" "${t_cyan}${t_bold}" "--- $* ---"
 }
 manual_line() { printf '    %s\n' "$*"; }
@@ -819,6 +827,71 @@ EOF
     fi
 }
 
+target_user_systemd_available() {
+    [[ -S "/run/user/${TARGET_UID}/bus" ]]
+}
+
+run_target_user_systemctl() {
+    local runtime_directory="/run/user/${TARGET_UID}"
+
+    run_as_target_user env \
+        XDG_RUNTIME_DIR="$runtime_directory" \
+        DBUS_SESSION_BUS_ADDRESS="unix:path=${runtime_directory}/bus" \
+        systemctl --user "$@"
+}
+
+configure_syncthing_service() {
+    command -v systemctl >/dev/null 2>&1 ||
+        die "systemctl is required to configure Syncthing"
+
+    run_target_user_systemctl enable syncthing.service ||
+        die "failed enabling Syncthing service for ${TARGET_USER}"
+
+    if ! target_user_systemd_available; then
+        warn "target user systemd manager is not running; Syncthing startup is deferred until login"
+        return
+    fi
+
+    run_target_user_systemctl start syncthing.service ||
+        die "failed starting Syncthing service for ${TARGET_USER}"
+    ok "Syncthing service enabled and started for ${TARGET_USER}"
+}
+
+configure_cryptomator_fuse_access() (
+    set -Eeuo pipefail
+
+    local profile_file="${APPARMOR_PROFILE_DIR}/fusermount3"
+    local local_directory="${APPARMOR_PROFILE_DIR}/local"
+    local local_file="${local_directory}/fusermount3"
+    local temporary_file
+
+    install -d -m 0755 "$local_directory"
+    temporary_file="$(mktemp)"
+    trap 'rm -f -- "$temporary_file"' EXIT
+
+    cat >"$temporary_file" <<'EOF'
+unix (receive, send) type=stream peer=(label=bwrap),
+unix (receive, send) type=stream peer=(label=unpriv_bwrap),
+EOF
+
+    if [[ ! -f "$local_file" ]] || ! cmp -s "$temporary_file" "$local_file"; then
+        install -m 0644 "$temporary_file" "$local_file"
+        ok "configured Cryptomator FUSE access in the local AppArmor profile"
+    else
+        info "Cryptomator FUSE AppArmor rules already configured"
+    fi
+
+    if [[ -f "$profile_file" ]]; then
+        command -v apparmor_parser >/dev/null 2>&1 ||
+            die "apparmor_parser is required to reload the fusermount3 profile"
+        apparmor_parser -r "$profile_file" ||
+            die "failed reloading the fusermount3 AppArmor profile"
+        ok "reloaded the fusermount3 AppArmor profile"
+    else
+        warn "fusermount3 parent profile is unavailable; local Cryptomator rules are ready for the next AppArmor profile load"
+    fi
+)
+
 configure_libvirt() {
     local user_groups
 
@@ -1141,6 +1214,156 @@ PYTHON_ARRAY
   printf '[gnome-settings] SET %s %s = %s\n' "$schema" "$key" "$actual"
 }
 
+gvariant_quote_string() {
+  python3 - "$1" <<'PYTHON_STRING'
+import sys
+
+print(repr(sys.argv[1]))
+PYTHON_STRING
+}
+
+gvariant_read_string() {
+  python3 - "$1" <<'PYTHON_STRING'
+import ast
+import sys
+
+print(ast.literal_eval(sys.argv[1]))
+PYTHON_STRING
+}
+
+string_array_lines() {
+  python3 - "$1" <<'PYTHON_ARRAY'
+import ast
+import sys
+
+raw = sys.argv[1]
+if raw.startswith("@as "):
+    raw = raw[4:]
+for value in ast.literal_eval(raw):
+    print(value)
+PYTHON_ARRAY
+}
+
+custom_keybinding_value() {
+  local path="$1"
+  local key="$2"
+  local schema="org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:${path}"
+
+  gsettings get "$schema" "$key" 2>/dev/null || printf "''\n"
+}
+
+find_custom_keybinding_by_name() {
+  local desired_name="$1"
+  local paths_raw path name_raw name
+
+  paths_raw="$(gsettings get org.gnome.settings-daemon.plugins.media-keys custom-keybindings)" || return 1
+  while IFS= read -r path; do
+    [[ -n "$path" ]] || continue
+    name_raw="$(custom_keybinding_value "$path" name)"
+    name="$(gvariant_read_string "$name_raw" 2>/dev/null || true)"
+    if [[ "$name" == "$desired_name" ]]; then
+      printf '%s\n' "$path"
+      return 0
+    fi
+  done < <(string_array_lines "$paths_raw")
+
+  return 1
+}
+
+next_custom_keybinding_path() {
+  local base='/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings'
+  local paths_raw path candidate name_raw command_raw binding_raw occupied
+  local index=0
+  local -a paths=()
+
+  paths_raw="$(gsettings get org.gnome.settings-daemon.plugins.media-keys custom-keybindings)" || return 1
+  mapfile -t paths < <(string_array_lines "$paths_raw")
+
+  while true; do
+    candidate="${base}/custom${index}/"
+    occupied=false
+    for path in "${paths[@]}"; do
+      if [[ "$path" == "$candidate" ]]; then
+        occupied=true
+        break
+      fi
+    done
+
+    if [[ "$occupied" == false ]]; then
+      name_raw="$(custom_keybinding_value "$candidate" name)"
+      command_raw="$(custom_keybinding_value "$candidate" command)"
+      binding_raw="$(custom_keybinding_value "$candidate" binding)"
+      if [[ "$name_raw" == "''" && "$command_raw" == "''" && "$binding_raw" == "''" ]]; then
+        printf '%s\n' "$candidate"
+        return 0
+      fi
+    fi
+    index=$((index + 1))
+  done
+}
+
+set_custom_keybinding_value() {
+  local path="$1"
+  local key="$2"
+  local value="$3"
+  local schema="org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:${path}"
+  local expected actual
+
+  expected="$(gvariant_quote_string "$value")"
+  actual="$(gsettings get "$schema" "$key")"
+  [[ "$actual" != "$expected" ]] || return 0
+
+  if ! gsettings set "$schema" "$key" "$expected"; then
+    printf '[gnome-settings] ERROR failed custom shortcut: %s %s = %s\n' "$path" "$key" "$expected" >&2
+    failures=$((failures + 1))
+    return 0
+  fi
+
+  actual="$(gsettings get "$schema" "$key")"
+  if [[ "$actual" != "$expected" ]]; then
+    printf '[gnome-settings] ERROR verify failed custom shortcut: %s %s; requested=%s actual=%s\n' \
+      "$path" "$key" "$expected" "$actual" >&2
+    failures=$((failures + 1))
+    return 0
+  fi
+  printf '[gnome-settings] SET custom shortcut %s %s = %s\n' "$path" "$key" "$actual"
+}
+
+ensure_custom_keyboard_shortcut() {
+  local name="$1"
+  local command="$2"
+  local binding="$3"
+  local path
+
+  if ! path="$(find_custom_keybinding_by_name "$name")"; then
+    path="$(next_custom_keybinding_path)" || {
+      printf '[gnome-settings] ERROR cannot allocate custom shortcut path for %s\n' "$name" >&2
+      failures=$((failures + 1))
+      return 0
+    }
+    update_string_array \
+      org.gnome.settings-daemon.plugins.media-keys \
+      custom-keybindings add "$path"
+  fi
+
+  set_custom_keybinding_value "$path" name "$name"
+  set_custom_keybinding_value "$path" command "$command"
+  set_custom_keybinding_value "$path" binding "$binding"
+}
+
+verify_custom_keyboard_shortcut() {
+  local name="$1"
+  local path command binding
+
+  if ! path="$(find_custom_keybinding_by_name "$name")"; then
+    printf '[gnome-settings] VERIFY shortcut missing: %s\n' "$name"
+    return
+  fi
+  command="$(gvariant_read_string "$(custom_keybinding_value "$path" command)")"
+  binding="$(gvariant_read_string "$(custom_keybinding_value "$path" binding)")"
+  printf '[gnome-settings] VERIFY shortcut name=%s command=%s binding=%s\n' "$name" "$command" "$binding"
+}
+
 # Appearance
 set_gsetting org.gnome.desktop.interface color-scheme "'prefer-dark'"
 set_gsetting org.gnome.desktop.interface document-font-name "'Adwaita Sans 11'"
@@ -1203,6 +1426,32 @@ set_gsetting org.gnome.desktop.peripherals.touchpad natural-scroll "false"
 # Dock favorites
 set_gsetting org.gnome.shell favorite-apps \
   "['org.gnome.Nautilus.desktop', 'brave-browser.desktop', 'terminator.desktop', 'sublime_text.desktop', 'obsidian.desktop', 'code.desktop']"
+
+# Custom keyboard shortcuts. Existing entries are matched by name so their
+# customN paths may change without creating duplicates.
+set_gsetting org.gnome.settings-daemon.plugins.media-keys home "['<Super>e']"
+set_gsetting org.gnome.settings-daemon.plugins.media-keys terminal "['<Alt>t']"
+set_gsetting org.freedesktop.ibus.panel.emoji hotkey "@as []"
+ensure_custom_keyboard_shortcut \
+  "Flameshot" \
+  "script --quiet --command \"/usr/bin/flameshot gui --clipboard --path ${HOME}/Pictures/flameshot\" /dev/null" \
+  "<Shift><Alt>s"
+ensure_custom_keyboard_shortcut "Emote" "/snap/bin/emote" "<Super>period"
+ensure_custom_keyboard_shortcut \
+  "Claude new chat" \
+  "claude-desktop claude://claude.ai/new" \
+  "<Control><Alt>space"
+
+printf '[gnome-settings] VERIFY custom keyboard shortcuts\n'
+printf '[gnome-settings] VERIFY launcher Home folder binding=%s\n' \
+  "$(gsettings get org.gnome.settings-daemon.plugins.media-keys home)"
+printf '[gnome-settings] VERIFY launcher Launch terminal binding=%s\n' \
+  "$(gsettings get org.gnome.settings-daemon.plugins.media-keys terminal)"
+verify_custom_keyboard_shortcut "Flameshot"
+verify_custom_keyboard_shortcut "Emote"
+verify_custom_keyboard_shortcut "Claude new chat"
+printf '[gnome-settings] VERIFY IBus emoji hotkey=%s\n' \
+  "$(gsettings get org.freedesktop.ibus.panel.emoji hotkey)"
 
 # Enable System Monitor Panel on Ubuntu 26.04.
 # Fall back to the packaged System Monitor extension on Ubuntu 24.04.
@@ -1581,7 +1830,7 @@ ensure_fastfetch_ppa() {
     esac
 }
 
-install_docker_ctop_repository() (
+ensure_docker_ctop_repository() (
     set -Eeuo pipefail
 
     local changed=false
@@ -1671,6 +1920,48 @@ EOF
         ok "configured Tailscale repository"
     else
         info "Tailscale repository already configured"
+    fi
+
+    [[ "$changed" == false ]] || return 10
+)
+
+ensure_syncthing_repository() (
+    set -Eeuo pipefail
+
+    local changed=false
+    local key_file="${SYSTEM_KEYRING_DIR}/syncthing-archive-keyring.gpg"
+    local source_file="${APT_SOURCES_DIR}/syncthing.list"
+    local temporary_dir
+    temporary_dir="$(mktemp -d)"
+    trap 'rm -rf -- "$temporary_dir"' EXIT
+
+    fetch_file \
+        "https://syncthing.net/release-key.gpg" \
+        "$temporary_dir/syncthing-archive-keyring.gpg" ||
+        die "failed downloading the Syncthing signing key"
+    validate_openpgp_key \
+        "$temporary_dir/syncthing-archive-keyring.gpg" \
+        "Syncthing"
+
+    cat >"$temporary_dir/syncthing.list" <<EOF
+deb [signed-by=${key_file}] https://apt.syncthing.net/ syncthing stable-v2
+EOF
+    validate_repository_source \
+        "$temporary_dir/syncthing.list" \
+        "https://apt.syncthing.net/" \
+        "$key_file"
+
+    if write_file_if_changed "$temporary_dir/syncthing-archive-keyring.gpg" "$key_file"; then
+        changed=true
+        ok "installed Syncthing repository signing key"
+    else
+        info "Syncthing repository signing key already current"
+    fi
+    if write_file_if_changed "$temporary_dir/syncthing.list" "$source_file"; then
+        changed=true
+        ok "configured Syncthing stable-v2 repository"
+    else
+        info "Syncthing stable-v2 repository already configured"
     fi
 
     [[ "$changed" == false ]] || return 10
@@ -2781,6 +3072,126 @@ install_starship() (
     ok "Starship installed"
 )
 
+install_claude_code() (
+    set -Eeuo pipefail
+
+    local claude_bin="${TARGET_HOME}/.local/bin/claude"
+    local claude_config_dir="${TARGET_HOME}/.claude"
+    local claude_download_dir="${TARGET_HOME}/.claude/downloads"
+    local temporary_dir version_output
+
+    if [[ -x "$claude_bin" ]]; then
+        version_output="$(run_as_target_user "$claude_bin" --version)" ||
+            die "existing Claude Code installation is not usable"
+        [[ -n "$version_output" ]] ||
+            die "existing Claude Code version could not be verified"
+        info "Claude Code ${version_output%%$'\n'*} already installed, skipping"
+        return
+    fi
+
+    temporary_dir="$(mktemp -d)"
+    trap 'rm -rf -- "$temporary_dir"' EXIT
+
+    info "installing Claude Code for ${TARGET_USER}"
+    fetch_file "$CLAUDE_CODE_INSTALL_URL" "$temporary_dir/install.sh" ||
+        die "failed downloading the Claude Code installer"
+    [[ -s "$temporary_dir/install.sh" ]] ||
+        die "downloaded Claude Code installer is empty"
+    bash -n "$temporary_dir/install.sh" ||
+        die "downloaded Claude Code installer is not valid Bash"
+    chmod 0755 "$temporary_dir"
+    chmod 0644 "$temporary_dir/install.sh"
+
+    [[ ! -L "$claude_config_dir" ]] ||
+        die "refusing symlinked Claude Code configuration directory: ${claude_config_dir}"
+    [[ ! -L "$claude_download_dir" ]] ||
+        die "refusing symlinked Claude Code download directory: ${claude_download_dir}"
+    install -d -m 0700 -o "$TARGET_USER" -g "$TARGET_GROUP" \
+        "$claude_config_dir" \
+        "$claude_download_dir"
+    [[ ! -L "${TARGET_HOME}/.local" ]] ||
+        die "refusing symlinked target-user local directory: ${TARGET_HOME}/.local"
+    [[ ! -L "${TARGET_HOME}/.local/bin" ]] ||
+        die "refusing symlinked target-user local bin directory: ${TARGET_HOME}/.local/bin"
+    if [[ ! -d "${TARGET_HOME}/.local" ]]; then
+        install -d -m 0700 -o "$TARGET_USER" -g "$TARGET_GROUP" "${TARGET_HOME}/.local"
+    fi
+    if [[ ! -d "${TARGET_HOME}/.local/bin" ]]; then
+        install -d -m 0755 -o "$TARGET_USER" -g "$TARGET_GROUP" "${TARGET_HOME}/.local/bin"
+    fi
+    chown -R -- "$TARGET_USER:$TARGET_GROUP" "$claude_download_dir"
+
+    if ! run_as_target_user \
+        timeout --foreground --kill-after=10s 10m \
+        bash "$temporary_dir/install.sh" </dev/null; then
+        die "Claude Code installation failed or timed out"
+    fi
+
+    [[ -x "$claude_bin" ]] ||
+        die "Claude Code installation did not provide ${claude_bin}"
+    version_output="$(run_as_target_user "$claude_bin" --version)" ||
+        die "Claude Code installation could not be verified"
+    [[ -n "$version_output" ]] ||
+        die "Claude Code installation returned an empty version"
+    ok "Claude Code ${version_output%%$'\n'*} installed for ${TARGET_USER}"
+)
+
+install_labctl() (
+    set -Eeuo pipefail
+
+    local install_root="${TARGET_HOME}/.iximiuz/labctl"
+    local labctl_bin="${TARGET_HOME}/.iximiuz/labctl/bin/labctl"
+    local temporary_dir version_output
+
+    if [[ -x "$labctl_bin" ]]; then
+        version_output="$(run_as_target_user "$labctl_bin" --version)" ||
+            die "existing labctl installation is not usable"
+        [[ -n "$version_output" ]] ||
+            die "existing labctl version could not be verified"
+        info "${version_output%%$'\n'*} already installed, skipping"
+        return
+    fi
+
+    temporary_dir="$(mktemp -d)"
+    trap 'rm -rf -- "$temporary_dir"' EXIT
+
+    info "installing iximiuz Labs control (labctl) for ${TARGET_USER}"
+    fetch_file "$LABCTL_INSTALL_URL" "$temporary_dir/install.sh" ||
+        die "failed downloading the labctl installer"
+    [[ -s "$temporary_dir/install.sh" ]] ||
+        die "downloaded labctl installer is empty"
+    bash -n "$temporary_dir/install.sh" ||
+        die "downloaded labctl installer is not valid Bash"
+    chmod 0755 "$temporary_dir"
+    chmod 0644 "$temporary_dir/install.sh"
+
+    [[ ! -L "${TARGET_HOME}/.iximiuz" ]] ||
+        die "refusing symlinked iximiuz configuration directory: ${TARGET_HOME}/.iximiuz"
+    [[ ! -L "$install_root" ]] ||
+        die "refusing symlinked labctl installation directory: ${install_root}"
+    if [[ ! -d "${TARGET_HOME}/.iximiuz" ]]; then
+        install -d -m 0700 -o "$TARGET_USER" -g "$TARGET_GROUP" "${TARGET_HOME}/.iximiuz"
+    fi
+    if [[ ! -d "$install_root" ]]; then
+        install -d -m 0755 -o "$TARGET_USER" -g "$TARGET_GROUP" "$install_root"
+    fi
+    chown -R -- "$TARGET_USER:$TARGET_GROUP" "$install_root"
+
+    if ! run_as_target_user bash -c \
+        'cd "$HOME" && exec timeout --foreground --kill-after=10s 10m bash "$1"' \
+        bash "$temporary_dir/install.sh" </dev/null; then
+        die "labctl installation failed or timed out"
+    fi
+
+    [[ -x "$labctl_bin" ]] ||
+        die "labctl installation did not provide ${labctl_bin}"
+    version_output="$(run_as_target_user "$labctl_bin" --version)" ||
+        die "labctl installation could not be verified"
+    [[ -n "$version_output" ]] ||
+        die "labctl installation returned an empty version"
+    ok "${version_output%%$'\n'*} installed for ${TARGET_USER}"
+)
+
 install_jetbrainsmono_nerd_font_for_user() (
     set -Eeuo pipefail
 
@@ -2972,6 +3383,7 @@ alias ip='ip --color=auto'
 alias ipa='ip -br -c a'
 alias ports='ss -tunlp'
 alias publicip='curl -4 ifconfig.me && echo'
+alias tcpdump='/usr/bin/stdbuf -o0 /usr/bin/grc --colour=auto tcpdump'
 
 # Python
 alias p3='python3'
@@ -3023,6 +3435,15 @@ else
   PS1='\[\e[1;32m\]\u@\h\[\e[0m\]:\[\e[1;34m\]\w\[\e[0m\]\$ '
 fi
 # <<< starship (managed) <<<'''
+
+labctl_block = r'''# >>> labctl (managed) >>>
+if [ -d "$HOME/.iximiuz/labctl/bin" ]; then
+  export PATH="$PATH:$HOME/.iximiuz/labctl/bin"
+fi
+if command -v labctl >/dev/null 2>&1; then
+  source <(labctl completion bash)
+fi
+# <<< labctl (managed) <<<'''
 
 dotfiles_hook = r'''# >>> future dotfiles hook (disabled) >>>
 # DOTFILES_REPO_URL="https://github.com/<owner>/<dotfiles-repository>.git"
@@ -3107,7 +3528,7 @@ source = set_line(source, r'^[ \t]*#?[ \t]*shopt -s checkwinsize.*$', 'shopt -s 
 source = set_line(source, r'^[ \t]*#?[ \t]*shopt -s globstar.*$', 'shopt -s globstar 2>/dev/null')
 source = re.sub(r'^[ \t]*#?[ \t]*set -o vi[ \t]*\n?', '', source, flags=re.M)
 
-for name in ("fzf", "fastfetch", "starship", "future dotfiles hook"):
+for name in ("fzf", "fastfetch", "starship", "labctl", "future dotfiles hook"):
     source = re.sub(
         rf'\n?# >>> {re.escape(name)} \((?:managed|disabled)\) >>>.*?# <<< {re.escape(name)} \((?:managed|disabled)\) <<<\n?',
         '\n',
@@ -3131,7 +3552,7 @@ if [ -f "$HOME/.bash_aliases" ]; then
 fi
 '''
 
-source = source.rstrip() + "\n\n" + fzf_block + "\n\n" + fastfetch_block + "\n\n" + starship_block + "\n\n" + dotfiles_hook + "\n"
+source = source.rstrip() + "\n\n" + fzf_block + "\n\n" + fastfetch_block + "\n\n" + starship_block + "\n\n" + labctl_block + "\n\n" + dotfiles_hook + "\n"
 
 install_if_changed(aliases_path, aliases)
 install_if_changed(bashrc, source)
@@ -3503,46 +3924,58 @@ show_manual_setup_hints() {
         manual_step "$((instruction_number += 1)). Fingerprint login"
         manual_line "Open: Settings -> System -> Users -> Fingerprint Login"
         manual_line "Enroll at least two fingers and verify sudo authentication."
+        manual_line "Documentation: https://help.gnome.org/users/gnome-help/stable/session-fingerprint.html.en"
 
         manual_step "$((instruction_number += 1)). Keyboard shortcuts"
-        manual_line "Open: Settings -> Keyboard -> View and Customize Shortcuts"
-        manual_line "- Launchers -> click Launch terminal and Set Shortcut"
+        manual_item "Name: Home folder"
+        manual_line "Command: GNOME built-in launcher"
+        manual_line "Shortcut: Super+E"
+        manual_line "----------------------------------------"
+        manual_item "Name: Launch terminal"
+        manual_line "Command: GNOME built-in launcher"
         manual_line "Shortcut: Alt+T"
-        manual_line "- Custom Shortcuts -> click Add Shortcut"
-        manual_item "Name: Claude new chat"
-        manual_line "Command:"
-        manual_command "claude-desktop claude://claude.ai/new"
-        manual_line "Shortcut: Ctrl+Alt+Space"
+        manual_line "----------------------------------------"
         manual_item "Name: Flameshot"
-        manual_line "Command:"
-        manual_command "script --quiet --command \"/usr/bin/flameshot gui --clipboard --path ${home}/Pictures/flameshot\" /dev/null"
-        manual_line "Shortcut: Print or Shift+Alt+S"
+        manual_line "Command: script --quiet --command \"/usr/bin/flameshot gui --clipboard --path ${home}/Pictures/flameshot\" /dev/null"
+        manual_line "Shortcut: Shift+Alt+S"
+        manual_line "----------------------------------------"
         manual_item "Name: Emote"
-        manual_line "Command:"
-        manual_command "/snap/bin/emote"
-        manual_line "Shortcut: Super+Comma (Windows key + ,)"
+        manual_line "Command: /snap/bin/emote"
+        manual_line "Shortcut: Super+."
+        manual_line "----------------------------------------"
+        manual_item "Name: Claude new chat"
+        manual_line "Command: claude-desktop claude://claude.ai/new"
+        manual_line "Shortcut: Ctrl+Alt+Space"
+        manual_line "Documentation: https://help.gnome.org/users/gnome-help/stable/keyboard-shortcuts-set.html.en"
 
         manual_step "$((instruction_number += 1)). Bluetooth devices"
         manual_line "Open: Settings -> Bluetooth"
         manual_line "Pair the mouse, soundbar, and other devices."
+        manual_line "Documentation: https://help.gnome.org/users/gnome-help/stable/bluetooth.html.en"
 
         manual_step "$((instruction_number += 1)). Visual Studio Code"
         manual_line "Open: VS Code -> Accounts -> Sign in with GitHub"
         manual_line "Enable Settings Sync and verify restored extensions and settings."
+        manual_line "Documentation: https://code.visualstudio.com/docs/configure/settings-sync"
 
         manual_step "$((instruction_number += 1)). Bitwarden and Ente Auth"
         manual_line "Sign in, complete MFA, and verify vault synchronization."
+        manual_line "Bitwarden documentation: https://bitwarden.com/help/"
+        manual_line "Ente Auth documentation: https://ente.com/help/auth/"
 
         manual_step "$((instruction_number += 1)). Brave"
         manual_line "Open: brave://settings/braveSync/setup"
         manual_line "Join the existing sync chain and verify bookmarks and extensions."
+        manual_line "Documentation: https://support.brave.com/hc/en-us/articles/360021218111-How-do-I-set-up-Sync"
 
         manual_step "$((instruction_number += 1)). Obsidian"
         manual_line "Vault path: ${home}/obsidian"
         manual_line "Configure Obsidian Sync, Git, or the selected backup method."
+        manual_line "Documentation: https://obsidian.md/help/sync"
 
         manual_step "$((instruction_number += 1)). Telegram"
         manual_line "Sign in and verify the session."
+        manual_line "Documentation: https://telegram.org/faq"
     fi
 
     manual_step "$((instruction_number += 1)). SSH private key"
@@ -3556,18 +3989,22 @@ show_manual_setup_hints() {
     manual_line "Load and test the key:"
     manual_command "ssh-add ${home}/.ssh/id_ed25519 || { eval \"\$(ssh-agent -s)\"; ssh-add ${home}/.ssh/id_ed25519; }"
     manual_command "ssh -T git@github.com"
+    manual_line "Documentation: https://www.openssh.org/manual.html"
 
     manual_step "$((instruction_number += 1)). Tailscale client"
     manual_command "sudo tailscale up"
     manual_line "Open the authentication URL, then verify the connection:"
     manual_command "tailscale status"
+    manual_line "Documentation: https://tailscale.com/docs/how-to/quickstart"
 
     manual_step "$((instruction_number += 1)). WireGuard connection"
     manual_line "Add the WireGuard configuration to /etc/wireguard/wg0.conf, then import it:"
     manual_command "sudo nmcli connection import type wireguard file /etc/wireguard/wg0.conf"
+    manual_line "Documentation: https://www.wireguard.com/quickstart/"
 
     manual_step "$((instruction_number += 1)). Cockpit web console"
     manual_line "Visit: https://localhost:9443/"
+    manual_line "Documentation: https://cockpit-project.org/running.html"
 
     manual_step "$((instruction_number += 1)). Clone Git repositories over SSH"
     manual_item "GitHub:  cd ${home}/repos/github"
@@ -3576,6 +4013,7 @@ show_manual_setup_hints() {
     manual_command "git clone git@github.com:syselement/<repository>.git"
     manual_line "Verify the configured Git identity:"
     manual_command "git config list"
+    manual_line "Documentation: https://git-scm.com/docs/git-clone"
 
     manual_step "$((instruction_number += 1)). Virtualization"
     manual_line "Log out and back in, or reboot, before managing virtual machines."
@@ -3589,6 +4027,25 @@ show_manual_setup_hints() {
     manual_line "Verify the local system connection and network state:"
     manual_command "virsh --connect qemu:///system list --all"
     manual_command "virsh --connect qemu:///system net-list --all"
+    manual_line "Documentation: https://libvirt.org/manpages/virsh.html"
+
+    manual_step "$((instruction_number += 1)). Syncthing"
+    manual_line "Open the Syncthing Web GUI: http://127.0.0.1:8384/"
+    manual_line "Check the user service status:"
+    manual_command "systemctl --user status syncthing.service"
+    manual_line "Documentation: https://docs.syncthing.net/"
+
+    manual_step "$((instruction_number += 1)). Claude Code"
+    manual_line "Start a new shell so ~/.local/bin is available, then open Claude Code configuration:"
+    manual_command "claude /config"
+    manual_line "Sign in if prompted, then review and save the preferred settings."
+    manual_line "Documentation: https://code.claude.com/docs/en/overview"
+
+    manual_step "$((instruction_number += 1)). iximiuz Labs control (labctl)"
+    manual_line "Open a new terminal, then verify labctl and sign in:"
+    manual_command "labctl --version"
+    manual_command "labctl auth login"
+    manual_line "Documentation: https://github.com/iximiuz/labctl"
 }
 
 # -----------------------------------------------------------------------------
@@ -3655,7 +4112,8 @@ main() {
     apt_transaction_begin
     info "ensuring common repositories"
     ensure_fastfetch_ppa
-    apply_repository_setup install_docker_ctop_repository
+    apply_repository_setup ensure_docker_ctop_repository
+    apply_repository_setup ensure_syncthing_repository
     apply_repository_setup ensure_tailscale_repository
 
     if [[ "$UBUNTU_VARIANT" == "desktop" ]]; then
@@ -3687,11 +4145,13 @@ main() {
     install_package_array "common" "${COMMON_PACKAGES[@]}"
     install_available_package_array "release-optional" "${RELEASE_OPTIONAL_PACKAGES[@]}"
     configure_cockpit_socket
+    configure_syncthing_service
     install_pandoc
     if [[ "$UBUNTU_VARIANT" == "desktop" ]]; then
         install_package_array "Desktop" "${DESKTOP_PACKAGES[@]}"
         configure_flathub
         install_flatpak_package_array "Desktop Flatpak" "${FLATPAK_PACKAGES[@]}"
+        configure_cryptomator_fuse_access
         install_rustdesk
         install_termius
         install_termix
@@ -3710,6 +4170,8 @@ main() {
     section "User Environment"
     info "installing common user tools and shell configuration"
     prepare_user_workspace "$USER_NAME"
+    install_claude_code
+    install_labctl
     install_starship
     for account in "$USER_NAME" root; do
         install_fzf_for_user "$account"

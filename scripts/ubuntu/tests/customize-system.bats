@@ -63,6 +63,7 @@ setup() {
 
   [[ "$status" -eq 0 ]]
   [[ "$output" == *" STEP  --- 1. SSH private key ---" ]]
+  [[ "$output" == *$'\n    ------------------------------------------------------------\n'* ]]
   [[ "$output" != *"===================="* ]]
   [[ "$output" != *$'\e['* ]]
 }
@@ -80,15 +81,38 @@ setup() {
   [[ "$output" == *"STEP  --- 12. Cockpit web console ---"* ]]
   [[ "$output" == *"STEP  --- 13. Clone Git repositories over SSH ---"* ]]
   [[ "$output" == *"STEP  --- 14. Virtualization ---"* ]]
-  [[ "$output" != *"/14"* ]]
+  [[ "$output" == *"STEP  --- 15. Syncthing ---"* ]]
+  [[ "$output" == *"STEP  --- 16. Claude Code ---"* ]]
+  [[ "$output" == *"STEP  --- 17. iximiuz Labs control (labctl) ---"* ]]
+  [[ "$(grep -c '^    ------------------------------------------------------------$' <<<"$output")" -eq 17 ]]
+  [[ "$(grep -ci '^    .*documentation: https://' <<<"$output")" -eq 18 ]]
+  [[ "$output" != *"/17"* ]]
   [[ "$output" == *"sudo nmcli connection import type wireguard file /etc/wireguard/wg0.conf"* ]]
   [[ "$output" == *"Visit: https://localhost:9443/"* ]]
   [[ "$output" == *"This applies the new libvirt group membership."* ]]
+  [[ "$output" == *"http://127.0.0.1:8384/"* ]]
+  [[ "$output" == *"systemctl --user status syncthing.service"* ]]
+  [[ "$output" == *"Start a new shell so ~/.local/bin is available"* ]]
+  [[ "$output" == *'$ claude /config'* ]]
+  [[ "$output" == *'$ labctl --version'* ]]
+  [[ "$output" == *'$ labctl auth login'* ]]
+  [[ "$output" == *"https://github.com/iximiuz/labctl"* ]]
+  [[ "$output" == *"https://code.visualstudio.com/docs/configure/settings-sync"* ]]
+  [[ "$output" == *"https://cockpit-project.org/running.html"* ]]
+  [[ "$output" == *"https://docs.syncthing.net/"* ]]
+  [[ "$output" == *"https://code.claude.com/docs/en/overview"* ]]
   [[ "$output" == *$'\n    Open: Settings -> System -> Users -> Fingerprint Login'* ]]
+  [[ "$output" == *$'\n    • Name: Home folder\n    Command: GNOME built-in launcher\n    Shortcut: Super+E'* ]]
+  [[ "$output" == *$'\n    • Name: Launch terminal\n    Command: GNOME built-in launcher\n    Shortcut: Alt+T'* ]]
+  [[ "$output" == *$'\n    • Name: Flameshot\n    Command: script --quiet --command'* ]]
+  [[ "$output" == *$'\n    Shortcut: Shift+Alt+S'* ]]
+  [[ "$output" == *$'\n    • Name: Emote\n    Command: /snap/bin/emote\n    Shortcut: Super+.'* ]]
   [[ "$output" == *$'\n    • Name: Claude new chat'* ]]
-  [[ "$output" == *$'\n      $ claude-desktop claude://claude.ai/new'* ]]
+  [[ "$(grep -c '^    ----------------------------------------$' <<<"$output")" -eq 4 ]]
+  [[ "$output" == *$'\n    Command: claude-desktop claude://claude.ai/new'* ]]
   [[ "$output" == *$'\n    Shortcut: Ctrl+Alt+Space'* ]]
-  [[ "$output" == *$'\n      $ script --quiet --command'* ]]
+  [[ "$output" != *"Print or Shift+Alt+S"* ]]
+  [[ "$output" != *"Super+Comma"* ]]
   [[ "$output" != *" INFO  "* ]]
   [[ "$output" != *" WARN "* ]]
 }
@@ -102,6 +126,11 @@ setup() {
   [[ "$status" -eq 0 ]]
   [[ "$output" == *"STEP  --- 1. SSH private key ---"* ]]
   [[ "$output" == *"STEP  --- 6. Virtualization ---"* ]]
+  [[ "$output" == *"STEP  --- 7. Syncthing ---"* ]]
+  [[ "$output" == *"STEP  --- 8. Claude Code ---"* ]]
+  [[ "$output" == *"STEP  --- 9. iximiuz Labs control (labctl) ---"* ]]
+  [[ "$output" == *'$ claude /config'* ]]
+  [[ "$output" == *'$ labctl auth login'* ]]
   [[ "$output" == *"Manage this headless host with virsh or a remote virt-manager client."* ]]
   [[ "$output" != *'$ virt-manager --connect qemu:///system'* ]]
   [[ "$output" != *"Fingerprint login"* ]]
@@ -154,6 +183,7 @@ setup() {
 
 @test "requested APT and Flatpak packages remain organized by scope" {
   [[ " ${COMMON_PACKAGES[*]} " == *" cockpit "* ]]
+  [[ " ${COMMON_PACKAGES[*]} " == *" syncthing "* ]]
   [[ " ${COMMON_PACKAGES[*]} " == *" tailscale "* ]]
   [[ " ${COMMON_PACKAGES[*]} " != *" rdap "* ]]
   [[ " ${RELEASE_OPTIONAL_PACKAGES[*]} " == *" rdap "* ]]
@@ -367,7 +397,9 @@ fi
 command="$1"
 schema="${2:-}"
 key="${3:-}"
-state_file="${FAKE_SETTINGS_DIR}/${schema}.${key}"
+safe_schema="${schema//\//_}"
+safe_schema="${safe_schema//:/_}"
+state_file="${FAKE_SETTINGS_DIR}/${safe_schema}.${key}"
 
 case "$command" in
   list-schemas)
@@ -382,6 +414,8 @@ case "$command" in
       org.gnome.settings-daemon.plugins.color \
       org.gnome.desktop.sound \
       org.gnome.settings-daemon.plugins.power \
+      org.gnome.settings-daemon.plugins.media-keys \
+      org.freedesktop.ibus.panel.emoji \
       org.gnome.shell.extensions.ding \
       org.gnome.desktop.peripherals.touchpad \
       org.gnome.shell.extensions.dim-background-windows \
@@ -397,7 +431,8 @@ case "$command" in
       night-light-schedule-automatic night-light-schedule-from night-light-schedule-to \
       night-light-temperature allow-volume-above-100-percent power-button-action \
       show-home natural-scroll favorite-apps disable-user-extensions \
-      enabled-extensions disabled-extensions brightness saturation
+      enabled-extensions disabled-extensions brightness saturation \
+      custom-keybindings hotkey home terminal name command binding
     ;;
   writable)
     printf 'true\n'
@@ -409,6 +444,24 @@ case "$command" in
       printf "'BOTTOM'\n"
     elif [[ "$key" == "enabled-extensions" || "$key" == "disabled-extensions" ]]; then
       printf '@as []\n'
+    elif [[ "$schema" == "org.gnome.settings-daemon.plugins.media-keys" && "$key" == "custom-keybindings" ]]; then
+      printf "['/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom2/', '/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom7/']\n"
+    elif [[ "$schema" == "org.freedesktop.ibus.panel.emoji" && "$key" == "hotkey" ]]; then
+      printf "['<Super>period', '<Super>semicolon']\n"
+    elif [[ "$schema" == *"custom2/" && "$key" == "name" ]]; then
+      printf "'Unrelated shortcut'\n"
+    elif [[ "$schema" == *"custom2/" && "$key" == "command" ]]; then
+      printf "'leave-me-alone'\n"
+    elif [[ "$schema" == *"custom2/" && "$key" == "binding" ]]; then
+      printf "'<Alt>u'\n"
+    elif [[ "$schema" == *"custom7/" && "$key" == "name" ]]; then
+      printf "'Flameshot'\n"
+    elif [[ "$schema" == *"custom7/" && "$key" == "command" ]]; then
+      printf "'stale-flameshot-command'\n"
+    elif [[ "$schema" == *"custom7/" && "$key" == "binding" ]]; then
+      printf "'<Alt>f'\n"
+    elif [[ "$schema" == org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:* ]]; then
+      printf "''\n"
     else
       printf 'false\n'
     fi
@@ -446,6 +499,35 @@ FAKE_GSETTINGS
     "$settings_dir/org.gnome.shell.enabled-extensions"
   grep -Fq 'hide-universal-access@akiirui.github.io' \
     "$settings_dir/org.gnome.shell.enabled-extensions"
+  grep -Fq $'org.gnome.settings-daemon.plugins.media-keys\thome\t[\x27<Super>e\x27]' "$command_log"
+  grep -Fq $'org.gnome.settings-daemon.plugins.media-keys\tterminal\t[\x27<Alt>t\x27]' "$command_log"
+  grep -Fq $'org.freedesktop.ibus.panel.emoji\thotkey\t@as []' "$command_log"
+  grep -Fq $'custom7/\tcommand\t\x27script --quiet --command "/usr/bin/flameshot gui --clipboard --path ' "$command_log"
+  grep -Fq $'custom7/\tbinding\t\x27<Shift><Alt>s\x27' "$command_log"
+  grep -Fq $'custom0/\tname\t\x27Emote\x27' "$command_log"
+  grep -Fq $'custom0/\tbinding\t\x27<Super>period\x27' "$command_log"
+  grep -Fq $'custom1/\tname\t\x27Claude new chat\x27' "$command_log"
+  grep -Fq $'custom1/\tbinding\t\x27<Control><Alt>space\x27' "$command_log"
+  ! grep -Fq $'custom2/\t' "$command_log"
+  [[ "$output" == *"VERIFY shortcut name=Flameshot"* ]]
+  [[ "$output" == *"VERIFY shortcut name=Emote command=/snap/bin/emote binding=<Super>period"* ]]
+  [[ "$output" == *"VERIFY shortcut name=Claude new chat command=claude-desktop claude://claude.ai/new binding=<Control><Alt>space"* ]]
+  [[ "$output" == *"VERIFY launcher Home folder binding=['<Super>e']"* ]]
+  [[ "$output" == *"VERIFY launcher Launch terminal binding=['<Alt>t']"* ]]
+  [[ "$output" == *"VERIFY IBus emoji hotkey=@as []"* ]]
+
+  local custom_paths_file="$settings_dir/org.gnome.settings-daemon.plugins.media-keys.custom-keybindings"
+  local custom_paths_before
+  custom_paths_before="$(<"$custom_paths_file")"
+  [[ "$custom_paths_before" == "['/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom2/', '/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom7/', '/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom0/', '/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom1/']" ]]
+
+  : >"$command_log"
+  run apply_gnome_preferences
+
+  [[ "$status" -eq 0 ]]
+  [[ "$(<"$custom_paths_file")" == "$custom_paths_before" ]]
+  ! grep -Fq 'org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:' "$command_log"
+  ! grep -Fq $'org.freedesktop.ibus.panel.emoji\thotkey\t' "$command_log"
 }
 
 @test "GNOME extension download is staged, validated, and installed as the target user" {
@@ -742,6 +824,91 @@ FAKE_GSETTINGS
   [[ "$(<"$SYSTEMD_CONFIG_DIR/cockpit.socket.d/listen.conf")" == $'[Socket]\nListenStream=\nListenStream=9443' ]]
   grep -Fqx 'enable cockpit.socket' "$command_record"
   ! grep -Fq 'start cockpit.socket' "$command_record"
+}
+
+@test "Syncthing user service is enabled and started when the user manager is available" {
+  local command_record="$BATS_TEST_TMPDIR/syncthing-systemctl-record"
+  TARGET_USER="testuser"
+  TARGET_UID="1000"
+
+  command() {
+    [[ "$1" == "-v" && "$2" == "systemctl" ]]
+  }
+  target_user_systemd_available() {
+    return 0
+  }
+  run_as_target_user() {
+    printf '%s\n' "$*" >>"$command_record"
+  }
+
+  configure_syncthing_service
+
+  grep -Fq 'systemctl --user enable syncthing.service' "$command_record"
+  grep -Fq 'systemctl --user start syncthing.service' "$command_record"
+}
+
+@test "Syncthing user service defers startup when the user manager is unavailable" {
+  local command_record="$BATS_TEST_TMPDIR/syncthing-deferred-record"
+  TARGET_USER="testuser"
+  TARGET_UID="1000"
+
+  command() {
+    [[ "$1" == "-v" && "$2" == "systemctl" ]]
+  }
+  target_user_systemd_available() {
+    return 1
+  }
+  run_as_target_user() {
+    printf '%s\n' "$*" >>"$command_record"
+  }
+
+  run configure_syncthing_service
+
+  [[ "$status" -eq 0 ]]
+  [[ "$output" == *"startup is deferred until login"* ]]
+  grep -Fq 'systemctl --user enable syncthing.service' "$command_record"
+  ! grep -Fq 'systemctl --user start syncthing.service' "$command_record"
+}
+
+@test "Cryptomator FUSE configuration writes only the required rules and reloads AppArmor" {
+  local parser_record="$BATS_TEST_TMPDIR/apparmor-parser-record"
+  APPARMOR_PROFILE_DIR="$BATS_TEST_TMPDIR/etc/apparmor.d"
+  mkdir -p "$APPARMOR_PROFILE_DIR/local"
+  printf '# fusermount3 profile\n' >"$APPARMOR_PROFILE_DIR/fusermount3"
+  printf '# preserve existing local rule\n' >"$APPARMOR_PROFILE_DIR/local/fusermount3"
+
+  apparmor_parser() {
+    printf '%s\n' "$*" >>"$parser_record"
+  }
+
+  configure_cryptomator_fuse_access
+  configure_cryptomator_fuse_access
+
+  [[ "$(wc -l <"$APPARMOR_PROFILE_DIR/local/fusermount3")" -eq 2 ]]
+  ! grep -Fq '# preserve existing local rule' "$APPARMOR_PROFILE_DIR/local/fusermount3"
+  [[ "$(grep -Fxc 'unix (receive, send) type=stream peer=(label=bwrap),' "$APPARMOR_PROFILE_DIR/local/fusermount3")" -eq 1 ]]
+  [[ "$(grep -Fxc 'unix (receive, send) type=stream peer=(label=unpriv_bwrap),' "$APPARMOR_PROFILE_DIR/local/fusermount3")" -eq 1 ]]
+  [[ "$(grep -Fxc -- "-r $APPARMOR_PROFILE_DIR/fusermount3" "$parser_record")" -eq 2 ]]
+}
+
+@test "Cryptomator FUSE configuration creates only the local file when the parent profile is missing" {
+  local parser_record="$BATS_TEST_TMPDIR/apparmor-missing-profile-record"
+  APPARMOR_PROFILE_DIR="$BATS_TEST_TMPDIR/etc/apparmor.d"
+  mkdir -p "$APPARMOR_PROFILE_DIR"
+
+  apparmor_parser() {
+    printf 'unexpected parser call: %s\n' "$*" >"$parser_record"
+    return 99
+  }
+
+  run configure_cryptomator_fuse_access
+
+  [[ "$status" -eq 0 ]]
+  [[ "$output" == *"parent profile is unavailable"* ]]
+  [[ ! -e "$APPARMOR_PROFILE_DIR/fusermount3" ]]
+  grep -Fqx 'unix (receive, send) type=stream peer=(label=bwrap),' "$APPARMOR_PROFILE_DIR/local/fusermount3"
+  grep -Fqx 'unix (receive, send) type=stream peer=(label=unpriv_bwrap),' "$APPARMOR_PROFILE_DIR/local/fusermount3"
+  [[ ! -e "$parser_record" ]]
 }
 
 @test "Libvirt configuration skips existing access and active socket state" {
@@ -1145,6 +1312,141 @@ FAKE_GSETTINGS
   [[ "$output" != *"unexpected Starship download"* ]]
 }
 
+@test "Claude Code native installer runs as the target user and verifies the binary" {
+  TARGET_USER="$(id -un)"
+  TARGET_HOME="$BATS_TEST_TMPDIR/home/$TARGET_USER"
+  TARGET_UID="$(id -u)"
+  TARGET_GROUP="$(id -gn)"
+  mkdir -p "$TARGET_HOME/.local/bin"
+  chmod 0700 "$TARGET_HOME/.local"
+  chmod 0711 "$TARGET_HOME/.local/bin"
+
+  fetch_file() {
+    [[ "$1" == "https://claude.ai/install.sh" ]]
+    cat >"$2" <<'INSTALLER'
+#!/usr/bin/env bash
+set -euo pipefail
+mkdir -p "$HOME/.local/bin"
+cat >"$HOME/.local/bin/claude" <<'CLAUDE'
+#!/usr/bin/env bash
+printf 'test-version (Claude Code)\n'
+CLAUDE
+chmod +x "$HOME/.local/bin/claude"
+INSTALLER
+  }
+  run_as_target_user() {
+    local argument installer_file=""
+    for argument in "$@"; do
+      if [[ "$argument" == */install.sh ]]; then
+        installer_file="$argument"
+      fi
+    done
+    if [[ -n "$installer_file" ]]; then
+      [[ "$*" == "timeout --foreground --kill-after=10s 10m bash $installer_file" ]]
+      [[ "$(stat -c '%a' "$(dirname -- "$installer_file")")" == "755" ]]
+      [[ "$(stat -c '%a' "$installer_file")" == "644" ]]
+    fi
+    HOME="$TARGET_HOME" USER="$TARGET_USER" LOGNAME="$TARGET_USER" "$@"
+  }
+
+  run install_claude_code
+
+  [[ "$status" -eq 0 ]]
+  [[ "$output" == *"Claude Code test-version (Claude Code) installed for ${TARGET_USER}"* ]]
+  [[ -x "$TARGET_HOME/.local/bin/claude" ]]
+  [[ "$(stat -c '%a' "$TARGET_HOME/.local")" == "700" ]]
+  [[ "$(stat -c '%a' "$TARGET_HOME/.local/bin")" == "711" ]]
+  [[ -d "$TARGET_HOME/.claude/downloads" ]]
+  [[ "$(stat -c '%U:%G' "$TARGET_HOME/.claude/downloads")" == "$(id -un):$(id -gn)" ]]
+}
+
+@test "existing Claude Code installation skips the native installer" {
+  TARGET_USER="testuser"
+  TARGET_HOME="$BATS_TEST_TMPDIR/home/testuser"
+  TARGET_UID="1000"
+  TARGET_GROUP="testgroup"
+  mkdir -p "$TARGET_HOME/.local/bin"
+  cat >"$TARGET_HOME/.local/bin/claude" <<'CLAUDE'
+#!/usr/bin/env bash
+printf 'existing-version (Claude Code)\n'
+CLAUDE
+  chmod +x "$TARGET_HOME/.local/bin/claude"
+
+  fetch_file() {
+    printf 'unexpected Claude Code installer download\n' >&2
+    return 99
+  }
+  run_as_target_user() {
+    HOME="$TARGET_HOME" USER="$TARGET_USER" LOGNAME="$TARGET_USER" "$@"
+  }
+
+  run install_claude_code
+
+  [[ "$status" -eq 0 ]]
+  [[ "$output" == *"existing-version (Claude Code) already installed, skipping"* ]]
+  [[ "$output" != *"unexpected Claude Code installer download"* ]]
+}
+
+@test "labctl installer runs as the target user from its home and verifies the binary" {
+  TARGET_USER="$(id -un)"
+  TARGET_HOME="$BATS_TEST_TMPDIR/home/$TARGET_USER"
+  TARGET_UID="$(id -u)"
+  TARGET_GROUP="$(id -gn)"
+  mkdir -p "$TARGET_HOME"
+
+  fetch_file() {
+    [[ "$1" == "https://labs.iximiuz.com/cli/install.sh" ]]
+    cat >"$2" <<'INSTALLER'
+#!/usr/bin/env bash
+set -euo pipefail
+printf '%s\n' "$PWD" >"$HOME/labctl-installer-pwd"
+mkdir -p "$HOME/.iximiuz/labctl/bin"
+cat >"$HOME/.iximiuz/labctl/bin/labctl" <<'LABCTL'
+#!/usr/bin/env bash
+printf 'labctl test-version\n'
+LABCTL
+chmod +x "$HOME/.iximiuz/labctl/bin/labctl"
+INSTALLER
+  }
+  run_as_target_user() {
+    HOME="$TARGET_HOME" USER="$TARGET_USER" LOGNAME="$TARGET_USER" "$@"
+  }
+
+  run install_labctl
+
+  [[ "$status" -eq 0 ]]
+  [[ "$output" == *"labctl test-version installed for ${TARGET_USER}"* ]]
+  [[ -x "$TARGET_HOME/.iximiuz/labctl/bin/labctl" ]]
+  [[ "$(<"$TARGET_HOME/labctl-installer-pwd")" == "$TARGET_HOME" ]]
+}
+
+@test "existing labctl installation skips the installer" {
+  TARGET_USER="testuser"
+  TARGET_HOME="$BATS_TEST_TMPDIR/home/testuser"
+  TARGET_UID="1000"
+  TARGET_GROUP="testgroup"
+  mkdir -p "$TARGET_HOME/.iximiuz/labctl/bin"
+  cat >"$TARGET_HOME/.iximiuz/labctl/bin/labctl" <<'LABCTL'
+#!/usr/bin/env bash
+printf 'labctl existing-version\n'
+LABCTL
+  chmod +x "$TARGET_HOME/.iximiuz/labctl/bin/labctl"
+
+  fetch_file() {
+    printf 'unexpected labctl installer download\n' >&2
+    return 99
+  }
+  run_as_target_user() {
+    HOME="$TARGET_HOME" USER="$TARGET_USER" LOGNAME="$TARGET_USER" "$@"
+  }
+
+  run install_labctl
+
+  [[ "$status" -eq 0 ]]
+  [[ "$output" == *"labctl existing-version already installed, skipping"* ]]
+  [[ "$output" != *"unexpected labctl installer download"* ]]
+}
+
 @test "installed tldr skips pipx mutation" {
   run_as_target_user() {
     if [[ "$*" == "pipx list --short" ]]; then
@@ -1235,6 +1537,8 @@ FAKE_GSETTINGS
   configure_bash_for_user root
 
   grep -Fq 'snap refresh && flatpak update -y" && brew upgrade' "$target_home/.bash_aliases"
+  grep -Fq 'export PATH="$PATH:$HOME/.iximiuz/labctl/bin"' "$target_home/.bashrc"
+  grep -Fq 'source <(labctl completion bash)' "$target_home/.bashrc"
   if grep -Fq 'snap refresh' "$root_home/.bash_aliases" ||
     grep -Fq 'flatpak update' "$root_home/.bash_aliases" ||
     grep -Fq 'brew upgrade' "$root_home/.bash_aliases"; then
@@ -1891,6 +2195,30 @@ EOF
     "$APT_SOURCES_DIR/tailscale.list"
 }
 
+@test "Syncthing repository is repeatable and uses the stable-v2 channel" {
+  local validation_record="$BATS_TEST_TMPDIR/syncthing-validation"
+
+  fetch_file() {
+    [[ "$1" == "https://syncthing.net/release-key.gpg" ]]
+    printf 'Syncthing test key\n' >"$2"
+  }
+  validate_openpgp_key() {
+    printf '%s\n' "$2" >"$validation_record"
+  }
+
+  apply_repository_setup ensure_syncthing_repository
+  [[ "$APT_SOURCES_CHANGED" == true ]]
+
+  APT_SOURCES_CHANGED=false
+  apply_repository_setup ensure_syncthing_repository
+
+  [[ "$APT_SOURCES_CHANGED" == false ]]
+  [[ "$(<"$validation_record")" == "Syncthing" ]]
+  grep -Fqx \
+    "deb [signed-by=${SYSTEM_KEYRING_DIR}/syncthing-archive-keyring.gpg] https://apt.syncthing.net/ syncthing stable-v2" \
+    "$APT_SOURCES_DIR/syncthing.list"
+}
+
 @test "Typora repository removes its obsolete key and is repeatable" {
   printf 'obsolete key\n' >"$APT_TRUSTED_KEY_DIR/typora.asc"
 
@@ -1927,7 +2255,7 @@ EOF
     printf '%s|%s\n' "$2" "$3" >"$validation_record"
   }
 
-  apply_repository_setup install_docker_ctop_repository
+  apply_repository_setup ensure_docker_ctop_repository
 
   [[ "$APT_SOURCES_CHANGED" == true ]]
   grep -Fqx 'URIs: https://packages.azlux.fr/debian/' "$APT_SOURCES_DIR/azlux.sources"
@@ -2025,4 +2353,13 @@ EOF
   [[ "$output" == *"13. Clone Git repositories over SSH"* ]]
   [[ "$output" == *"14. Virtualization"* ]]
   [[ "$output" == *"virsh --connect qemu:///system list --all"* ]]
+  [[ "$output" == *"15. Syncthing"* ]]
+  [[ "$output" == *"http://127.0.0.1:8384/"* ]]
+  [[ "$output" == *"systemctl --user status syncthing.service"* ]]
+  [[ "$output" == *"16. Claude Code"* ]]
+  [[ "$output" == *"claude /config"* ]]
+  [[ "$output" == *"17. iximiuz Labs control (labctl)"* ]]
+  [[ "$output" == *"labctl --version"* ]]
+  [[ "$output" == *"labctl auth login"* ]]
+  [[ "$output" == *"https://github.com/iximiuz/labctl"* ]]
 }
