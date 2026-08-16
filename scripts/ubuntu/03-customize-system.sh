@@ -3517,7 +3517,7 @@ alias alert='notify-send --urgency=low -i "$([ $? = 0 ] && echo terminal || echo
 '''
 
 if update_scope == "desktop-user":
-    updateos_alias = """alias updateos='sudo sh -c \"apt update && apt -y upgrade && apt -y autoremove && snap refresh && flatpak update -y\" && brew upgrade'"""
+    updateos_alias = """alias updateos='sudo sh -c \"apt update && apt -y upgrade && apt -y autoremove && snap refresh && flatpak update -y\" && brew upgrade -y'"""
 elif update_scope == "system":
     updateos_alias = """alias updateos='sudo sh -c \"apt update && apt -y upgrade && apt -y autoremove\"'"""
 else:
