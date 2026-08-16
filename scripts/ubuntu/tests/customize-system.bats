@@ -87,7 +87,7 @@ setup() {
   [[ "$output" == *"STEP  --- 17. Claude Code ---"* ]]
   [[ "$output" == *"STEP  --- 18. iximiuz Labs control (labctl) ---"* ]]
   [[ "$(grep -c '^    ------------------------------------------------------------$' <<<"$output")" -eq 18 ]]
-  [[ "$(grep -ci '^    .*documentation: https://' <<<"$output")" -eq 22 ]]
+  [[ "$(grep -ci '^    .*documentation: https://' <<<"$output")" -eq 23 ]]
   [[ "$output" != *"/18"* ]]
   [[ "$output" == *"sudo nmcli connection import type wireguard file /etc/wireguard/wg0.conf"* ]]
   [[ "$output" == *"Visit: https://localhost:9443/"* ]]
@@ -113,7 +113,7 @@ setup() {
   [[ "$output" == *$'\n    • Name: Launch terminal\n    Command: GNOME built-in launcher\n    Shortcut: Alt+T'* ]]
   [[ "$output" == *$'\n    • Name: Flameshot\n    Command: script --quiet --command'* ]]
   [[ "$output" == *$'\n    Shortcut: Shift+Alt+S'* ]]
-  [[ "$output" == *$'\n    • Name: Emote\n    Command: /snap/bin/emote\n    Shortcut: Super+.'* ]]
+  [[ "$output" == *$'\n    • Name: Smile\n    Command: flatpak run it.mijorus.smile\n    Shortcut: Super+.'* ]]
   [[ "$output" == *$'\n    • Name: Claude new chat'* ]]
   [[ "$(grep -c '^    ----------------------------------------$' <<<"$output")" -eq 4 ]]
   [[ "$output" == *$'\n    Command: claude-desktop claude://claude.ai/new'* ]]
@@ -205,6 +205,7 @@ setup() {
   [[ " ${DESKTOP_PACKAGES[*]} " == *" meld "* ]]
   [[ " ${DESKTOP_PACKAGES[*]} " == *" typora "* ]]
   [[ " ${FLATPAK_PACKAGES[*]} " == *" org.cryptomator.Cryptomator "* ]]
+  [[ " ${FLATPAK_PACKAGES[*]} " == *" it.mijorus.smile "* ]]
   [[ " ${VIRTUALIZATION_HOST_PACKAGES[*]} " == *" cockpit-machines "* ]]
   [[ " ${VIRTUALIZATION_HOST_PACKAGES[*]} " == *" libvirt-daemon-system "* ]]
   [[ " ${VIRTUALIZATION_HOST_PACKAGES[*]} " != *" virt-manager "* ]]
@@ -453,7 +454,8 @@ KUBECTL
     "$settings_dir" \
     "$BATS_TEST_TMPDIR/.local/share/gnome-shell/extensions/dim-background-windows@stephane-13.github.com/schemas" \
     "$BATS_TEST_TMPDIR/.local/share/gnome-shell/extensions/system-monitor-panel@naimur" \
-    "$BATS_TEST_TMPDIR/.local/share/gnome-shell/extensions/hide-universal-access@akiirui.github.io"
+    "$BATS_TEST_TMPDIR/.local/share/gnome-shell/extensions/hide-universal-access@akiirui.github.io" \
+    "$BATS_TEST_TMPDIR/.local/share/gnome-shell/extensions/smile-extension@mijorus.it"
 
   cat >"$fake_bin/gsettings" <<'FAKE_GSETTINGS'
 #!/usr/bin/env bash
@@ -568,18 +570,20 @@ FAKE_GSETTINGS
     "$settings_dir/org.gnome.shell.enabled-extensions"
   grep -Fq 'hide-universal-access@akiirui.github.io' \
     "$settings_dir/org.gnome.shell.enabled-extensions"
+  grep -Fq 'smile-extension@mijorus.it' \
+    "$settings_dir/org.gnome.shell.enabled-extensions"
   grep -Fq $'org.gnome.settings-daemon.plugins.media-keys\thome\t[\x27<Super>e\x27]' "$command_log"
   grep -Fq $'org.gnome.settings-daemon.plugins.media-keys\tterminal\t[\x27<Alt>t\x27]' "$command_log"
   grep -Fq $'org.freedesktop.ibus.panel.emoji\thotkey\t@as []' "$command_log"
   grep -Fq $'custom7/\tcommand\t\x27script --quiet --command "/usr/bin/flameshot gui --clipboard --path ' "$command_log"
   grep -Fq $'custom7/\tbinding\t\x27<Shift><Alt>s\x27' "$command_log"
-  grep -Fq $'custom0/\tname\t\x27Emote\x27' "$command_log"
-  grep -Fq $'custom0/\tbinding\t\x27<Super>period\x27' "$command_log"
+  grep -Fq $'custom0/\tname\t\x27Smile\x27' "$command_log"
+  grep -Fq $'custom0/\tcommand\t\x27flatpak run it.mijorus.smile\x27' "$command_log"
   grep -Fq $'custom1/\tname\t\x27Claude new chat\x27' "$command_log"
   grep -Fq $'custom1/\tbinding\t\x27<Control><Alt>space\x27' "$command_log"
   ! grep -Fq $'custom2/\t' "$command_log"
   [[ "$output" == *"VERIFY shortcut name=Flameshot"* ]]
-  [[ "$output" == *"VERIFY shortcut name=Emote command=/snap/bin/emote binding=<Super>period"* ]]
+  [[ "$output" == *"VERIFY shortcut name=Smile command=flatpak run it.mijorus.smile binding=<Super>period"* ]]
   [[ "$output" == *"VERIFY shortcut name=Claude new chat command=claude-desktop claude://claude.ai/new binding=<Control><Alt>space"* ]]
   [[ "$output" == *"VERIFY launcher Home folder binding=['<Super>e']"* ]]
   [[ "$output" == *"VERIFY launcher Launch terminal binding=['<Alt>t']"* ]]
@@ -673,6 +677,23 @@ FAKE_GSETTINGS
     [[ "$output" == *'<dim-background-windows@stephane-13.github.com>'* ]]
     [[ "$output" == *'<https://extensions.gnome.org/download-extension/dim-background-windows@stephane-13.github.com.shell-extension.zip?version_tag=70012>'* ]]
     [[ "$output" == *'<compile:Dim Background Windows dim-background-windows@stephane-13.github.com>'* ]]
+  done
+}
+
+@test "Smile complementary extension uses the active GNOME 45 through 50 bundle" {
+  TARGET_USER="testuser"
+
+  install_gnome_extension_from_zip() {
+    printf '<%s>\n' "$@"
+  }
+
+  for VERSION_ID in 24.04 26.04; do
+    run install_smile_complementary_extension "$TARGET_USER"
+
+    [[ "$status" -eq 0 ]]
+    [[ "$output" == *'<Smile complementary>'* ]]
+    [[ "$output" == *'<smile-extension@mijorus.it>'* ]]
+    [[ "$output" == *'<https://extensions.gnome.org/review/download/70078.shell-extension.zip>'* ]]
   done
 }
 
