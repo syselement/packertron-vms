@@ -1,3 +1,12 @@
+# [0.58.0](https://github.com/syselement/packertron-vms/compare/v0.57.0...v0.58.0) (2026-08-16)
+
+
+### Features
+
+* add Kubernetes CLI tools installation and Helm repository setup ([8acc829](https://github.com/syselement/packertron-vms/commit/8acc829dce777056c057fc3bf8b02a4e09914660))
+
+
+
 # [0.57.0](https://github.com/syselement/packertron-vms/compare/v0.56.0...v0.57.0) (2026-08-16)
 
 
@@ -44,15 +53,6 @@
 ### Bug Fixes
 
 * update manual setup hints for consistency in settings navigation ([87d2be3](https://github.com/syselement/packertron-vms/commit/87d2be3a9a6c7e8604e41b7cbe4c4217e90ad8a4))
-
-
-
-# [0.54.0](https://github.com/syselement/packertron-vms/compare/v0.53.0...v0.54.0) (2026-08-04)
-
-
-### Features
-
-* add support for Dim Background Windows GNOME extension and schema compilation ([a8c6476](https://github.com/syselement/packertron-vms/commit/a8c6476000606504eb3da71a869609b80b6c9b27))
 
 
 
