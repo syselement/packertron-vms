@@ -39,6 +39,7 @@ REBOOT_AT_END="${REBOOT_AT_END:-true}"
 LOG_FILE="/var/log/${SCRIPT_NAME}-${RUN_ID}.log"
 APT_SOURCES_CHANGED=false
 STARSHIP_INSTALL_URL="${STARSHIP_INSTALL_URL:-https://starship.rs/install.sh}"
+CLAUDE_CODE_INSTALL_URL="${CLAUDE_CODE_INSTALL_URL:-https://claude.ai/install.sh}"
 SYSTEM_KEYRING_DIR="${PACKERTRON_SYSTEM_KEYRING_DIR:-/usr/share/keyrings}"
 APT_SOURCES_DIR="${PACKERTRON_APT_SOURCES_DIR:-/etc/apt/sources.list.d}"
 APT_TRUSTED_KEY_DIR="${PACKERTRON_APT_TRUSTED_KEY_DIR:-/etc/apt/trusted.gpg.d}"
@@ -3070,6 +3071,70 @@ install_starship() (
     ok "Starship installed"
 )
 
+install_claude_code() (
+    set -Eeuo pipefail
+
+    local claude_bin="${TARGET_HOME}/.local/bin/claude"
+    local claude_config_dir="${TARGET_HOME}/.claude"
+    local claude_download_dir="${TARGET_HOME}/.claude/downloads"
+    local temporary_dir version_output
+
+    if [[ -x "$claude_bin" ]]; then
+        version_output="$(run_as_target_user "$claude_bin" --version)" ||
+            die "existing Claude Code installation is not usable"
+        [[ -n "$version_output" ]] ||
+            die "existing Claude Code version could not be verified"
+        info "Claude Code ${version_output%%$'\n'*} already installed, skipping"
+        return
+    fi
+
+    temporary_dir="$(mktemp -d)"
+    trap 'rm -rf -- "$temporary_dir"' EXIT
+
+    info "installing Claude Code for ${TARGET_USER}"
+    fetch_file "$CLAUDE_CODE_INSTALL_URL" "$temporary_dir/install.sh" ||
+        die "failed downloading the Claude Code installer"
+    [[ -s "$temporary_dir/install.sh" ]] ||
+        die "downloaded Claude Code installer is empty"
+    bash -n "$temporary_dir/install.sh" ||
+        die "downloaded Claude Code installer is not valid Bash"
+    chmod 0755 "$temporary_dir"
+    chmod 0644 "$temporary_dir/install.sh"
+
+    [[ ! -L "$claude_config_dir" ]] ||
+        die "refusing symlinked Claude Code configuration directory: ${claude_config_dir}"
+    [[ ! -L "$claude_download_dir" ]] ||
+        die "refusing symlinked Claude Code download directory: ${claude_download_dir}"
+    install -d -m 0700 -o "$TARGET_USER" -g "$TARGET_GROUP" \
+        "$claude_config_dir" \
+        "$claude_download_dir"
+    [[ ! -L "${TARGET_HOME}/.local" ]] ||
+        die "refusing symlinked target-user local directory: ${TARGET_HOME}/.local"
+    [[ ! -L "${TARGET_HOME}/.local/bin" ]] ||
+        die "refusing symlinked target-user local bin directory: ${TARGET_HOME}/.local/bin"
+    if [[ ! -d "${TARGET_HOME}/.local" ]]; then
+        install -d -m 0700 -o "$TARGET_USER" -g "$TARGET_GROUP" "${TARGET_HOME}/.local"
+    fi
+    if [[ ! -d "${TARGET_HOME}/.local/bin" ]]; then
+        install -d -m 0755 -o "$TARGET_USER" -g "$TARGET_GROUP" "${TARGET_HOME}/.local/bin"
+    fi
+    chown -R -- "$TARGET_USER:$TARGET_GROUP" "$claude_download_dir"
+
+    if ! run_as_target_user \
+        timeout --foreground --kill-after=10s 10m \
+        bash "$temporary_dir/install.sh" </dev/null; then
+        die "Claude Code installation failed or timed out"
+    fi
+
+    [[ -x "$claude_bin" ]] ||
+        die "Claude Code installation did not provide ${claude_bin}"
+    version_output="$(run_as_target_user "$claude_bin" --version)" ||
+        die "Claude Code installation could not be verified"
+    [[ -n "$version_output" ]] ||
+        die "Claude Code installation returned an empty version"
+    ok "Claude Code ${version_output%%$'\n'*} installed for ${TARGET_USER}"
+)
+
 install_jetbrainsmono_nerd_font_for_user() (
     set -Eeuo pipefail
 
@@ -3887,6 +3952,11 @@ show_manual_setup_hints() {
     manual_line "Open the Syncthing Web GUI: http://127.0.0.1:8384/"
     manual_line "Check the user service status:"
     manual_command "systemctl --user status syncthing.service"
+
+    manual_step "$((instruction_number += 1)). Claude Code"
+    manual_line "Start a new shell so ~/.local/bin is available, then open Claude Code configuration:"
+    manual_command "claude /config"
+    manual_line "Sign in if prompted, then review and save the preferred settings."
 }
 
 # -----------------------------------------------------------------------------
@@ -4011,6 +4081,7 @@ main() {
     section "User Environment"
     info "installing common user tools and shell configuration"
     prepare_user_workspace "$USER_NAME"
+    install_claude_code
     install_starship
     for account in "$USER_NAME" root; do
         install_fzf_for_user "$account"

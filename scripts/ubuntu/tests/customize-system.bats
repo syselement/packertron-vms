@@ -82,13 +82,16 @@ setup() {
   [[ "$output" == *"STEP  --- 13. Clone Git repositories over SSH ---"* ]]
   [[ "$output" == *"STEP  --- 14. Virtualization ---"* ]]
   [[ "$output" == *"STEP  --- 15. Syncthing ---"* ]]
-  [[ "$(grep -c '^    ------------------------------------------------------------$' <<<"$output")" -eq 15 ]]
-  [[ "$output" != *"/15"* ]]
+  [[ "$output" == *"STEP  --- 16. Claude Code ---"* ]]
+  [[ "$(grep -c '^    ------------------------------------------------------------$' <<<"$output")" -eq 16 ]]
+  [[ "$output" != *"/16"* ]]
   [[ "$output" == *"sudo nmcli connection import type wireguard file /etc/wireguard/wg0.conf"* ]]
   [[ "$output" == *"Visit: https://localhost:9443/"* ]]
   [[ "$output" == *"This applies the new libvirt group membership."* ]]
   [[ "$output" == *"http://127.0.0.1:8384/"* ]]
   [[ "$output" == *"systemctl --user status syncthing.service"* ]]
+  [[ "$output" == *"Start a new shell so ~/.local/bin is available"* ]]
+  [[ "$output" == *'$ claude /config'* ]]
   [[ "$output" == *$'\n    Open: Settings -> System -> Users -> Fingerprint Login'* ]]
   [[ "$output" == *$'\n    • Name: Home folder\n    Command: GNOME built-in launcher\n    Shortcut: Super+E'* ]]
   [[ "$output" == *$'\n    • Name: Launch terminal\n    Command: GNOME built-in launcher\n    Shortcut: Alt+T'* ]]
@@ -115,6 +118,8 @@ setup() {
   [[ "$output" == *"STEP  --- 1. SSH private key ---"* ]]
   [[ "$output" == *"STEP  --- 6. Virtualization ---"* ]]
   [[ "$output" == *"STEP  --- 7. Syncthing ---"* ]]
+  [[ "$output" == *"STEP  --- 8. Claude Code ---"* ]]
+  [[ "$output" == *'$ claude /config'* ]]
   [[ "$output" == *"Manage this headless host with virsh or a remote virt-manager client."* ]]
   [[ "$output" != *'$ virt-manager --connect qemu:///system'* ]]
   [[ "$output" != *"Fingerprint login"* ]]
@@ -275,10 +280,10 @@ setup() {
 }
 
 @test "target-user helper provides the resolved identity and home" {
-  TARGET_USER="testuser"
+  TARGET_USER="$(id -un)"
   TARGET_HOME="/home/testuser"
   TARGET_UID="1234"
-  TARGET_GROUP="testgroup"
+  TARGET_GROUP="$(id -gn)"
 
   sudo() {
     printf '<%s>\n' "$@"
@@ -1296,6 +1301,81 @@ FAKE_GSETTINGS
   [[ "$output" != *"unexpected Starship download"* ]]
 }
 
+@test "Claude Code native installer runs as the target user and verifies the binary" {
+  TARGET_USER="$(id -un)"
+  TARGET_HOME="$BATS_TEST_TMPDIR/home/$TARGET_USER"
+  TARGET_UID="$(id -u)"
+  TARGET_GROUP="$(id -gn)"
+  mkdir -p "$TARGET_HOME/.local/bin"
+  chmod 0700 "$TARGET_HOME/.local"
+  chmod 0711 "$TARGET_HOME/.local/bin"
+
+  fetch_file() {
+    [[ "$1" == "https://claude.ai/install.sh" ]]
+    cat >"$2" <<'INSTALLER'
+#!/usr/bin/env bash
+set -euo pipefail
+mkdir -p "$HOME/.local/bin"
+cat >"$HOME/.local/bin/claude" <<'CLAUDE'
+#!/usr/bin/env bash
+printf 'test-version (Claude Code)\n'
+CLAUDE
+chmod +x "$HOME/.local/bin/claude"
+INSTALLER
+  }
+  run_as_target_user() {
+    local argument installer_file=""
+    for argument in "$@"; do
+      if [[ "$argument" == */install.sh ]]; then
+        installer_file="$argument"
+      fi
+    done
+    if [[ -n "$installer_file" ]]; then
+      [[ "$*" == "timeout --foreground --kill-after=10s 10m bash $installer_file" ]]
+      [[ "$(stat -c '%a' "$(dirname -- "$installer_file")")" == "755" ]]
+      [[ "$(stat -c '%a' "$installer_file")" == "644" ]]
+    fi
+    HOME="$TARGET_HOME" USER="$TARGET_USER" LOGNAME="$TARGET_USER" "$@"
+  }
+
+  run install_claude_code
+
+  [[ "$status" -eq 0 ]]
+  [[ "$output" == *"Claude Code test-version (Claude Code) installed for ${TARGET_USER}"* ]]
+  [[ -x "$TARGET_HOME/.local/bin/claude" ]]
+  [[ "$(stat -c '%a' "$TARGET_HOME/.local")" == "700" ]]
+  [[ "$(stat -c '%a' "$TARGET_HOME/.local/bin")" == "711" ]]
+  [[ -d "$TARGET_HOME/.claude/downloads" ]]
+  [[ "$(stat -c '%U:%G' "$TARGET_HOME/.claude/downloads")" == "$(id -un):$(id -gn)" ]]
+}
+
+@test "existing Claude Code installation skips the native installer" {
+  TARGET_USER="testuser"
+  TARGET_HOME="$BATS_TEST_TMPDIR/home/testuser"
+  TARGET_UID="1000"
+  TARGET_GROUP="testgroup"
+  mkdir -p "$TARGET_HOME/.local/bin"
+  cat >"$TARGET_HOME/.local/bin/claude" <<'CLAUDE'
+#!/usr/bin/env bash
+printf 'existing-version (Claude Code)\n'
+CLAUDE
+  chmod +x "$TARGET_HOME/.local/bin/claude"
+
+  fetch_file() {
+    printf 'unexpected Claude Code installer download\n' >&2
+    return 99
+  }
+  run_as_target_user() {
+    HOME="$TARGET_HOME" USER="$TARGET_USER" LOGNAME="$TARGET_USER" "$@"
+  }
+
+  run install_claude_code
+
+  [[ "$status" -eq 0 ]]
+  [[ "$output" == *"existing-version (Claude Code) already installed, skipping"* ]]
+  [[ "$output" != *"unexpected Claude Code installer download"* ]]
+}
+
 @test "installed tldr skips pipx mutation" {
   run_as_target_user() {
     if [[ "$*" == "pipx list --short" ]]; then
@@ -2203,4 +2283,6 @@ EOF
   [[ "$output" == *"15. Syncthing"* ]]
   [[ "$output" == *"http://127.0.0.1:8384/"* ]]
   [[ "$output" == *"systemctl --user status syncthing.service"* ]]
+  [[ "$output" == *"16. Claude Code"* ]]
+  [[ "$output" == *"claude /config"* ]]
 }
