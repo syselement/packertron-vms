@@ -1,3 +1,12 @@
+## [0.58.1](https://github.com/syselement/packertron-vms/compare/v0.58.0...v0.58.1) (2026-08-16)
+
+
+### Bug Fixes
+
+* add missing -y flag to brew upgrade in updateos alias for desktop users ([85603a7](https://github.com/syselement/packertron-vms/commit/85603a79f74939659e1cb0fe9b1d9a0665fd95df))
+
+
+
 # [0.58.0](https://github.com/syselement/packertron-vms/compare/v0.57.0...v0.58.0) (2026-08-16)
 
 
@@ -44,15 +53,6 @@
 * add Claude Desktop repository and corresponding tests ([020a11d](https://github.com/syselement/packertron-vms/commit/020a11d1033d439fbe4b6ec5576b5507dcace622))
 * add manual setup hints for Claude new chat and corresponding tests ([5c0b0a5](https://github.com/syselement/packertron-vms/commit/5c0b0a5b2d491673a8ed28b4413ff150f097df49))
 * configure Cockpit to listen on port 9443 and update manual setup instructions ([a553c3c](https://github.com/syselement/packertron-vms/commit/a553c3cfef2ee9b64ba9647aad9e40d2c15b7454))
-
-
-
-## [0.54.1](https://github.com/syselement/packertron-vms/compare/v0.54.0...v0.54.1) (2026-08-04)
-
-
-### Bug Fixes
-
-* update manual setup hints for consistency in settings navigation ([87d2be3](https://github.com/syselement/packertron-vms/commit/87d2be3a9a6c7e8604e41b7cbe4c4217e90ad8a4))
 
 
 
