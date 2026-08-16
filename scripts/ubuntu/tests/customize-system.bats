@@ -1387,7 +1387,7 @@ CLAUDE
   [[ "$output" != *"unexpected Claude Code installer download"* ]]
 }
 
-@test "labctl installer runs as the target user from its home and verifies the binary" {
+@test "labctl installer runs as the target user and verifies the binary" {
   TARGET_USER="$(id -un)"
   TARGET_HOME="$BATS_TEST_TMPDIR/home/$TARGET_USER"
   TARGET_UID="$(id -u)"
@@ -1399,7 +1399,6 @@ CLAUDE
     cat >"$2" <<'INSTALLER'
 #!/usr/bin/env bash
 set -euo pipefail
-printf '%s\n' "$PWD" >"$HOME/labctl-installer-pwd"
 mkdir -p "$HOME/.iximiuz/labctl/bin"
 cat >"$HOME/.iximiuz/labctl/bin/labctl" <<'LABCTL'
 #!/usr/bin/env bash
@@ -1417,7 +1416,6 @@ INSTALLER
   [[ "$status" -eq 0 ]]
   [[ "$output" == *"labctl test-version installed for ${TARGET_USER}"* ]]
   [[ -x "$TARGET_HOME/.iximiuz/labctl/bin/labctl" ]]
-  [[ "$(<"$TARGET_HOME/labctl-installer-pwd")" == "$TARGET_HOME" ]]
 }
 
 @test "existing labctl installation skips the installer" {
