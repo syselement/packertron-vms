@@ -1,3 +1,13 @@
+# [0.60.0](https://github.com/syselement/packertron-vms/compare/v0.59.0...v0.60.0) (2026-08-17)
+
+
+### Features
+
+* add balenaEtcher installation and update Termix handling in customization script ([35d2bce](https://github.com/syselement/packertron-vms/commit/35d2bcefd4653337124bef37e960c9d4b25cd034))
+* add MKVToolNix repository and related packages to customization script ([7cb280b](https://github.com/syselement/packertron-vms/commit/7cb280b090418bb53ee40eff40f84ed050090a10))
+
+
+
 # [0.59.0](https://github.com/syselement/packertron-vms/compare/v0.58.1...v0.59.0) (2026-08-16)
 
 
@@ -38,15 +48,6 @@
 * add documentation links to manual setup hints in customization script ([4a506f8](https://github.com/syselement/packertron-vms/commit/4a506f8a365908b1573da096fec774513284a8e4))
 * add iximiuz Labs control (labctl) installation and verification to customization script ([468cdd5](https://github.com/syselement/packertron-vms/commit/468cdd554c91e2588185c1787e0db0d0e564611b))
 * add Syncthing service configuration and repository setup ([5e7d0ab](https://github.com/syselement/packertron-vms/commit/5e7d0ab0ea52a85ad5ed67bd40d3d3610381b094))
-
-
-
-# [0.56.0](https://github.com/syselement/packertron-vms/compare/v0.55.0...v0.56.0) (2026-08-09)
-
-
-### Features
-
-* update GNOME interface font settings to use Adwaita Sans ([e01f54c](https://github.com/syselement/packertron-vms/commit/e01f54c43b6587ab37943cb6dc662178c1c058f3))
 
 
 
