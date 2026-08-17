@@ -2132,6 +2132,20 @@ EOF
   [[ "$(<"$install_record")" == *"/package.deb|rustdesk|RustDesk" ]]
 }
 
+@test "balenaEtcher uses the latest official AMD64 Debian release" {
+  install_latest_github_debian_package() {
+    printf '<%s>\n' "$@"
+  }
+
+  run install_balena_etcher
+
+  [[ "$status" -eq 0 ]]
+  [[ "$output" == *"<balena-io/etcher>"* ]]
+  [[ "$output" == *"<_amd64.deb>"* ]]
+  [[ "$output" == *"<balena-etcher>"* ]]
+  [[ "$output" == *"<balenaEtcher>"* ]]
+}
+
 @test "current GitHub DEB release skips the asset download" {
   dpkg-query() {
     printf '1.2.3-1\n'
@@ -2161,43 +2175,54 @@ EOF
   [[ "$output" != *"unexpected package installation"* ]]
 }
 
-@test "installed target-user Termix Flatpak skips release download" {
+@test "current target-user Termix Flatpak skips bundle download" {
   ARCH="amd64"
   TARGET_USER="testuser"
 
   flatpak() {
+    if [[ "$1" == "list" ]]; then
+      printf 'com.karmaa.termix\t2.6.0\n'
+    fi
     return 0
   }
   run_as_target_user() {
     "$@"
   }
   fetch_file() {
-    printf 'unexpected Termix download\n' >&2
+    if [[ "$1" == *"/releases/latest" ]]; then
+      printf '{"tag_name":"release-2.6.0-tag","assets":[]}\n' >"$2"
+      return
+    fi
+    printf 'unexpected Termix bundle download\n' >&2
     return 99
   }
 
   run install_termix
 
   [[ "$status" -eq 0 ]]
-  [[ "$output" == *"Termix Flatpak already installed"* ]]
-  [[ "$output" != *"unexpected Termix download"* ]]
+  [[ "$output" == *"Termix Flatpak 2.6.0 already matches latest release 2.6.0, skipping"* ]]
+  [[ "$output" != *"unexpected Termix bundle download"* ]]
 }
 
-@test "Termix bundle is installed before its application ID is verified" {
-  local command_record="$BATS_TEST_TMPDIR/termix-command-record"
-  local installed_marker="$BATS_TEST_TMPDIR/termix-installed"
+@test "older target-user Termix Flatpak is updated from the latest GitHub bundle" {
+  local command_record="$BATS_TEST_TMPDIR/termix-update-command-record"
+  local version_file="$BATS_TEST_TMPDIR/termix-version"
 
   ARCH="amd64"
   TARGET_USER="testuser"
+  printf '2.5.1\n' >"$version_file"
 
   flatpak() {
     printf '%s\n' "$*" >>"$command_record"
     case "$1" in
       info)
-        [[ -e "$installed_marker" ]]
+        ;;
+      list)
+        printf 'com.karmaa.termix\t%s\n' "$(<"$version_file")"
         ;;
       install)
-        touch "$installed_marker"
+        [[ "$*" == *"--or-update"* ]]
+        printf '2.6.0\n' >"$version_file"
         ;;
       *)
         return 2
@@ -2211,6 +2236,7 @@ EOF
     if [[ "$1" == *"/releases/latest" ]]; then
       cat >"$2" <<'EOF'
 {
+  "tag_name": "release-2.6.0-tag",
   "assets": [
     {
       "name": "termix_linux_flatpak.flatpak",
@@ -2231,8 +2257,68 @@ EOF
   run install_termix
 
   [[ "$status" -eq 0 ]]
-  [[ "$output" == *"Termix Flatpak installed for testuser"* ]]
-  grep -Fq 'install --user --noninteractive -y' "$command_record"
+  [[ "$output" == *"updating Termix Flatpak from 2.5.1 to 2.6.0 for testuser"* ]]
+  [[ "$output" == *"Termix Flatpak updated to 2.6.0 for testuser"* ]]
+  grep -Fq 'list --user --app --columns=application,version' "$command_record"
+  grep -Fq 'install --user --noninteractive --or-update -y' "$command_record"
+  ! grep -Fq -- '--show-version' "$command_record"
+}
+
+@test "Termix bundle is installed before its application ID is verified" {
+  local command_record="$BATS_TEST_TMPDIR/termix-command-record"
+  local installed_marker="$BATS_TEST_TMPDIR/termix-installed"
+
+  ARCH="amd64"
+  TARGET_USER="testuser"
+
+  flatpak() {
+    printf '%s\n' "$*" >>"$command_record"
+    case "$1" in
+      info)
+        [[ -e "$installed_marker" ]] || return 1
+        ;;
+      list)
+        [[ -e "$installed_marker" ]] || return 1
+        printf 'com.karmaa.termix\t2.6.0\n'
+        ;;
+      install)
+        touch "$installed_marker"
+        ;;
+      *)
+        return 2
+        ;;
+    esac
+  }
+  run_as_target_user() {
+    "$@"
+  }
+  fetch_file() {
+    if [[ "$1" == *"/releases/latest" ]]; then
+      cat >"$2" <<'EOF'
+{
+  "tag_name": "release-2.6.0-tag",
+  "assets": [
+    {
+      "name": "termix_linux_flatpak.flatpak",
+      "browser_download_url": "https://github.com/Termix-SSH/Termix/releases/download/test/termix_linux_flatpak.flatpak",
+      "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    }
+  ]
+}
+EOF
+    else
+      printf 'test Flatpak bundle\n' >"$2"
+    fi
+  }
+  verify_github_asset_digest() {
+    return 0
+  }
+
+  run install_termix
+
+  [[ "$status" -eq 0 ]]
+  [[ "$output" == *"Termix Flatpak 2.6.0 installed for testuser"* ]]
+  grep -Fq 'install --user --noninteractive --or-update -y' "$command_record"
   ! grep -Fq -- '--show-ref' "$command_record"
 }
 

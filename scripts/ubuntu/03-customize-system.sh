@@ -79,6 +79,7 @@ readonly -a COMMON_PACKAGES=(
     eza
     fastfetch
     fd-find
+    ffmpeg
     fontconfig
     gdu
     git
@@ -152,6 +153,7 @@ readonly -a DESKTOP_PACKAGES=(
     terminator
     typora
     vlc
+    wireshark
     xclip
 )
 
@@ -2420,7 +2422,15 @@ install_termix() (
     set -Eeuo pipefail
 
     local app_id="com.karmaa.termix"
+    local installed_version=""
+    local release_tag release_version
     local temporary_dir
+    local was_installed=false
+
+    termix_installed_version() {
+        run_as_target_user flatpak list --user --app --columns=application,version |
+            awk -F '\t' -v app_id="$app_id" '$1 == app_id { print $2; exit }'
+    }
 
     if [[ "$ARCH" != "amd64" ]]; then
         warn "Termix Flatpak bundle is only configured for amd64; skipping on ${ARCH}"
@@ -2429,18 +2439,32 @@ install_termix() (
     command -v flatpak >/dev/null 2>&1 ||
         die "flatpak is required to install Termix"
 
-    if run_as_target_user flatpak info --user "$app_id" >/dev/null 2>&1; then
-        info "Termix Flatpak already installed for ${TARGET_USER}, skipping"
-        return
-    fi
-
     temporary_dir="$(mktemp -d)"
     trap 'rm -rf -- "$temporary_dir"' EXIT
 
     info "checking latest Termix GitHub release"
+    fetch_latest_github_release_metadata "Termix-SSH/Termix" "$temporary_dir/release.json" "Termix"
+    release_tag="$(jq -r '.tag_name // empty' "$temporary_dir/release.json")"
+    release_version="${release_tag#release-}"
+    release_version="${release_version%-tag}"
+    [[ "$release_tag" == release-* && "$release_version" =~ ^[0-9]+(\.[0-9]+)+$ ]] ||
+        die "unexpected Termix release tag: ${release_tag:-missing}"
+
+    if run_as_target_user flatpak info --user "$app_id" >/dev/null 2>&1; then
+        was_installed=true
+        installed_version="$(termix_installed_version)" ||
+            die "installed Termix Flatpak version could not be read"
+        [[ -n "$installed_version" ]] ||
+            die "installed Termix Flatpak returned an empty version"
+
+        if dpkg --compare-versions "$installed_version" ge "$release_version"; then
+            info "Termix Flatpak ${installed_version} already matches latest release ${release_version}, skipping"
+            return
+        fi
+    fi
+
     info "downloading Termix Flatpak bundle"
-    fetch_latest_github_asset \
-        "Termix-SSH/Termix" \
+    fetch_github_asset_from_metadata \
         "exact" \
         "termix_linux_flatpak.flatpak" \
         "$temporary_dir/termix.flatpak" \
@@ -2449,14 +2473,27 @@ install_termix() (
 
     chmod 0755 "$temporary_dir"
     chmod 0644 "$temporary_dir/termix.flatpak"
-    info "installing Termix Flatpak for ${TARGET_USER}"
+    if [[ "$was_installed" == true ]]; then
+        info "updating Termix Flatpak from ${installed_version} to ${release_version} for ${TARGET_USER}"
+    else
+        info "installing Termix Flatpak ${release_version} for ${TARGET_USER}"
+    fi
     run_quiet_command "Termix Flatpak installation failed" \
-        run_as_target_user flatpak install --user --noninteractive -y \
+        run_as_target_user flatpak install --user --noninteractive --or-update -y \
         "$temporary_dir/termix.flatpak" ||
         die "failed installing Termix Flatpak"
-    run_as_target_user flatpak info --user "$app_id" >/dev/null 2>&1 ||
+    installed_version="$(termix_installed_version)" ||
         die "Termix Flatpak installation could not be verified"
-    ok "Termix Flatpak installed for ${TARGET_USER}"
+    if [[ -z "$installed_version" ]] ||
+        ! dpkg --compare-versions "$installed_version" ge "$release_version"; then
+        die "Termix Flatpak ${release_version} installation could not be verified"
+    fi
+
+    if [[ "$was_installed" == true ]]; then
+        ok "Termix Flatpak updated to ${installed_version} for ${TARGET_USER}"
+    else
+        ok "Termix Flatpak ${installed_version} installed for ${TARGET_USER}"
+    fi
 )
 
 install_termius() {
@@ -2469,6 +2506,14 @@ install_termius() {
         "https://download.termius.com/linux/Termius.deb" \
         "termius-app" \
         "Termius"
+}
+
+install_balena_etcher() {
+    install_latest_github_debian_package \
+        "balena-io/etcher" \
+        "_amd64.deb" \
+        "balena-etcher" \
+        "balenaEtcher"
 }
 
 install_rustdesk() {
@@ -4355,6 +4400,7 @@ main() {
         configure_flathub
         install_flatpak_package_array "Desktop Flatpak" "${FLATPAK_PACKAGES[@]}"
         configure_cryptomator_fuse_access
+        install_balena_etcher
         install_rustdesk
         install_termius
         install_termix
