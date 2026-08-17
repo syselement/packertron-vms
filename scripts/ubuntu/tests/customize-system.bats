@@ -203,9 +203,12 @@ setup() {
   [[ " ${RELEASE_OPTIONAL_PACKAGES[*]} " == *" rdap "* ]]
   [[ " ${DESKTOP_PACKAGES[*]} " == *" claude-desktop "* ]]
   [[ " ${DESKTOP_PACKAGES[*]} " == *" meld "* ]]
+  [[ " ${DESKTOP_PACKAGES[*]} " == *" mkvtoolnix "* ]]
+  [[ " ${DESKTOP_PACKAGES[*]} " == *" mkvtoolnix-gui "* ]]
   [[ " ${DESKTOP_PACKAGES[*]} " == *" typora "* ]]
   [[ " ${FLATPAK_PACKAGES[*]} " == *" org.cryptomator.Cryptomator "* ]]
   [[ " ${FLATPAK_PACKAGES[*]} " == *" it.mijorus.smile "* ]]
+  [[ " ${FLATPAK_PACKAGES[*]} " == *" org.jdownloader.JDownloader "* ]]
   [[ " ${VIRTUALIZATION_HOST_PACKAGES[*]} " == *" cockpit-machines "* ]]
   [[ " ${VIRTUALIZATION_HOST_PACKAGES[*]} " == *" libvirt-daemon-system "* ]]
   [[ " ${VIRTUALIZATION_HOST_PACKAGES[*]} " != *" virt-manager "* ]]
@@ -2132,6 +2135,20 @@ EOF
   [[ "$(<"$install_record")" == *"/package.deb|rustdesk|RustDesk" ]]
 }
 
+@test "balenaEtcher uses the latest official AMD64 Debian release" {
+  install_latest_github_debian_package() {
+    printf '<%s>\n' "$@"
+  }
+
+  run install_balena_etcher
+
+  [[ "$status" -eq 0 ]]
+  [[ "$output" == *"<balena-io/etcher>"* ]]
+  [[ "$output" == *"<_amd64.deb>"* ]]
+  [[ "$output" == *"<balena-etcher>"* ]]
+  [[ "$output" == *"<balenaEtcher>"* ]]
+}
+
 @test "current GitHub DEB release skips the asset download" {
   dpkg-query() {
     printf '1.2.3-1\n'
@@ -2161,43 +2178,54 @@ EOF
   [[ "$output" != *"unexpected package installation"* ]]
 }
 
-@test "installed target-user Termix Flatpak skips release download" {
+@test "current target-user Termix Flatpak skips bundle download" {
   ARCH="amd64"
   TARGET_USER="testuser"
 
   flatpak() {
+    if [[ "$1" == "list" ]]; then
+      printf 'com.karmaa.termix\t2.6.0\n'
+    fi
     return 0
   }
   run_as_target_user() {
     "$@"
   }
   fetch_file() {
-    printf 'unexpected Termix download\n' >&2
+    if [[ "$1" == *"/releases/latest" ]]; then
+      printf '{"tag_name":"release-2.6.0-tag","assets":[]}\n' >"$2"
+      return
+    fi
+    printf 'unexpected Termix bundle download\n' >&2
     return 99
   }
 
   run install_termix
 
   [[ "$status" -eq 0 ]]
-  [[ "$output" == *"Termix Flatpak already installed"* ]]
-  [[ "$output" != *"unexpected Termix download"* ]]
+  [[ "$output" == *"Termix Flatpak 2.6.0 already matches latest release 2.6.0, skipping"* ]]
+  [[ "$output" != *"unexpected Termix bundle download"* ]]
 }
 
-@test "Termix bundle is installed before its application ID is verified" {
-  local command_record="$BATS_TEST_TMPDIR/termix-command-record"
-  local installed_marker="$BATS_TEST_TMPDIR/termix-installed"
+@test "older target-user Termix Flatpak is updated from the latest GitHub bundle" {
+  local command_record="$BATS_TEST_TMPDIR/termix-update-command-record"
+  local version_file="$BATS_TEST_TMPDIR/termix-version"
 
   ARCH="amd64"
   TARGET_USER="testuser"
+  printf '2.5.1\n' >"$version_file"
 
   flatpak() {
     printf '%s\n' "$*" >>"$command_record"
     case "$1" in
       info)
-        [[ -e "$installed_marker" ]]
+        ;;
+      list)
+        printf 'com.karmaa.termix\t%s\n' "$(<"$version_file")"
         ;;
       install)
-        touch "$installed_marker"
+        [[ "$*" == *"--or-update"* ]]
+        printf '2.6.0\n' >"$version_file"
         ;;
       *)
         return 2
@@ -2211,6 +2239,7 @@ EOF
     if [[ "$1" == *"/releases/latest" ]]; then
       cat >"$2" <<'EOF'
 {
+  "tag_name": "release-2.6.0-tag",
   "assets": [
     {
       "name": "termix_linux_flatpak.flatpak",
@@ -2231,8 +2260,68 @@ EOF
   run install_termix
 
   [[ "$status" -eq 0 ]]
-  [[ "$output" == *"Termix Flatpak installed for testuser"* ]]
-  grep -Fq 'install --user --noninteractive -y' "$command_record"
+  [[ "$output" == *"updating Termix Flatpak from 2.5.1 to 2.6.0 for testuser"* ]]
+  [[ "$output" == *"Termix Flatpak updated to 2.6.0 for testuser"* ]]
+  grep -Fq 'list --user --app --columns=application,version' "$command_record"
+  grep -Fq 'install --user --noninteractive --or-update -y' "$command_record"
+  ! grep -Fq -- '--show-version' "$command_record"
+}
+
+@test "Termix bundle is installed before its application ID is verified" {
+  local command_record="$BATS_TEST_TMPDIR/termix-command-record"
+  local installed_marker="$BATS_TEST_TMPDIR/termix-installed"
+
+  ARCH="amd64"
+  TARGET_USER="testuser"
+
+  flatpak() {
+    printf '%s\n' "$*" >>"$command_record"
+    case "$1" in
+      info)
+        [[ -e "$installed_marker" ]] || return 1
+        ;;
+      list)
+        [[ -e "$installed_marker" ]] || return 1
+        printf 'com.karmaa.termix\t2.6.0\n'
+        ;;
+      install)
+        touch "$installed_marker"
+        ;;
+      *)
+        return 2
+        ;;
+    esac
+  }
+  run_as_target_user() {
+    "$@"
+  }
+  fetch_file() {
+    if [[ "$1" == *"/releases/latest" ]]; then
+      cat >"$2" <<'EOF'
+{
+  "tag_name": "release-2.6.0-tag",
+  "assets": [
+    {
+      "name": "termix_linux_flatpak.flatpak",
+      "browser_download_url": "https://github.com/Termix-SSH/Termix/releases/download/test/termix_linux_flatpak.flatpak",
+      "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    }
+  ]
+}
+EOF
+    else
+      printf 'test Flatpak bundle\n' >"$2"
+    fi
+  }
+  verify_github_asset_digest() {
+    return 0
+  }
+
+  run install_termix
+
+  [[ "$status" -eq 0 ]]
+  [[ "$output" == *"Termix Flatpak 2.6.0 installed for testuser"* ]]
+  grep -Fq 'install --user --noninteractive --or-update -y' "$command_record"
   ! grep -Fq -- '--show-ref' "$command_record"
 }
 
@@ -2402,6 +2491,34 @@ EOF
     "$APT_SOURCES_DIR/typora.list"
 }
 
+@test "MKVToolNix repository is repeatable and uses the supported Ubuntu codename" {
+  local validation_record="$BATS_TEST_TMPDIR/mkvtoolnix-validation"
+  CODENAME="resolute"
+
+  fetch_file() {
+    [[ "$1" == "https://mkvtoolnix.download/gpg-pub-moritzbunkus.gpg" ]]
+    printf 'MKVToolNix test key\n' >"$2"
+  }
+  validate_openpgp_key() {
+    printf '%s|%s\n' "$2" "$3" >"$validation_record"
+  }
+
+  apply_repository_setup ensure_mkvtoolnix_repository
+  [[ "$APT_SOURCES_CHANGED" == true ]]
+
+  APT_SOURCES_CHANGED=false
+  apply_repository_setup ensure_mkvtoolnix_repository
+
+  [[ "$APT_SOURCES_CHANGED" == false ]]
+  [[ "$(<"$validation_record")" == 'MKVToolNix|D9199745B0545F2E8197062B0F92290A445B9007' ]]
+  grep -Fqx \
+    "deb [arch=amd64 signed-by=${SYSTEM_KEYRING_DIR}/gpg-pub-moritzbunkus.gpg] https://mkvtoolnix.download/ubuntu/ resolute main" \
+    "$APT_SOURCES_DIR/mkvtoolnix.download.list"
+  grep -Fqx \
+    "deb-src [arch=amd64 signed-by=${SYSTEM_KEYRING_DIR}/gpg-pub-moritzbunkus.gpg] https://mkvtoolnix.download/ubuntu/ resolute main" \
+    "$APT_SOURCES_DIR/mkvtoolnix.download.list"
+}
+
 @test "AZLux repository uses HTTPS and validates its published fingerprint" {
   local validation_record="$BATS_TEST_TMPDIR/azlux-validation"
 
@@ -2447,10 +2564,12 @@ EOF
     ensure_brave_browser_repository
     ensure_claude_desktop_repository
     ensure_dbeaver_repository
+    ensure_mkvtoolnix_repository
     ensure_mullvad_repository
     ensure_typora_repository
   )
   UBUNTU_VARIANT="desktop"
+  CODENAME="noble"
 
   fetch_file() {
     if [[ "$1" == *"brave-browser.sources" ]]; then
@@ -2486,6 +2605,8 @@ EOF
   grep -Fq "$SYSTEM_KEYRING_DIR/claude-desktop-archive-keyring.asc" \
     "$APT_SOURCES_DIR/claude-desktop.list"
   grep -Fq "$SYSTEM_KEYRING_DIR/dbeaver.gpg.key" "$APT_SOURCES_DIR/dbeaver.list"
+  grep -Fq "$SYSTEM_KEYRING_DIR/gpg-pub-moritzbunkus.gpg" \
+    "$APT_SOURCES_DIR/mkvtoolnix.download.list"
   grep -Fq "$SYSTEM_KEYRING_DIR/mullvad-keyring.asc" "$APT_SOURCES_DIR/mullvad.list"
   grep -Fq "$SYSTEM_KEYRING_DIR/typora.gpg" "$APT_SOURCES_DIR/typora.list"
 }
