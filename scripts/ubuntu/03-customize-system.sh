@@ -80,6 +80,7 @@ readonly -a COMMON_PACKAGES=(
     fastfetch
     fd-find
     ffmpeg
+    fio
     fontconfig
     gdu
     git
@@ -103,6 +104,7 @@ readonly -a COMMON_PACKAGES=(
     s-tui
     shellcheck
     shfmt
+    smartmontools
     speedtest-cli
     sshpass
     stress
@@ -146,12 +148,19 @@ readonly -a DESKTOP_PACKAGES=(
     gnome-shell-extensions
     gnome-system-monitor
     gnome-tweaks
+    gparted
+    gsmartcontrol
+    kdiskmark
+    libimobiledevice-utils
     meld
+    mkvtoolnix
+    mkvtoolnix-gui
     mullvad-vpn
     qbittorrent
     sublime-text
     terminator
     typora
+    usbmuxd
     vlc
     wireshark
     xclip
@@ -166,6 +175,7 @@ readonly -a FLATPAK_PACKAGES=(
     it.mijorus.smile
     org.cryptomator.Cryptomator
     org.gnome.Boxes
+    org.jdownloader.JDownloader
 )
 
 readonly -a VIRTUALIZATION_HOST_PACKAGES=(
@@ -2343,6 +2353,59 @@ EOF
     [[ "$changed" == false ]] || return 10
 )
 
+ensure_mkvtoolnix_repository() (
+    set -Eeuo pipefail
+
+    local changed=false
+    local key_file="${SYSTEM_KEYRING_DIR}/gpg-pub-moritzbunkus.gpg"
+    local repository_url="https://mkvtoolnix.download/ubuntu/"
+    local source_file="${APT_SOURCES_DIR}/mkvtoolnix.download.list"
+    local temporary_dir
+
+    case "$CODENAME" in
+        noble | resolute) ;;
+        *)
+            die "MKVToolNix repository is not configured for Ubuntu codename ${CODENAME}"
+            ;;
+    esac
+
+    temporary_dir="$(mktemp -d)"
+    trap 'rm -rf -- "$temporary_dir"' EXIT
+
+    fetch_file \
+        "https://mkvtoolnix.download/gpg-pub-moritzbunkus.gpg" \
+        "$temporary_dir/gpg-pub-moritzbunkus.gpg" ||
+        die "failed downloading the MKVToolNix repository signing key"
+    validate_openpgp_key \
+        "$temporary_dir/gpg-pub-moritzbunkus.gpg" \
+        "MKVToolNix" \
+        "D9199745B0545F2E8197062B0F92290A445B9007"
+
+    cat >"$temporary_dir/mkvtoolnix.download.list" <<EOF
+deb [arch=amd64 signed-by=${key_file}] ${repository_url} ${CODENAME} main
+deb-src [arch=amd64 signed-by=${key_file}] ${repository_url} ${CODENAME} main
+EOF
+    validate_repository_source \
+        "$temporary_dir/mkvtoolnix.download.list" \
+        "$repository_url" \
+        "$key_file"
+
+    if write_file_if_changed "$temporary_dir/gpg-pub-moritzbunkus.gpg" "$key_file"; then
+        changed=true
+        ok "installed MKVToolNix repository signing key"
+    else
+        info "MKVToolNix repository signing key already current"
+    fi
+    if write_file_if_changed "$temporary_dir/mkvtoolnix.download.list" "$source_file"; then
+        changed=true
+        ok "configured MKVToolNix repository"
+    else
+        info "MKVToolNix repository already configured"
+    fi
+
+    [[ "$changed" == false ]] || return 10
+)
+
 ensure_typora_repository() (
     set -Eeuo pipefail
 
@@ -4367,6 +4430,7 @@ main() {
         apply_repository_setup ensure_brave_browser_repository
         apply_repository_setup ensure_claude_desktop_repository
         apply_repository_setup ensure_dbeaver_repository
+        apply_repository_setup ensure_mkvtoolnix_repository
         apply_repository_setup ensure_mullvad_repository
         apply_repository_setup ensure_sublime_text_repository
         apply_repository_setup ensure_typora_repository
@@ -4445,6 +4509,7 @@ main() {
         configure_terminator_as_default "$USER_NAME"
         install_snap_package discord "Discord"
         connect_snap_interface discord:system-observe "Discord system-observe"
+        install_snap_package losslesscut "LosslessCut"
         install_snap_package postman "Postman"
         install_snap_package telegram-desktop "Telegram Desktop"
         ok "Desktop-specific tools installed/configured"
