@@ -42,6 +42,9 @@ STARSHIP_INSTALL_URL="${STARSHIP_INSTALL_URL:-https://starship.rs/install.sh}"
 CLAUDE_CODE_INSTALL_URL="${CLAUDE_CODE_INSTALL_URL:-https://claude.ai/install.sh}"
 LABCTL_INSTALL_URL="${LABCTL_INSTALL_URL:-https://labs.iximiuz.com/cli/install.sh}"
 KUBECTL_STABLE_URL="${KUBECTL_STABLE_URL:-https://dl.k8s.io/release/stable.txt}"
+YUBICO_AUTHENTICATOR_URL="${YUBICO_AUTHENTICATOR_URL:-https://developers.yubico.com/yubioath-flutter/Releases/yubico-authenticator-latest-linux.tar.gz}"
+YUBICO_AUTHENTICATOR_INSTALL_DIR="${PACKERTRON_YUBICO_AUTHENTICATOR_INSTALL_DIR:-/opt/yubico-authenticator}"
+ZED_INSTALL_URL="${ZED_INSTALL_URL:-https://zed.dev/install.sh}"
 SYSTEM_KEYRING_DIR="${PACKERTRON_SYSTEM_KEYRING_DIR:-/usr/share/keyrings}"
 APT_SOURCES_DIR="${PACKERTRON_APT_SOURCES_DIR:-/etc/apt/sources.list.d}"
 APT_TRUSTED_KEY_DIR="${PACKERTRON_APT_TRUSTED_KEY_DIR:-/etc/apt/trusted.gpg.d}"
@@ -144,6 +147,7 @@ readonly -a DESKTOP_PACKAGES=(
     filezilla
     flatpak
     fonts-noto-color-emoji
+    fsearch
     gnome-shell-extension-manager
     gnome-shell-extensions
     gnome-system-monitor
@@ -156,7 +160,9 @@ readonly -a DESKTOP_PACKAGES=(
     mkvtoolnix
     mkvtoolnix-gui
     mullvad-vpn
+    pcscd
     qbittorrent
+    qdirstat
     sublime-text
     terminator
     typora
@@ -384,6 +390,22 @@ validate_zip_archive() {
             die "downloaded ${description} archive contains an unsafe path: ${entry}"
         fi
     done < <(unzip -Z1 "$archive_file")
+}
+
+validate_tar_gzip_archive() {
+    local archive_file="$1"
+    local description="$2"
+    local entry
+
+    [[ -s "$archive_file" ]] || die "downloaded ${description} archive is empty"
+    tar -tzf "$archive_file" >/dev/null ||
+        die "downloaded ${description} archive is invalid"
+
+    while IFS= read -r entry; do
+        if [[ "$entry" == /* || "$entry" == ../* || "$entry" == */.. || "$entry" == */../* ]]; then
+            die "downloaded ${description} archive contains an unsafe path: ${entry}"
+        fi
+    done < <(tar -tzf "$archive_file")
 }
 
 validate_gnome_extension_archive() {
@@ -2616,6 +2638,155 @@ install_pandoc() {
         "Pandoc"
 }
 
+install_yubico_authenticator() (
+    set -Eeuo pipefail
+
+    local archive_root archive_version
+    local backup_directory=""
+    local desktop_file="${TARGET_HOME}/.local/share/applications/com.yubico.yubioath.desktop"
+    local extracted_directory
+    local install_directory="$YUBICO_AUTHENTICATOR_INSTALL_DIR"
+    local install_parent
+    local installed_version=""
+    local marker_file="${YUBICO_AUTHENTICATOR_INSTALL_DIR}/.packertron-version"
+    local release_version
+    local staged_directory=""
+    local temporary_dir
+
+    restore_previous_yubico_authenticator() {
+        rm -rf -- "$install_directory"
+        if [[ -n "$backup_directory" && -d "$backup_directory" ]]; then
+            mv -- "$backup_directory" "$install_directory"
+            backup_directory=""
+            if [[ -f "$install_directory/desktop_integration.sh" ]]; then
+                run_as_target_user \
+                    bash "$install_directory/desktop_integration.sh" --install \
+                    >/dev/null 2>&1 || true
+            fi
+        fi
+    }
+
+    if [[ "$ARCH" != "amd64" ]]; then
+        warn "Yubico Authenticator is only configured for amd64; skipping on ${ARCH}"
+        return
+    fi
+
+    temporary_dir="$(mktemp -d)"
+    trap 'rm -rf -- "$temporary_dir"; [[ -z "$staged_directory" ]] || rm -rf -- "$staged_directory"; [[ -z "$backup_directory" ]] || rm -rf -- "$backup_directory"' EXIT
+
+    info "checking latest Yubico Authenticator release"
+    fetch_file "$YUBICO_AUTHENTICATOR_URL" "$temporary_dir/yubico-authenticator.tar.gz" ||
+        die "failed downloading Yubico Authenticator"
+    validate_tar_gzip_archive \
+        "$temporary_dir/yubico-authenticator.tar.gz" \
+        "Yubico Authenticator"
+
+    archive_root="$(
+        tar -tzf "$temporary_dir/yubico-authenticator.tar.gz" |
+            awk -F/ 'NF && $1 != "" { print $1 }' |
+            sort -u
+    )"
+    [[ "$archive_root" =~ ^yubico-authenticator-([0-9]+(\.[0-9]+)+)-linux$ ]] ||
+        die "unexpected Yubico Authenticator archive layout: ${archive_root:-missing}"
+    archive_version="${BASH_REMATCH[1]}"
+
+    install -d -m 0755 "$temporary_dir/extracted"
+    tar \
+        --extract \
+        --gzip \
+        --file "$temporary_dir/yubico-authenticator.tar.gz" \
+        --directory "$temporary_dir/extracted" \
+        --no-same-owner \
+        --no-same-permissions
+    extracted_directory="$temporary_dir/extracted/$archive_root"
+    [[ -x "$extracted_directory/authenticator" ]] ||
+        die "Yubico Authenticator archive does not contain its executable"
+    [[ -f "$extracted_directory/desktop_integration.sh" ]] ||
+        die "Yubico Authenticator archive does not contain desktop_integration.sh"
+    [[ -f "$extracted_directory/data/flutter_assets/version.json" ]] ||
+        die "Yubico Authenticator archive does not contain version metadata"
+
+    release_version="$(
+        jq -r '.version // empty' \
+            "$extracted_directory/data/flutter_assets/version.json"
+    )" || die "Yubico Authenticator version metadata is invalid"
+    [[ "$release_version" == "$archive_version" ]] ||
+        die "Yubico Authenticator archive version mismatch: ${archive_version} != ${release_version:-missing}"
+
+    [[ ! -f "$marker_file" ]] || installed_version="$(<"$marker_file")"
+    if [[ -n "$installed_version" ]] &&
+        dpkg --compare-versions "$installed_version" ge "$release_version" &&
+        [[ -x "$install_directory/authenticator" ]] &&
+        grep -Fqx "Exec=\"${install_directory}/authenticator\"" "$desktop_file" 2>/dev/null; then
+        info "Yubico Authenticator ${installed_version} already installed for ${TARGET_USER}, skipping"
+        return
+    fi
+
+    install_parent="$(dirname -- "$install_directory")"
+    [[ "$(basename -- "$install_directory")" == "yubico-authenticator" && "$install_parent" != "/" ]] ||
+        die "unsafe Yubico Authenticator installation directory: ${install_directory}"
+    [[ ! -L "${TARGET_HOME}/.local" ]] ||
+        die "refusing symlinked target-user local directory: ${TARGET_HOME}/.local"
+    [[ ! -L "$install_directory" ]] ||
+        die "refusing symlinked Yubico Authenticator directory: ${install_directory}"
+    [[ ! -L "${TARGET_HOME}/.local/share" ]] ||
+        die "refusing symlinked target-user share directory: ${TARGET_HOME}/.local/share"
+    [[ ! -L "${TARGET_HOME}/.local/share/applications" ]] ||
+        die "refusing symlinked target-user applications directory: ${TARGET_HOME}/.local/share/applications"
+
+    if [[ ! -d "${TARGET_HOME}/.local" ]]; then
+        install -d -m 0700 -o "$TARGET_USER" -g "$TARGET_GROUP" "${TARGET_HOME}/.local"
+    fi
+    for directory in \
+        "${TARGET_HOME}/.local/share" \
+        "${TARGET_HOME}/.local/share/applications"; do
+        if [[ ! -d "$directory" ]]; then
+            install -d -m 0755 -o "$TARGET_USER" -g "$TARGET_GROUP" "$directory"
+        fi
+    done
+
+    install -d -m 0755 "$install_parent"
+    staged_directory="$(mktemp -d "${install_parent}/.yubico-authenticator.stage.XXXXXX")"
+    cp -a -- "$extracted_directory/." "$staged_directory/"
+    chmod 0755 "$staged_directory"
+    chmod 0755 \
+        "$staged_directory/authenticator" \
+        "$staged_directory/desktop_integration.sh"
+    printf '%s\n' "$release_version" >"$staged_directory/.packertron-version"
+    chmod 0644 "$staged_directory/.packertron-version"
+
+    if [[ -e "$install_directory" ]]; then
+        backup_directory="${install_parent}/.yubico-authenticator.backup.$$"
+        [[ ! -e "$backup_directory" ]] ||
+            die "Yubico Authenticator backup path already exists: ${backup_directory}"
+        mv -- "$install_directory" "$backup_directory"
+    fi
+    if ! mv -- "$staged_directory" "$install_directory"; then
+        restore_previous_yubico_authenticator
+        die "failed activating Yubico Authenticator ${release_version}"
+    fi
+    staged_directory=""
+    [[ -x "$install_directory/authenticator" &&
+        -f "$install_directory/desktop_integration.sh" ]] ||
+        die "Yubico Authenticator ${release_version} installation directory is incomplete"
+
+    info "installing Yubico Authenticator ${release_version} for ${TARGET_USER}"
+    if ! run_quiet_command "Yubico Authenticator desktop integration failed" \
+        run_as_target_user bash "$install_directory/desktop_integration.sh" --install; then
+        restore_previous_yubico_authenticator
+        die "failed installing Yubico Authenticator desktop integration"
+    fi
+    if ! grep -Fqx "Exec=\"${install_directory}/authenticator\"" "$desktop_file"; then
+        restore_previous_yubico_authenticator
+        die "Yubico Authenticator desktop integration could not be verified"
+    fi
+    if [[ -n "$backup_directory" ]]; then
+        rm -rf -- "$backup_directory"
+        backup_directory=""
+    fi
+    ok "Yubico Authenticator ${release_version} installed for ${TARGET_USER}"
+)
+
 install_typora_themeable() (
     set -Eeuo pipefail
 
@@ -3450,6 +3621,58 @@ install_labctl() (
         die "labctl installation could not be verified"
     [[ -n "$version_output" ]] ||
         die "labctl installation returned an empty version"
+    ok "${version_output%%$'\n'*} installed for ${TARGET_USER}"
+)
+
+install_zed() (
+    set -Eeuo pipefail
+
+    local desktop_file="${TARGET_HOME}/.local/share/applications/dev.zed.Zed.desktop"
+    local temporary_dir
+    local version_output
+    local zed_bin="${TARGET_HOME}/.local/bin/zed"
+
+    if [[ "$ARCH" != "amd64" ]]; then
+        warn "Zed is only configured for amd64; skipping on ${ARCH}"
+        return
+    fi
+
+    if [[ -x "$zed_bin" && -f "$desktop_file" ]]; then
+        version_output="$(run_as_target_user "$zed_bin" --version)" ||
+            die "existing Zed installation is not usable"
+        [[ -n "$version_output" ]] ||
+            die "existing Zed version could not be verified"
+        info "${version_output%%$'\n'*} already installed for ${TARGET_USER}, skipping"
+        return
+    fi
+
+    temporary_dir="$(mktemp -d)"
+    trap 'rm -rf -- "$temporary_dir"' EXIT
+
+    info "installing Zed for ${TARGET_USER}"
+    fetch_file "$ZED_INSTALL_URL" "$temporary_dir/install.sh" ||
+        die "failed downloading the Zed installer"
+    [[ -s "$temporary_dir/install.sh" ]] ||
+        die "downloaded Zed installer is empty"
+    sh -n "$temporary_dir/install.sh" ||
+        die "downloaded Zed installer is not valid shell"
+    chmod 0755 "$temporary_dir"
+    chmod 0644 "$temporary_dir/install.sh"
+
+    if ! run_as_target_user \
+        timeout --foreground --kill-after=10s 10m \
+        sh "$temporary_dir/install.sh" </dev/null; then
+        die "Zed installation failed or timed out"
+    fi
+
+    [[ -x "$zed_bin" ]] ||
+        die "Zed installation did not provide ${zed_bin}"
+    [[ -f "$desktop_file" ]] ||
+        die "Zed installation did not provide ${desktop_file}"
+    version_output="$(run_as_target_user "$zed_bin" --version)" ||
+        die "Zed installation could not be verified"
+    [[ -n "$version_output" ]] ||
+        die "Zed installation returned an empty version"
     ok "${version_output%%$'\n'*} installed for ${TARGET_USER}"
 )
 
@@ -4469,6 +4692,8 @@ main() {
         install_termius
         install_termix
         install_typora_themeable
+        install_yubico_authenticator
+        install_zed
     else
         info "Server detected; Desktop packages skipped"
     fi
