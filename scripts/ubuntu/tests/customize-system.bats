@@ -205,6 +205,7 @@ setup() {
   [[ " ${DESKTOP_PACKAGES[*]} " == *" meld "* ]]
   [[ " ${DESKTOP_PACKAGES[*]} " == *" mkvtoolnix "* ]]
   [[ " ${DESKTOP_PACKAGES[*]} " == *" mkvtoolnix-gui "* ]]
+  [[ " ${DESKTOP_PACKAGES[*]} " == *" pcscd "* ]]
   [[ " ${DESKTOP_PACKAGES[*]} " == *" typora "* ]]
   [[ " ${FLATPAK_PACKAGES[*]} " == *" org.cryptomator.Cryptomator "* ]]
   [[ " ${FLATPAK_PACKAGES[*]} " == *" it.mijorus.smile "* ]]
@@ -1538,6 +1539,65 @@ LABCTL
   [[ "$output" != *"unexpected labctl installer download"* ]]
 }
 
+@test "Zed official installer runs as the target user and skips a healthy rerun" {
+  local desktop_file
+  local installer_file=""
+
+  ARCH="amd64"
+  TARGET_USER="$(id -un)"
+  TARGET_HOME="$BATS_TEST_TMPDIR/home/$TARGET_USER"
+  TARGET_UID="$(id -u)"
+  TARGET_GROUP="$(id -gn)"
+  desktop_file="$TARGET_HOME/.local/share/applications/dev.zed.Zed.desktop"
+  mkdir -p "$TARGET_HOME/.local"
+  chmod 0700 "$TARGET_HOME/.local"
+
+  fetch_file() {
+    [[ "$1" == "$ZED_INSTALL_URL" ]]
+    installer_file="$2"
+    cat >"$2" <<'ZED_INSTALLER'
+#!/bin/sh
+set -eu
+mkdir -p "$HOME/.local/bin" "$HOME/.local/share/applications" "$HOME/.local/zed.app/bin"
+cat >"$HOME/.local/zed.app/bin/zed" <<'ZED_BIN'
+#!/bin/sh
+printf 'Zed test-version\n'
+ZED_BIN
+chmod 0755 "$HOME/.local/zed.app/bin/zed"
+ln -sf "$HOME/.local/zed.app/bin/zed" "$HOME/.local/bin/zed"
+printf '[Desktop Entry]\nExec=%s/.local/zed.app/bin/zed\n' "$HOME" \
+  >"$HOME/.local/share/applications/dev.zed.Zed.desktop"
+ZED_INSTALLER
+  }
+  run_as_target_user() {
+    if [[ "$*" == *"install.sh"* ]]; then
+      [[ "$(stat -c '%a' "$(dirname -- "$installer_file")")" == "755" ]] || return 98
+      [[ "$(stat -c '%a' "$installer_file")" == "644" ]] || return 99
+    fi
+    HOME="$TARGET_HOME" USER="$TARGET_USER" LOGNAME="$TARGET_USER" "$@"
+  }
+
+  run install_zed
+
+  [[ "$status" -eq 0 ]]
+  [[ "$output" == *"Zed test-version installed for ${TARGET_USER}"* ]]
+  [[ -x "$TARGET_HOME/.local/bin/zed" ]]
+  [[ -x "$TARGET_HOME/.local/zed.app/bin/zed" ]]
+  [[ -f "$desktop_file" ]]
+  [[ "$(stat -c '%a' "$TARGET_HOME/.local")" == "700" ]]
+
+  fetch_file() {
+    printf 'unexpected Zed installer download\n' >&2
+    return 99
+  }
+
+  run install_zed
+
+  [[ "$status" -eq 0 ]]
+  [[ "$output" == *"Zed test-version already installed for ${TARGET_USER}, skipping"* ]]
+  [[ "$output" != *"unexpected Zed installer download"* ]]
+}
+
 @test "installed tldr skips pipx mutation" {
   run_as_target_user() {
     if [[ "$*" == "pipx list --short" ]]; then
@@ -2350,6 +2410,91 @@ EOF
   [[ "$output" != *"unexpected theme archive download"* ]]
   [[ "$(stat -c '%U:%G:%a' "$TARGET_HOME/.config/Typora")" == "$TARGET_USER:$TARGET_GROUP:755" ]]
   [[ "$(stat -c '%U:%G:%a' "$TARGET_HOME/.config/Typora/themes")" == "$TARGET_USER:$TARGET_GROUP:755" ]]
+}
+
+@test "Yubico Authenticator installs and updates one fixed system directory" {
+  local archive_root="yubico-authenticator-7.4.1-linux"
+  local desktop_file
+  local fixture_directory="$BATS_TEST_TMPDIR/yubico-fixture"
+
+  ARCH="amd64"
+  TARGET_USER="$(id -un)"
+  TARGET_GROUP="$(id -gn)"
+  TARGET_HOME="$BATS_TEST_TMPDIR/home"
+  YUBICO_AUTHENTICATOR_INSTALL_DIR="$BATS_TEST_TMPDIR/opt/yubico-authenticator"
+  YUBICO_TEST_ARCHIVE_ROOT="$archive_root"
+  desktop_file="$TARGET_HOME/.local/share/applications/com.yubico.yubioath.desktop"
+
+  mkdir -p \
+    "$TARGET_HOME/.local" \
+    "$fixture_directory/$archive_root/data/flutter_assets" \
+    "$fixture_directory/$archive_root/linux_support"
+  chmod 0700 "$TARGET_HOME/.local"
+  printf '#!/usr/bin/env bash\nexit 0\n' >"$fixture_directory/$archive_root/authenticator"
+  chmod 0755 "$fixture_directory/$archive_root/authenticator"
+  printf '{"version":"7.4.1"}\n' \
+    >"$fixture_directory/$archive_root/data/flutter_assets/version.json"
+  printf 'test icon\n' \
+    >"$fixture_directory/$archive_root/linux_support/com.yubico.yubioath.png"
+  cat >"$fixture_directory/$archive_root/desktop_integration.sh" <<'FAKE_INSTALLER'
+#!/usr/bin/env bash
+set -euo pipefail
+[[ "$1" == "--install" ]]
+integration_directory="$(cd -- "$(dirname -- "$0")" && pwd)"
+cat >"$HOME/.local/share/applications/com.yubico.yubioath.desktop" <<EOF
+[Desktop Entry]
+Name=Yubico Authenticator
+Exec="${integration_directory}/authenticator"
+EOF
+FAKE_INSTALLER
+
+  fetch_file() {
+    [[ "$1" == "$YUBICO_AUTHENTICATOR_URL" ]]
+    tar -czf "$2" -C "$fixture_directory" "$YUBICO_TEST_ARCHIVE_ROOT"
+  }
+  run_as_target_user() {
+    [[ "$(stat -c '%a' "$YUBICO_AUTHENTICATOR_INSTALL_DIR")" == "755" ]] || return 99
+    [[ "$(stat -c '%a' "$YUBICO_AUTHENTICATOR_INSTALL_DIR/desktop_integration.sh")" == "755" ]] || return 99
+    HOME="$TARGET_HOME" "$@"
+  }
+
+  run install_yubico_authenticator
+
+  [[ "$status" -eq 0 ]]
+  [[ "$output" == *"Yubico Authenticator 7.4.1 installed for ${TARGET_USER}"* ]]
+  [[ -x "$YUBICO_AUTHENTICATOR_INSTALL_DIR/authenticator" ]]
+  [[ "$(stat -c '%a' "$YUBICO_AUTHENTICATOR_INSTALL_DIR")" == "755" ]]
+  [[ "$(stat -c '%a' "$YUBICO_AUTHENTICATOR_INSTALL_DIR/desktop_integration.sh")" == "755" ]]
+  grep -Fqx \
+    "Exec=\"${YUBICO_AUTHENTICATOR_INSTALL_DIR}/authenticator\"" \
+    "$desktop_file"
+  [[ "$(<"$YUBICO_AUTHENTICATOR_INSTALL_DIR/.packertron-version")" == "7.4.1" ]]
+  [[ ! -e "$TARGET_HOME/.local/opt" ]]
+  [[ "$(stat -c '%a' "$TARGET_HOME/.local")" == "700" ]]
+
+  run install_yubico_authenticator
+
+  [[ "$status" -eq 0 ]]
+  [[ "$output" == *"Yubico Authenticator 7.4.1 already installed for ${TARGET_USER}, skipping"* ]]
+  [[ "$(stat -c '%a' "$TARGET_HOME/.local")" == "700" ]]
+
+  YUBICO_TEST_ARCHIVE_ROOT="yubico-authenticator-7.4.2-linux"
+  cp -a \
+    "$fixture_directory/$archive_root" \
+    "$fixture_directory/$YUBICO_TEST_ARCHIVE_ROOT"
+  printf '{"version":"7.4.2"}\n' \
+    >"$fixture_directory/$YUBICO_TEST_ARCHIVE_ROOT/data/flutter_assets/version.json"
+
+  run install_yubico_authenticator
+
+  [[ "$status" -eq 0 ]]
+  [[ "$output" == *"Yubico Authenticator 7.4.2 installed for ${TARGET_USER}"* ]]
+  [[ "$(<"$YUBICO_AUTHENTICATOR_INSTALL_DIR/.packertron-version")" == "7.4.2" ]]
+  grep -Fqx \
+    "Exec=\"${YUBICO_AUTHENTICATOR_INSTALL_DIR}/authenticator\"" \
+    "$desktop_file"
+  [[ ! -e "$YUBICO_AUTHENTICATOR_INSTALL_DIR/7.4.1" ]]
+  [[ ! -e "$YUBICO_AUTHENTICATOR_INSTALL_DIR/7.4.2" ]]
 }
 
 @test "failed repository download preserves existing files" {
