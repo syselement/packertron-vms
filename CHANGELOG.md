@@ -1,3 +1,12 @@
+# [0.62.0](https://github.com/syselement/packertron-vms/compare/v0.61.0...v0.62.0) (2026-08-22)
+
+
+### Features
+
+* add installation support for ChatGPT and update Obsidian release handling in customization script ([86d74bd](https://github.com/syselement/packertron-vms/commit/86d74bd0aa175114d9ddbb8d1888d97ee61be2a8))
+
+
+
 # [0.61.0](https://github.com/syselement/packertron-vms/compare/v0.60.0...v0.61.0) (2026-08-20)
 
 
@@ -33,15 +42,6 @@
 ### Bug Fixes
 
 * add missing -y flag to brew upgrade in updateos alias for desktop users ([85603a7](https://github.com/syselement/packertron-vms/commit/85603a79f74939659e1cb0fe9b1d9a0665fd95df))
-
-
-
-# [0.58.0](https://github.com/syselement/packertron-vms/compare/v0.57.0...v0.58.0) (2026-08-16)
-
-
-### Features
-
-* add Kubernetes CLI tools installation and Helm repository setup ([8acc829](https://github.com/syselement/packertron-vms/commit/8acc829dce777056c057fc3bf8b02a4e09914660))
 
 
 
