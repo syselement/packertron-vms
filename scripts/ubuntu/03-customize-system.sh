@@ -45,6 +45,7 @@ KUBECTL_STABLE_URL="${KUBECTL_STABLE_URL:-https://dl.k8s.io/release/stable.txt}"
 YUBICO_AUTHENTICATOR_URL="${YUBICO_AUTHENTICATOR_URL:-https://developers.yubico.com/yubioath-flutter/Releases/yubico-authenticator-latest-linux.tar.gz}"
 YUBICO_AUTHENTICATOR_INSTALL_DIR="${PACKERTRON_YUBICO_AUTHENTICATOR_INSTALL_DIR:-/opt/yubico-authenticator}"
 ZED_INSTALL_URL="${ZED_INSTALL_URL:-https://zed.dev/install.sh}"
+CHATGPT_DEB_URL="${CHATGPT_DEB_URL:-https://persistent.oaistatic.com/codex-app-prod/linux/deb/latest/chatgpt_amd64.deb}"
 SYSTEM_KEYRING_DIR="${PACKERTRON_SYSTEM_KEYRING_DIR:-/usr/share/keyrings}"
 APT_SOURCES_DIR="${PACKERTRON_APT_SOURCES_DIR:-/etc/apt/sources.list.d}"
 APT_TRUSTED_KEY_DIR="${PACKERTRON_APT_TRUSTED_KEY_DIR:-/etc/apt/trusted.gpg.d}"
@@ -372,6 +373,28 @@ fetch_file() {
         --speed-time 30 \
         --retry 2 \
         --retry-delay 2 \
+        --output "$destination_file" \
+        "$url"
+}
+
+fetch_file_range() {
+    local byte_range="$2"
+    local destination_file="$3"
+    local url="$1"
+
+    curl \
+        --fail \
+        --show-error \
+        --silent \
+        --location \
+        --connect-timeout 10 \
+        --max-time 30 \
+        --speed-limit 1024 \
+        --speed-time 30 \
+        --retry 2 \
+        --retry-delay 2 \
+        --range "$byte_range" \
+        --max-filesize 65536 \
         --output "$destination_file" \
         "$url"
 }
@@ -2593,6 +2616,47 @@ install_termius() {
         "Termius"
 }
 
+install_chatgpt() (
+    set -Eeuo pipefail
+
+    local control_data installed_version package_architecture package_name package_version
+    local temporary_dir
+
+    temporary_dir="$(mktemp -d)"
+    trap 'rm -rf -- "$temporary_dir"' EXIT
+
+    installed_version="$(dpkg-query -W -f='${Version}' chatgpt 2>/dev/null || true)"
+    if [[ -n "$installed_version" ]]; then
+        info "checking latest ChatGPT version"
+        fetch_file_range "$CHATGPT_DEB_URL" "0-65535" "$temporary_dir/package-prefix.deb" ||
+            die "failed checking latest ChatGPT version"
+        control_data="$(
+            ar p "$temporary_dir/package-prefix.deb" control.tar.xz 2>/dev/null |
+                tar -xJOf - ./control 2>/dev/null
+        )" || die "could not read the latest ChatGPT package metadata"
+        package_name="$(awk -F ': ' '$1 == "Package" { print $2; exit }' <<<"$control_data")"
+        package_version="$(awk -F ': ' '$1 == "Version" { print $2; exit }' <<<"$control_data")"
+        package_architecture="$(awk -F ': ' '$1 == "Architecture" { print $2; exit }' <<<"$control_data")"
+
+        [[ "$package_name" == "chatgpt" ]] ||
+            die "unexpected ChatGPT package name: ${package_name:-missing}"
+        [[ "$package_architecture" == "amd64" ]] ||
+            die "unexpected ChatGPT package architecture: ${package_architecture:-missing}"
+        [[ -n "$package_version" ]] ||
+            die "latest ChatGPT package does not declare a version"
+
+        if dpkg --compare-versions "$installed_version" ge "$package_version"; then
+            info "ChatGPT ${installed_version} already installed, skipping"
+            return
+        fi
+    fi
+
+    install_downloaded_debian_package \
+        "$CHATGPT_DEB_URL" \
+        "chatgpt" \
+        "ChatGPT"
+)
+
 install_balena_etcher() {
     install_latest_github_debian_package \
         "balena-io/etcher" \
@@ -3234,7 +3298,7 @@ EOF
 install_obsidian() (
     set -euo pipefail
 
-    local api_url="https://api.github.com/repos/obsidianmd/obsidian-releases/releases/latest"
+    local api_url="https://api.github.com/repos/obsidianmd/obsidian-releases/releases?per_page=5"
     local cmd
     local release_json tag latest_version
     local architecture asset_url asset_name asset_digest package_architecture package_version
@@ -3263,15 +3327,26 @@ install_obsidian() (
     tmp_dir="$(mktemp -d)"
     trap 'rm -rf -- "$tmp_dir"' EXIT
 
-    info "checking latest Obsidian GitHub release"
+    info "checking recent Obsidian GitHub releases for a Debian package"
 
     fetch_file "$api_url" "$tmp_dir/release.json" ||
         die "failed downloading Obsidian release metadata"
-    release_json="$(<"$tmp_dir/release.json")"
+    release_json="$(
+        jq -c --arg suffix "_${architecture}.deb" '
+          first(
+            .[]
+            | select(.draft == false and .prerelease == false)
+            | select(any(.assets[]?; .name | endswith($suffix)))
+          ) // empty
+        ' "$tmp_dir/release.json"
+    )" || die "Obsidian release metadata is invalid"
+    [[ -n "$release_json" ]] ||
+        die "no recent stable Obsidian Debian package found for ${architecture}"
+
     tag="$(jq -r '.tag_name // empty' <<<"$release_json")" ||
         die "Obsidian release metadata is invalid"
     [[ -n "$tag" ]] ||
-        die "could not determine the latest Obsidian release"
+        die "could not determine the latest Obsidian Debian release"
 
     latest_version="${tag#v}"
 
@@ -3300,7 +3375,7 @@ install_obsidian() (
     )" || die "Obsidian release metadata is invalid"
 
     [[ -n "$asset_url" ]] ||
-        die "no Obsidian Debian package found for ${architecture}"
+        die "selected Obsidian release has no Debian package for ${architecture}"
 
     asset_name="${asset_url##*/}"
 
@@ -4687,6 +4762,7 @@ main() {
         configure_flathub
         install_flatpak_package_array "Desktop Flatpak" "${FLATPAK_PACKAGES[@]}"
         configure_cryptomator_fuse_access
+        install_chatgpt
         install_balena_etcher
         install_rustdesk
         install_termius
