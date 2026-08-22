@@ -1809,6 +1809,77 @@ ZED_INSTALLER
   [[ ! -e "$snap_record" ]]
 }
 
+@test "Obsidian selects the newest stable release containing an AMD64 Debian package" {
+  local install_record="$BATS_TEST_TMPDIR/install-record"
+
+  ARCH="amd64"
+  dpkg() {
+    if [[ "$1" == "--print-architecture" ]]; then
+      printf 'amd64\n'
+      return
+    fi
+    if [[ "$1" == "--compare-versions" ]]; then
+      command dpkg "$@"
+      return
+    fi
+    return 2
+  }
+  dpkg-query() {
+    [[ -e "$install_record" ]] && printf '1.13.7\n'
+  }
+  dpkg-deb() {
+    case "$1" in
+      --info) return 0 ;;
+      -f)
+        case "$3" in
+          Package) printf 'obsidian\n' ;;
+          Architecture) printf 'amd64\n' ;;
+          Version) printf '1.13.7\n' ;;
+        esac
+        ;;
+    esac
+  }
+  snap() {
+    return 1
+  }
+  fetch_file() {
+    if [[ "$1" == *"releases?per_page=5" ]]; then
+      cat >"$2" <<'EOF'
+[
+  {
+    "tag_name": "v1.13.8",
+    "draft": false,
+    "prerelease": false,
+    "assets": [{"name": "Obsidian-1.13.8.apk", "browser_download_url": "https://github.com/obsidianmd/obsidian-releases/releases/download/v1.13.8/Obsidian-1.13.8.apk"}]
+  },
+  {
+    "tag_name": "v1.13.7",
+    "draft": false,
+    "prerelease": false,
+    "assets": [{"name": "obsidian_1.13.7_amd64.deb", "browser_download_url": "https://github.com/obsidianmd/obsidian-releases/releases/download/v1.13.7/obsidian_1.13.7_amd64.deb", "digest": "sha256:test"}]
+  }
+]
+EOF
+      return
+    fi
+    [[ "$1" == *"v1.13.7/obsidian_1.13.7_amd64.deb" ]] || return 98
+    printf 'test Debian package\n' >"$2"
+  }
+  verify_github_asset_digest() {
+    [[ "$2" == "sha256:test" ]]
+  }
+  run_apt_get() {
+    printf '%s\n' "$*" >"$install_record"
+  }
+
+  run install_obsidian
+
+  [[ "$status" -eq 0 ]]
+  [[ "$output" == *"downloading Obsidian v1.13.7 for amd64"* ]]
+  [[ "$output" != *"downloading Obsidian v1.13.8"* ]]
+  [[ "$(<"$install_record")" == *"obsidian_1.13.7_amd64.deb"* ]]
+}
+
 @test "correct bat symlink is left unchanged" {
   local test_home="$BATS_TEST_TMPDIR/home"
 
@@ -2207,6 +2278,59 @@ EOF
   [[ "$output" == *"<_amd64.deb>"* ]]
   [[ "$output" == *"<balena-etcher>"* ]]
   [[ "$output" == *"<balenaEtcher>"* ]]
+}
+
+@test "ChatGPT uses the official latest AMD64 Debian package" {
+  dpkg-query() {
+    return 1
+  }
+  install_downloaded_debian_package() {
+    printf '<%s>\n' "$@"
+  }
+
+  CHATGPT_DEB_URL="https://persistent.oaistatic.com/codex-app-prod/linux/deb/latest/chatgpt_amd64.deb"
+
+  run install_chatgpt
+
+  [[ "$status" -eq 0 ]]
+  [[ "$output" == *"<${CHATGPT_DEB_URL}>"* ]]
+  [[ "$output" == *"<chatgpt>"* ]]
+  [[ "$output" == *"<ChatGPT>"* ]]
+}
+
+@test "current ChatGPT installation checks package metadata without downloading the full DEB" {
+  local package_dir="$BATS_TEST_TMPDIR/chatgpt-package"
+  local package_file="$BATS_TEST_TMPDIR/chatgpt.deb"
+
+  ARCH="amd64"
+  mkdir -p "$package_dir/DEBIAN"
+  cat >"$package_dir/DEBIAN/control" <<'EOF'
+Package: chatgpt
+Version: 26.818.41705
+Architecture: amd64
+Maintainer: Test <test@example.invalid>
+Description: ChatGPT test package
+EOF
+  dpkg-deb -Zxz --build "$package_dir" "$package_file" >/dev/null
+
+  dpkg-query() {
+    printf '26.818.41705\n'
+  }
+  fetch_file_range() {
+    [[ "$1" == "$CHATGPT_DEB_URL" ]]
+    [[ "$2" == "0-65535" ]]
+    cp "$package_file" "$3"
+  }
+  install_downloaded_debian_package() {
+    printf 'unexpected full ChatGPT download\n' >&2
+    return 99
+  }
+
+  run install_chatgpt
+
+  [[ "$status" -eq 0 ]]
+  [[ "$output" == *"ChatGPT 26.818.41705 already installed, skipping"* ]]
+  [[ "$output" != *"unexpected full ChatGPT download"* ]]
 }
 
 @test "current GitHub DEB release skips the asset download" {
