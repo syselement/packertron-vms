@@ -2333,6 +2333,70 @@ EOF
   [[ "$output" != *"unexpected full ChatGPT download"* ]]
 }
 
+@test "Strawberry selects the latest stable AMD64 package for the Ubuntu codename" {
+  local install_record="$BATS_TEST_TMPDIR/strawberry-install"
+
+  ARCH="amd64"
+  CODENAME="resolute"
+  dpkg-query() {
+    return 1
+  }
+  fetch_file() {
+    case "$1" in
+      "${STRAWBERRY_FILES_URL}/")
+        cat >"$2" <<'EOF'
+<a href="strawberry_1.2.26-resolute_amd64.deb">old</a>
+<a href="strawberry_1.2.27-noble_amd64.deb">other Ubuntu release</a>
+<a href="strawberry_1.2.27rc1-resolute_amd64.deb">release candidate</a>
+<a href="strawberry_1.2.27-resolute_amd64.deb">latest</a>
+EOF
+        ;;
+      "${STRAWBERRY_FILES_URL}/strawberry_1.2.27-resolute_amd64.deb")
+        printf 'Strawberry test package\n' >"$2"
+        ;;
+      *) return 98 ;;
+    esac
+  }
+  install_debian_package() {
+    printf '%s|%s|%s\n' "$1" "$2" "$3" >"$install_record"
+  }
+
+  run install_strawberry
+
+  [[ "$status" -eq 0 ]]
+  [[ "$output" == *"downloading Strawberry 1.2.27 for Ubuntu resolute"* ]]
+  [[ "$output" == *"does not publish a SHA-256 checksum"* ]]
+  [[ "$(<"$install_record")" == *"/package.deb|strawberry|Strawberry" ]]
+}
+
+@test "current Strawberry package skips package and checksum downloads" {
+  local download_record="$BATS_TEST_TMPDIR/strawberry-downloads"
+
+  ARCH="amd64"
+  CODENAME="noble"
+  dpkg-query() {
+    printf '1.2.27\n'
+  }
+  fetch_file() {
+    printf '%s\n' "$1" >>"$download_record"
+    if [[ "$1" == "${STRAWBERRY_FILES_URL}/" ]]; then
+      printf '<a href="strawberry_1.2.27-noble_amd64.deb">latest</a>\n' >"$2"
+      return
+    fi
+    return 99
+  }
+  install_debian_package() {
+    printf 'unexpected Strawberry installation\n' >&2
+    return 99
+  }
+
+  run install_strawberry
+
+  [[ "$status" -eq 0 ]]
+  [[ "$output" == *"Strawberry 1.2.27 already installed, skipping"* ]]
+  [[ "$(wc -l <"$download_record")" -eq 1 ]]
+}
+
 @test "current GitHub DEB release skips the asset download" {
   dpkg-query() {
     printf '1.2.3-1\n'

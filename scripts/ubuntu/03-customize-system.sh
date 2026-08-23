@@ -46,6 +46,7 @@ YUBICO_AUTHENTICATOR_URL="${YUBICO_AUTHENTICATOR_URL:-https://developers.yubico.
 YUBICO_AUTHENTICATOR_INSTALL_DIR="${PACKERTRON_YUBICO_AUTHENTICATOR_INSTALL_DIR:-/opt/yubico-authenticator}"
 ZED_INSTALL_URL="${ZED_INSTALL_URL:-https://zed.dev/install.sh}"
 CHATGPT_DEB_URL="${CHATGPT_DEB_URL:-https://persistent.oaistatic.com/codex-app-prod/linux/deb/latest/chatgpt_amd64.deb}"
+STRAWBERRY_FILES_URL="${STRAWBERRY_FILES_URL:-https://files.strawberrymusicplayer.org}"
 SYSTEM_KEYRING_DIR="${PACKERTRON_SYSTEM_KEYRING_DIR:-/usr/share/keyrings}"
 APT_SOURCES_DIR="${PACKERTRON_APT_SOURCES_DIR:-/etc/apt/sources.list.d}"
 APT_TRUSTED_KEY_DIR="${PACKERTRON_APT_TRUSTED_KEY_DIR:-/etc/apt/trusted.gpg.d}"
@@ -93,6 +94,7 @@ readonly -a COMMON_PACKAGES=(
     htop
     iftop
     imagemagick
+    inxi
     ipcalc
     iperf3
     jq
@@ -155,6 +157,7 @@ readonly -a DESKTOP_PACKAGES=(
     gnome-tweaks
     gparted
     gsmartcontrol
+    hardinfo2
     kdiskmark
     libimobiledevice-utils
     meld
@@ -2657,6 +2660,64 @@ install_chatgpt() (
         "ChatGPT"
 )
 
+install_strawberry() (
+    set -Eeuo pipefail
+
+    local actual_digest asset_name asset_version checksum_name installed_version published_digest
+    local temporary_dir
+
+    temporary_dir="$(mktemp -d)"
+    trap 'rm -rf -- "$temporary_dir"' EXIT
+
+    info "checking latest Strawberry package for Ubuntu ${CODENAME}"
+    fetch_file "${STRAWBERRY_FILES_URL}/" "$temporary_dir/index.html" ||
+        die "failed downloading the Strawberry package index"
+
+    asset_name="$(
+        sed -n 's/.*href="\([^"]*\.deb\)".*/\1/p' "$temporary_dir/index.html" |
+            awk -v codename="$CODENAME" \
+                '$0 ~ ("^strawberry_[0-9]+(\\.[0-9]+)+-" codename "_amd64\\.deb$")' |
+            sort -V |
+            tail -n 1
+    )"
+    [[ -n "$asset_name" ]] ||
+        die "no stable Strawberry Debian package found for Ubuntu ${CODENAME} on amd64"
+
+    asset_version="${asset_name#strawberry_}"
+    asset_version="${asset_version%-"${CODENAME}"_amd64.deb}"
+    installed_version="$(dpkg-query -W -f='${Version}' strawberry 2>/dev/null || true)"
+    if [[ -n "$installed_version" ]] &&
+        dpkg --compare-versions "$installed_version" ge "$asset_version"; then
+        info "Strawberry ${installed_version} already installed, skipping"
+        return
+    fi
+
+    info "downloading Strawberry ${asset_version} for Ubuntu ${CODENAME}"
+    fetch_file "${STRAWBERRY_FILES_URL}/${asset_name}" "$temporary_dir/package.deb" ||
+        die "failed downloading Strawberry ${asset_version}"
+
+    checksum_name="$(
+        sed -n 's/.*href="\([^"]*\.sha256sum\)".*/\1/p' "$temporary_dir/index.html" |
+            awk -v expected="${asset_name}.sha256sum" '$0 == expected { print; exit }'
+    )"
+    if [[ -n "$checksum_name" ]]; then
+        fetch_file "${STRAWBERRY_FILES_URL}/${checksum_name}" "$temporary_dir/package.sha256sum" ||
+            die "failed downloading the Strawberry ${asset_version} checksum"
+
+        published_digest="$(awk 'NF { print $1; exit }' "$temporary_dir/package.sha256sum")"
+        [[ "$published_digest" =~ ^[[:xdigit:]]{64}$ ]] ||
+            die "invalid Strawberry ${asset_version} SHA-256 checksum"
+        actual_digest="$(sha256sum "$temporary_dir/package.deb")"
+        actual_digest="${actual_digest%% *}"
+        [[ "${actual_digest,,}" == "${published_digest,,}" ]] ||
+            die "SHA-256 verification failed for Strawberry ${asset_version}"
+    else
+        warn "Strawberry does not publish a SHA-256 checksum for ${asset_name}; relying on Debian package validation"
+    fi
+
+    install_debian_package "$temporary_dir/package.deb" "strawberry" "Strawberry"
+)
+
 install_balena_etcher() {
     install_latest_github_debian_package \
         "balena-io/etcher" \
@@ -4763,6 +4824,7 @@ main() {
         install_flatpak_package_array "Desktop Flatpak" "${FLATPAK_PACKAGES[@]}"
         configure_cryptomator_fuse_access
         install_chatgpt
+        install_strawberry
         install_balena_etcher
         install_rustdesk
         install_termius
