@@ -2333,6 +2333,21 @@ EOF
   [[ "$output" != *"unexpected full ChatGPT download"* ]]
 }
 
+@test "Clockify uses the official latest AMD64 Debian package" {
+  install_latest_url_debian_package() {
+    printf '<%s>\n' "$@"
+  }
+
+  CLOCKIFY_DEB_URL="https://clockify.me/downloads/Clockify_Setup_x64.deb"
+
+  run install_clockify
+
+  [[ "$status" -eq 0 ]]
+  [[ "$output" == *"<${CLOCKIFY_DEB_URL}>"* ]]
+  [[ "$output" == *"<clockify>"* ]]
+  [[ "$output" == *"<Clockify>"* ]]
+}
+
 @test "Strawberry selects the latest stable AMD64 package for the Ubuntu codename" {
   local install_record="$BATS_TEST_TMPDIR/strawberry-install"
 
