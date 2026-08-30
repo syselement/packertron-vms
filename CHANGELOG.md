@@ -1,3 +1,12 @@
+# [0.64.0](https://github.com/syselement/packertron-vms/compare/v0.63.0...v0.64.0) (2026-08-30)
+
+
+### Features
+
+* update dock favorites to include Termix ([d7ceb89](https://github.com/syselement/packertron-vms/commit/d7ceb89a35d8117642a5d53fac8fa3506c1527aa))
+
+
+
 # [0.63.0](https://github.com/syselement/packertron-vms/compare/v0.62.0...v0.63.0) (2026-08-23)
 
 
@@ -33,16 +42,6 @@
 
 * add balenaEtcher installation and update Termix handling in customization script ([35d2bce](https://github.com/syselement/packertron-vms/commit/35d2bcefd4653337124bef37e960c9d4b25cd034))
 * add MKVToolNix repository and related packages to customization script ([7cb280b](https://github.com/syselement/packertron-vms/commit/7cb280b090418bb53ee40eff40f84ed050090a10))
-
-
-
-# [0.59.0](https://github.com/syselement/packertron-vms/compare/v0.58.1...v0.59.0) (2026-08-16)
-
-
-### Features
-
-* add Smile complementary extension and update keyboard shortcuts ([5228eea](https://github.com/syselement/packertron-vms/commit/5228eea7595bc4554437cd9ad6f3be2ebc59c53e))
-* update dock favorites to include Claude and Typora ([b4b4160](https://github.com/syselement/packertron-vms/commit/b4b41607f7f04e5f515abeb6d4066cb9f4d735e4))
 
 
 
