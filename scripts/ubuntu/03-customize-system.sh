@@ -1557,7 +1557,7 @@ set_gsetting org.gnome.desktop.peripherals.touchpad natural-scroll "false"
 
 # Dock favorites
 set_gsetting org.gnome.shell favorite-apps \
-  "['org.gnome.Nautilus.desktop', 'brave-browser.desktop', 'com.anthropic.Claude.desktop', 'terminator.desktop', 'sublime_text.desktop', 'md.obsidian.Obsidian.desktop', 'typora.desktop', 'code.desktop']"
+  "['org.gnome.Nautilus.desktop', 'brave-browser.desktop', 'com.anthropic.Claude.desktop', 'terminator.desktop', 'com.karmaa.termix.desktop', 'sublime_text.desktop', 'md.obsidian.Obsidian.desktop', 'typora.desktop', 'code.desktop']"
 
 # Custom keyboard shortcuts. Existing entries are matched by name so their
 # customN paths may change without creating duplicates.
