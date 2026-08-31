@@ -1,3 +1,12 @@
+# [0.65.0](https://github.com/syselement/packertron-vms/compare/v0.64.0...v0.65.0) (2026-08-31)
+
+
+### Features
+
+* add support for user-level systemd services and update tests for Syncthing ([ec40b9a](https://github.com/syselement/packertron-vms/commit/ec40b9a85a5a046670951e1bc891a7ae6393e101))
+
+
+
 # [0.64.0](https://github.com/syselement/packertron-vms/compare/v0.63.0...v0.64.0) (2026-08-30)
 
 
@@ -32,16 +41,6 @@
 ### Features
 
 * add installation support for Yubico Authenticator and Zed in customization script ([0443b30](https://github.com/syselement/packertron-vms/commit/0443b30f4bd448566ff9b188a2ca6048ed605806))
-
-
-
-# [0.60.0](https://github.com/syselement/packertron-vms/compare/v0.59.0...v0.60.0) (2026-08-17)
-
-
-### Features
-
-* add balenaEtcher installation and update Termix handling in customization script ([35d2bce](https://github.com/syselement/packertron-vms/commit/35d2bcefd4653337124bef37e960c9d4b25cd034))
-* add MKVToolNix repository and related packages to customization script ([7cb280b](https://github.com/syselement/packertron-vms/commit/7cb280b090418bb53ee40eff40f84ed050090a10))
 
 
 
