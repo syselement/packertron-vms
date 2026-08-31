@@ -922,8 +922,8 @@ FAKE_GSETTINGS
 
 @test "Syncthing user service is enabled and started when the user manager is available" {
   local command_record="$BATS_TEST_TMPDIR/syncthing-systemctl-record"
-  TARGET_USER="testuser"
-  TARGET_UID="1000"
+  TARGET_USER="$(id -un)"
+  TARGET_UID="$(id -u)"
 
   command() {
     [[ "$1" == "-v" && "$2" == "systemctl" ]]
@@ -943,8 +943,13 @@ FAKE_GSETTINGS
 
 @test "Syncthing user service defers startup when the user manager is unavailable" {
   local command_record="$BATS_TEST_TMPDIR/syncthing-deferred-record"
-  TARGET_USER="testuser"
-  TARGET_UID="1000"
+  TARGET_USER="$(id -un)"
+  TARGET_UID="$(id -u)"
+  TARGET_GROUP="$(id -gn)"
+  TARGET_HOME="$BATS_TEST_TMPDIR/home"
+  SYSTEMD_USER_UNIT_DIR="$BATS_TEST_TMPDIR/usr/lib/systemd/user"
+  mkdir -p "$TARGET_HOME" "$SYSTEMD_USER_UNIT_DIR"
+  touch "$SYSTEMD_USER_UNIT_DIR/syncthing.service"
 
   command() {
     [[ "$1" == "-v" && "$2" == "systemctl" ]]
@@ -953,15 +958,20 @@ FAKE_GSETTINGS
     return 1
   }
   run_as_target_user() {
-    printf '%s\n' "$*" >>"$command_record"
+    "$@"
   }
 
   run configure_syncthing_service
 
   [[ "$status" -eq 0 ]]
   [[ "$output" == *"startup is deferred until login"* ]]
-  grep -Fq 'systemctl --user enable syncthing.service' "$command_record"
-  ! grep -Fq 'systemctl --user start syncthing.service' "$command_record"
+  [[ ! -e "$command_record" ]]
+  [[ "$(readlink -- "$TARGET_HOME/.config/systemd/user/default.target.wants/syncthing.service")" == "$SYSTEMD_USER_UNIT_DIR/syncthing.service" ]]
+
+  run configure_syncthing_service
+
+  [[ "$status" -eq 0 ]]
+  [[ "$(find "$TARGET_HOME/.config/systemd/user/default.target.wants" -type l | wc -l)" -eq 1 ]]
 }
 
 @test "Cryptomator FUSE configuration writes only the required rules and reloads AppArmor" {
