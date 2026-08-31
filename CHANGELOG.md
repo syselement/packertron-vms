@@ -1,3 +1,12 @@
+# [0.66.0](https://github.com/syselement/packertron-vms/compare/v0.65.0...v0.66.0) (2026-08-31)
+
+
+### Features
+
+* add run_as_target_user_in_home function and update tests for home directory context ([0a4fd51](https://github.com/syselement/packertron-vms/commit/0a4fd5191f3ee0ed0e62719c8217a0ef1bd91025))
+
+
+
 # [0.65.0](https://github.com/syselement/packertron-vms/compare/v0.64.0...v0.65.0) (2026-08-31)
 
 
@@ -32,15 +41,6 @@
 ### Features
 
 * add installation support for ChatGPT and update Obsidian release handling in customization script ([86d74bd](https://github.com/syselement/packertron-vms/commit/86d74bd0aa175114d9ddbb8d1888d97ee61be2a8))
-
-
-
-# [0.61.0](https://github.com/syselement/packertron-vms/compare/v0.60.0...v0.61.0) (2026-08-20)
-
-
-### Features
-
-* add installation support for Yubico Authenticator and Zed in customization script ([0443b30](https://github.com/syselement/packertron-vms/commit/0443b30f4bd448566ff9b188a2ca6048ed605806))
 
 
 
