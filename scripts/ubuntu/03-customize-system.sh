@@ -53,6 +53,7 @@ APT_SOURCES_DIR="${PACKERTRON_APT_SOURCES_DIR:-/etc/apt/sources.list.d}"
 APT_TRUSTED_KEY_DIR="${PACKERTRON_APT_TRUSTED_KEY_DIR:-/etc/apt/trusted.gpg.d}"
 SYSTEMD_RUNTIME_DIR="${PACKERTRON_SYSTEMD_RUNTIME_DIR:-/run/systemd/system}"
 SYSTEMD_CONFIG_DIR="${PACKERTRON_SYSTEMD_CONFIG_DIR:-/etc/systemd/system}"
+SYSTEMD_USER_UNIT_DIR="${PACKERTRON_SYSTEMD_USER_UNIT_DIR:-/usr/lib/systemd/user}"
 LOCAL_BIN_DIR="${PACKERTRON_LOCAL_BIN_DIR:-/usr/local/bin}"
 APPARMOR_PROFILE_DIR="${PACKERTRON_APPARMOR_PROFILE_DIR:-/etc/apparmor.d}"
 KVM_DEVICE="${PACKERTRON_KVM_DEVICE:-/dev/kvm}"
@@ -972,17 +973,42 @@ run_target_user_systemctl() {
         systemctl --user "$@"
 }
 
+enable_target_user_service_offline() {
+    local service_name="$1"
+    local unit_file="${SYSTEMD_USER_UNIT_DIR}/${service_name}"
+    local wants_directory="${TARGET_HOME}/.config/systemd/user/default.target.wants"
+    local wants_link="${wants_directory}/${service_name}"
+
+    [[ "$service_name" =~ ^[[:alnum:]_.@-]+\.service$ ]] ||
+        die "invalid target-user service name: ${service_name}"
+    [[ -f "$unit_file" ]] ||
+        die "target-user service unit is unavailable: ${unit_file}"
+
+    run_as_target_user mkdir -p -- "$wants_directory" ||
+        die "failed preparing target-user systemd configuration for ${TARGET_USER}"
+
+    if [[ -L "$wants_link" && "$(readlink -- "$wants_link")" == "$unit_file" ]]; then
+        return
+    fi
+    [[ ! -e "$wants_link" && ! -L "$wants_link" ]] ||
+        die "refusing to replace existing target-user service link: ${wants_link}"
+
+    run_as_target_user ln -s -- "$unit_file" "$wants_link" ||
+        die "failed enabling ${service_name} for ${TARGET_USER}"
+}
+
 configure_syncthing_service() {
     command -v systemctl >/dev/null 2>&1 ||
         die "systemctl is required to configure Syncthing"
 
-    run_target_user_systemctl enable syncthing.service ||
-        die "failed enabling Syncthing service for ${TARGET_USER}"
-
     if ! target_user_systemd_available; then
+        enable_target_user_service_offline syncthing.service
         warn "target user systemd manager is not running; Syncthing startup is deferred until login"
         return
     fi
+
+    run_target_user_systemctl enable syncthing.service ||
+        die "failed enabling Syncthing service for ${TARGET_USER}"
 
     run_target_user_systemctl start syncthing.service ||
         die "failed starting Syncthing service for ${TARGET_USER}"
