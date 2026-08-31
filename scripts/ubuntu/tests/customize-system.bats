@@ -1503,6 +1503,7 @@ CLAUDE
     cat >"$2" <<'INSTALLER'
 #!/usr/bin/env bash
 set -euo pipefail
+[[ "$PWD" == "$HOME" ]]
 mkdir -p "$HOME/.iximiuz/labctl/bin"
 cat >"$HOME/.iximiuz/labctl/bin/labctl" <<'LABCTL'
 #!/usr/bin/env bash
