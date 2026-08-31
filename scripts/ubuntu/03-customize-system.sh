@@ -317,6 +317,14 @@ run_as_target_user() {
         "$@"
 }
 
+run_as_target_user_in_home() {
+    (($# > 0)) || die "run_as_target_user_in_home requires a command"
+
+    # Expanded by the target user's Bash, after run_as_target_user sets HOME.
+    # shellcheck disable=SC2016
+    run_as_target_user bash -c 'cd -- "$HOME" && exec "$@"' bash "$@"
+}
+
 verify_target_ownership() {
     local description="$2"
     local path="$1"
@@ -3784,7 +3792,7 @@ install_labctl() (
     fi
     chown -R -- "$TARGET_USER:$TARGET_GROUP" "$install_root"
 
-    if ! run_as_target_user \
+    if ! run_as_target_user_in_home \
         timeout --foreground --kill-after=10s 10m \
         bash "$temporary_dir/install.sh" </dev/null; then
         die "labctl installation failed or timed out"
