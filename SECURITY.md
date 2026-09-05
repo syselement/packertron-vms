@@ -62,8 +62,25 @@ Not settable from a file - enable these in the GitHub UI:
 
 - Secret scanning, **and** push protection.
 - Dependabot alerts.
-- Require the `Template checks` and `Ubuntu static checks` workflows to pass
-  before merging to `main`.
+- A branch ruleset on `main` with **Restrict deletions**, **Block force
+  pushes** and **Require status checks to pass**.
+
+Required status checks match the *job* context, not the workflow name, so the
+two to add are:
+
+- `Ubuntu static checks`
+- `Template checks complete`
+
+`Template checks complete` is an aggregate job that depends on the others.
+Require it rather than the individual jobs: `packer` is a matrix and emits one
+context per template, so requiring those directly breaks the ruleset whenever a
+template is added or renamed, and a removed entry leaves a required check that
+can never report again.
+
+Do **not** require `Changelog CI`. It has no `pull_request` trigger, so it
+would never report and no PR could merge. It also pushes the release commit and
+tag straight to `main`, so if **Require a pull request before merging** is on,
+give the release actor a bypass entry or releases will stop.
 
 ## Reporting
 
