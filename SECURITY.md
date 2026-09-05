@@ -78,9 +78,42 @@ template is added or renamed, and a removed entry leaves a required check that
 can never report again.
 
 Do **not** require `Changelog CI`. It has no `pull_request` trigger, so it
-would never report and no PR could merge. It also pushes the release commit and
-tag straight to `main`, so if **Require a pull request before merging** is on,
-give the release actor a bypass entry or releases will stop.
+would never report and no PR could merge.
+
+### Letting the release through the ruleset
+
+`Changelog CI` pushes the version bump and tag straight to `main`. A ruleset
+enforces **Require status checks to pass** on direct pushes too, and the
+release commit is created on the runner, so it has no check runs and never can
+have. The push is rejected:
+
+```
+remote: - 2 of 2 required status checks are expected.
+```
+
+A push authenticated with the default `GITHUB_TOKEN` acts as
+`github-actions[bot]`, which is not a repository admin and so cannot bypass the
+rule. The workflow therefore uses a `RELEASE_TOKEN` secret:
+
+1. **Create a fine-grained PAT** — Settings → Developer settings → Personal
+   access tokens → Fine-grained tokens. Scope it to this repository only, with
+   **Repository permissions → Contents: Read and write**. Nothing else. Give it
+   the shortest expiry you are willing to renew.
+2. **Store it** as repository secret `RELEASE_TOKEN`.
+3. **Allow the bypass** — in the `main` ruleset, *Bypass list* → *Add bypass* →
+   **Repository admin**.
+
+The token is a real credential: it can write to this repository. Rotate it on
+expiry, and revoke it immediately if it leaks. If the secret is absent the
+workflow falls back to `GITHUB_TOKEN`, so a fork still runs and simply fails at
+the push step rather than at checkout.
+
+A tag can outlive a rejected push. `git push --follow-tags` sends tags and the
+branch separately, so a blocked release leaves an orphan tag pointing at a
+commit that is not on `main`; the next run then treats it as the last release
+and skips the bump. Check with `git ls-remote --tags origin` after any failed
+release, and delete the stray tag with
+`git push origin :refs/tags/vX.Y.Z`.
 
 ## Reporting
 

@@ -43,13 +43,28 @@ jobs:
     steps:
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
       # Actions are pinned to commits rather than tags; Dependabot keeps them current.
+      #
+      # RELEASE_TOKEN, not GITHUB_TOKEN. The branch ruleset on main requires
+      # status checks, and a ruleset enforces that on direct pushes as well as
+      # on pull requests. The release commit is created here on the runner, so
+      # it has no check runs and never can have: the push is rejected with
+      # "2 of 2 required status checks are expected".
+      #
+      # A push authenticated as github-actions[bot] cannot bypass that, because
+      # the bot is not a repository admin. RELEASE_TOKEN is a fine-grained PAT
+      # belonging to the repository owner, so the push is attributed to a user
+      # holding the admin role, which the ruleset bypass list allows.
+      #
+      # The fallback keeps forks and any clone without the secret working: they
+      # simply fail at the push step instead of at checkout.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
+          token: ${{ secrets.RELEASE_TOKEN || secrets.GITHUB_TOKEN }}
       - name: "✏️ Conventional Changelog Action"
         uses: TriPSs/conventional-changelog-action@469f0e5e35831fbd1962706f29f65daf0a5723f2 # v6.5.0
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          github-token: ${{ secrets.RELEASE_TOKEN || secrets.GITHUB_TOKEN }}
           skip-git-pull: "true"
           version-file: 'version.yaml'
           version-path: 'version'
