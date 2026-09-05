@@ -14,10 +14,12 @@ crash.log
 *.ffs_db
 
 # Temporary files and directories
+# Deliberately NOT *tmp* / *temp*: those substring globs match any path
+# containing "temp", which in a repository full of *template* files silently
+# swallows real content. They already dropped a workflow named
+# template-checks.yml from a commit without reporting anything.
 *.tmp
 *.temp
-*tmp*
-*temp*
 tmp/
 temp/
 
