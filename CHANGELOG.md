@@ -1,3 +1,12 @@
+# [0.67.0](https://github.com/syselement/packertron-vms/compare/v0.66.0...v0.67.0) (2026-09-05)
+
+
+### Features
+
+* add run_as_target_user_in_home function and update tests for home directory context ([f362356](https://github.com/syselement/packertron-vms/commit/f362356efba3d266332d863d4366ee819fc9d7fc))
+
+
+
 # [0.66.0](https://github.com/syselement/packertron-vms/compare/v0.65.0...v0.66.0) (2026-08-31)
 
 
@@ -32,15 +41,6 @@
 
 * add installation support for Clockify ([4c0f176](https://github.com/syselement/packertron-vms/commit/4c0f176fe137238d8ad18a02d8ad614bdc0172e2))
 * add installation support for Strawberry Music Player and related tests, inxi and hardinfo2 tools ([5ac3d4d](https://github.com/syselement/packertron-vms/commit/5ac3d4d124fbf5eb75a40d864d008c5c0e871919))
-
-
-
-# [0.62.0](https://github.com/syselement/packertron-vms/compare/v0.61.0...v0.62.0) (2026-08-22)
-
-
-### Features
-
-* add installation support for ChatGPT and update Obsidian release handling in customization script ([86d74bd](https://github.com/syselement/packertron-vms/commit/86d74bd0aa175114d9ddbb8d1888d97ee61be2a8))
 
 
 
