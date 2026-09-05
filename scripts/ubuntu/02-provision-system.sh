@@ -602,8 +602,8 @@ main() {
     ok "System provisioning complete"
 
     if [[ "$REBOOT_AT_END" == "true" ]]; then
-        info "rebooting in 5 seconds"
-        sleep 5
+        info "rebooting in 10 seconds"
+        sleep 10
         sync
         shutdown -r now
     else
