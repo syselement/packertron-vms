@@ -29,6 +29,8 @@ run_apt_get() {
         -o Acquire::Retries=3 \
         -o Acquire::http::Timeout=30 \
         -o Acquire::https::Timeout=30 \
+        -o Dpkg::Options::=--force-confdef \
+        -o Dpkg::Options::=--force-confold \
         "$@"
 }
 
