@@ -81,32 +81,37 @@ variable "vm_name" {
 
 # Source block
 source "vmware-iso" "winsrv2025" {
-  boot_command     = ["<spacebar>"]
-  boot_wait        = "2s"
-  communicator     = "ssh"
-  cpus             = var.vm_cpu_cores
-  disk_size        = var.vm_disk_size
-  disk_type_id     = "0"
-  floppy_files     = ["config/autounattend.xml","${path.root}/../scripts/windows/packer_shutdown.bat"]
-  guest_os_type    = "windows2022srvnext-64"
-  headless         = false
-  iso_checksum     = var.iso_checksum
-  iso_url          = var.iso_url
-  memory           = var.vm_memory
-  shutdown_command = "A:/packer_shutdown.bat" 
-  shutdown_timeout = "30m"
-  skip_compaction  = false
-  version            = "21" # https://knowledge.broadcom.com/external/article?articleNumber=315655
-  vm_name          = var.vm_name
+  boot_command  = ["<spacebar>"]
+  boot_wait     = "2s"
+  communicator  = "ssh"
+  cpus          = var.vm_cpu_cores
+  disk_size     = var.vm_disk_size
+  disk_type_id  = "0"
+  floppy_files  = ["config/autounattend.xml", "${path.root}/../scripts/windows/packer_shutdown.bat"]
+  guest_os_type = "windows2022srvnext-64"
+  headless      = false
+  iso_checksum  = var.iso_checksum
+  iso_url       = var.iso_url
+  memory        = var.vm_memory
+  # Required since packer-plugin-vmware v2.1.6; builds fail validation without it.
+  # e1000e rather than the vmxnet3 used by the Ubuntu templates: vmxnet3 needs
+  # drivers that VMware Tools supplies, which Windows setup does not have yet,
+  # so an unattended install would come up with no network adapter.
+  network_adapter_type = "e1000e"
+  shutdown_command     = "A:/packer_shutdown.bat"
+  shutdown_timeout     = "30m"
+  skip_compaction      = false
+  version              = "21" # https://knowledge.broadcom.com/external/article?articleNumber=315655
+  vm_name              = var.vm_name
   vmx_data = {
-    firmware            = "efi"
-    "scsi0.virtualDev"  = "lsisas1068" # Autounattend requires SCSI hard disk controller to be LSI Logic SAS
+    firmware                       = "efi"
+    "scsi0.virtualDev"             = "lsisas1068" # Autounattend requires SCSI hard disk controller to be LSI Logic SAS
     "isolation.tools.hgfs.disable" = "TRUE"
   }
-  ssh_password     = var.ssh_password
-  ssh_port         = 22
-  ssh_timeout      = "30m"
-  ssh_username     = var.ssh_username
+  ssh_password = var.ssh_password
+  ssh_port     = 22
+  ssh_timeout  = "30m"
+  ssh_username = var.ssh_username
 }
 
 # -------------------------------------------------
@@ -126,7 +131,7 @@ build {
 
   # Copy unattend.xml to the VM for the final sysprep shutdown step in the packer_shutdown.bat script
   provisioner "file" {
-    source = "config/unattend.xml"
+    source      = "config/unattend.xml"
     destination = "C:/Windows/Panther/unattend.xml"
   }
 
@@ -136,12 +141,12 @@ build {
   }
 
   provisioner "file" {
-    source = "${path.root}/../scripts/windows/04_startup.cmd"
+    source      = "${path.root}/../scripts/windows/04_startup.cmd"
     destination = "c:/tmp/startup.cmd"
   }
 
   provisioner "file" {
-    source = "${path.root}/../scripts/windows/04_startup.ps1"
+    source      = "${path.root}/../scripts/windows/04_startup.ps1"
     destination = "c:/tmp/startup.ps1"
   }
 

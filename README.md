@@ -262,11 +262,19 @@ Pull requests and improvements are welcome! Ensure your code follows the repo’
 ## 🌍 Future Roadmap
 
 - [ ] Proxmox support
+    - [ ] Templates from the official Ubuntu cloud image, plus an ISO +
+      autoinstall path for parity with the bare-metal install
+    - [ ] Provisioning at first boot per VM, through the existing
+      `packertron-firstboot` service, so templates stay thin and every VM
+      picks up current scripts
+    - [ ] Credentials from the environment (`PROXMOX_VE_*` /
+      `PKR_VAR_proxmox_api_token_*`) - never committed, never KeePass
+- [ ] OpenTofu layer to create and manage the VMs cloned from those templates
 - [ ] O.S Packer builds:
     - [ ] Win11
-    - [ ] Ubuntu Server
-    - [x] Ubuntu Desktop
-    - [ ] Kali Linux
+    - [x] Ubuntu Server (24.04 and 26.04)
+    - [x] Ubuntu Desktop (24.04 and 26.04)
+    - [ ] Kali Linux - template validates, but still needs `http/kali.preseed`
 - [ ] Integration with **Ansible** for advanced provisioning
 
 ---

@@ -1,0 +1,25 @@
+# gitleaks configuration.
+#
+# Start from the upstream ruleset and narrow it in exactly one place.
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = """
+The autoinstall seeds commit a SHA-512 crypt hash for the initial user. That
+is deliberate and unavoidable for an unattended install: subiquity needs the
+hash at install time, before anything exists to fetch a secret from.
+
+Treat it as public. The plaintext is documented in the seed files, so every
+machine built from this repository starts with the same known console
+password, and the same seeds grant that user NOPASSWD sudo. These images are
+for a lab; do not expose one to an untrusted network without changing the
+password first.
+
+Only the crypt-hash pattern is allowlisted, not the files that carry it, so a
+real credential added to those same files is still reported.
+"""
+regexes = [
+  '''\$6\$[./A-Za-z0-9]{1,32}\$[./A-Za-z0-9]{20,}''',
+]

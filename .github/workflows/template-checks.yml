@@ -1,0 +1,141 @@
+name: Template checks
+
+# Everything outside scripts/ubuntu/ had no CI at all, which is how four
+# templates ended up unable to build and a cloud-init seed ended up holding
+# four concatenated documents. This validates the Packer HCL and the
+# cloud-init seeds, and scans the tree for committed secrets.
+
+on:
+  pull_request:
+    paths:
+      - "**/*.pkr.hcl"
+      - "**/*.pkrvars.hcl"
+      - "**/http/user-data"
+      - "**/http/meta-data"
+      - "scripts/ubuntu/autoinstall-*.yaml"
+      - ".github/workflows/template-checks.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "**/*.pkr.hcl"
+      - "**/*.pkrvars.hcl"
+      - "**/http/user-data"
+      - "**/http/meta-data"
+      - "scripts/ubuntu/autoinstall-*.yaml"
+      - ".github/workflows/template-checks.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  packer:
+    name: "packer: ${{ matrix.template }}"
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        # win-11 is deliberately absent: its build block is still unrepaired
+        # (sources. instead of source.) and it depends on a KeePass database
+        # that is not in this repository. Add it here in the same change that
+        # fixes it.
+        template:
+          - kali
+          - ubuntu-24.04-x64-desktop
+          - ubuntu-26.04-x64-desktop
+          - ubuntu-24.04-x64-server
+          - ubuntu-26.04-x64-server
+          - win-srv-2025
+
+    steps:
+      # Actions are pinned to commits rather than tags; Dependabot keeps them current.
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Install Packer
+        uses: hashicorp/setup-packer@ce93c3c08a6c2ff2275bf4b54ff0d9a75f6c9789 # v3.4.0
+        with:
+          version: "latest"
+
+      - name: Install plugins
+        working-directory: ${{ matrix.template }}
+        run: packer init .
+
+      - name: Check formatting
+        working-directory: ${{ matrix.template }}
+        run: packer fmt -check -diff .
+
+      - name: Validate
+        working-directory: ${{ matrix.template }}
+        # The Proxmox builder refuses to validate without a username and a
+        # token, so the credential-shaped variables get obvious throwaway
+        # values here. They are never used to reach a real node: validate does
+        # not contact the API. Templates that declare no such variables ignore
+        # these flags.
+        run: |
+          if grep -q 'proxmox-iso' ./*.pkr.hcl; then
+            packer validate \
+              -var 'proxmox_api_token_id=ci@pve!ci' \
+              -var 'proxmox_api_token_secret=ci-not-a-real-secret' \
+              -var 'ssh_password=ci-not-a-real-secret' \
+              .
+          else
+            packer validate .
+          fi
+
+  cloud-init:
+    name: cloud-init schema
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Install cloud-init
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends cloud-init
+
+      - name: Validate every seed file
+        run: |
+          status=0
+          # shellcheck disable=SC2044
+          for file in scripts/ubuntu/autoinstall-*.yaml */http/user-data; do
+            [ -f "$file" ] || continue
+
+            # cloud-init reads the first document and silently ignores the
+            # rest, so a second one is dead text that looks live. Catch it.
+            documents=$(grep -c '^#cloud-config' "$file" || true)
+            if [ "$documents" -gt 1 ]; then
+              printf '%s: %s #cloud-config documents; only the first is read\n' \
+                "$file" "$documents" >&2
+              status=1
+            fi
+
+            printf '== %s\n' "$file"
+            sudo cloud-init schema --config-file "$file" --annotate || status=1
+          done
+          exit "$status"
+
+  secrets:
+    name: Secret scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          # gitleaks scans history, so it needs all of it.
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Run gitleaks
+        uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

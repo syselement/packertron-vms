@@ -8,7 +8,7 @@
 # https://canonical-subiquity.readthedocs-hosted.com/en/latest/reference/autoinstall-reference.html
 #
 # This file is used by cloud-init to perform an unattended installation of
-# Ubuntu 24.04 Server, served over HTTP by the Packer vmware-iso build in this
+# Ubuntu 26.04 Server, served over HTTP by the Packer vmware-iso build in this
 # directory.
 #
 # Customize username, password, timezone, keyboard layout, ssh authorized keys and other settings as needed.
@@ -45,7 +45,7 @@ autoinstall:
   # or
   #   mkpasswd -m sha-512 packer
   identity:
-    hostname: sysubsrv
+    hostname: sysubsrv26
     username: syselement
     password: "$6$OxXY0.ndy/Q1c4mU$A6QNNCNXD24WVyJXm5gpHd5tq7tjLhJKAf1wAoG0yjsFdO0vFCs02JBtKRUqT0ivHXDdzFtKhs66jvL/x0rKM1"
 

@@ -14,9 +14,36 @@ crash.log
 *.ffs_db
 
 # Temporary files and directories
+# Deliberately NOT *tmp* / *temp*: those substring globs match any path
+# containing "temp", which in a repository full of *template* files silently
+# swallows real content. They already dropped a workflow named
+# template-checks.yml from a commit without reporting anything.
 *.tmp
 *.temp
-*tmp*
-*temp*
 tmp/
 temp/
+
+# Secrets and credentials
+# The tracked *.auto.pkrvars.hcl files hold ISO URLs and checksums only. Keep
+# anything sensitive in a *.local.pkrvars.hcl beside them, or in the
+# environment (PROXMOX_VE_*), so it can never be committed by accident.
+*.local.pkrvars.hcl
+*secret*.pkrvars.hcl
+*.tfvars
+*.kdbx
+.env
+.env.*
+*.pem
+*.key
+*_rsa
+*_ed25519
+
+# OpenTofu / Terraform state
+.terraform/
+.terraform.lock.hcl
+*.tfstate
+*.tfstate.*
+
+# Packer logs
+packer.log
+*.packer.log

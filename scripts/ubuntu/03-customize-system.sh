@@ -2295,7 +2295,7 @@ update_scope = sys.argv[2]
 bashrc = home / ".bashrc"
 aliases_path = home / ".bash_aliases"
 
-aliases = r'''# $HOME/.bash_aliases — centralized interactive aliases
+aliases = r'''# $HOME/.bash_aliases - centralized interactive aliases
 
 # System update
 @UPDATEOS_ALIAS@
