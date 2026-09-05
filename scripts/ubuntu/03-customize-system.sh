@@ -31,6 +31,8 @@ SCRIPT_DIR="$(
 . "$SCRIPT_DIR/lib/apt.sh"
 # shellcheck source=lib/download.sh
 . "$SCRIPT_DIR/lib/download.sh"
+# shellcheck source=lib/logging.sh
+. "$SCRIPT_DIR/lib/logging.sh"
 # shellcheck source=lib/custom-tools.sh
 . "$SCRIPT_DIR/lib/custom-tools.sh"
 
@@ -239,11 +241,9 @@ initialize_runtime() {
         t_reset=$'\e[0m'
     fi
     install -m 0600 /dev/null "$LOG_FILE"
-    # The log file drops ANSI escapes, and keeps only the final state of a
-    # carriage-return redrawn line. dpkg and curl repaint progress with \r, so
-    # without the second expression every intermediate percentage is appended
-    # to the log. The console still shows progress live.
-    exec > >(tee >(sed -u -r -e 's/\x1B\[[0-9;]*[[:alpha:]]//g' -e 's/.*\r//' >"$LOG_FILE")) 2>&1
+    # The console keeps live progress; the log file gets the filtered
+    # transcript. See lib/logging.sh for what is stripped and why.
+    exec > >(tee >(filter_log_output >"$LOG_FILE")) 2>&1
 
     initialize_ubuntu_context
     USER_NAME="$TARGET_USER"

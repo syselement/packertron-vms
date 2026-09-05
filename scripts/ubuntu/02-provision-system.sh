@@ -22,6 +22,8 @@ SCRIPT_DIR="$(
 . "$SCRIPT_DIR/lib/apt.sh"
 # shellcheck source=lib/download.sh
 . "$SCRIPT_DIR/lib/download.sh"
+# shellcheck source=lib/logging.sh
+. "$SCRIPT_DIR/lib/logging.sh"
 
 SCRIPT_NAME="provision-system"
 LOG_PREFIX="[${SCRIPT_NAME}]"
@@ -521,7 +523,9 @@ main() {
 
     install -m 0600 /dev/null "$LOG_FILE"
 
-    exec > >(tee >(sed -u -r -e 's/\x1B\[[0-9;]*[[:alpha:]]//g' -e 's/.*\r//' >"$LOG_FILE")) 2>&1
+    # The console keeps live progress; the log file gets the filtered
+    # transcript. See lib/logging.sh for what is stripped and why.
+    exec > >(tee >(filter_log_output >"$LOG_FILE")) 2>&1
 
     printf '%s\n' "################################"
     printf '%s\n' "# Provision System"
