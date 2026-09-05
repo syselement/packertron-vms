@@ -27,6 +27,8 @@ SCRIPT_DIR="$(
 . "$SCRIPT_DIR/lib/ubuntu-context.sh"
 # shellcheck source=lib/apt-transaction.sh
 . "$SCRIPT_DIR/lib/apt-transaction.sh"
+# shellcheck source=lib/custom-tools.sh
+. "$SCRIPT_DIR/lib/custom-tools.sh"
 
 # -----------------------------------------------------------------------------
 # Configuration and package manifests
@@ -592,63 +594,6 @@ install_debian_package() {
     fi
     ok "${description} ${installed_version} installed"
 }
-
-install_downloaded_debian_package() (
-    set -Eeuo pipefail
-
-    local url="$1"
-    local package_name="$2"
-    local description="$3"
-    local temporary_dir
-
-    temporary_dir="$(mktemp -d)"
-    trap 'rm -rf -- "$temporary_dir"' EXIT
-
-    info "downloading ${description}"
-    fetch_file "$url" "$temporary_dir/package.deb" ||
-        die "failed downloading ${description}"
-    install_debian_package "$temporary_dir/package.deb" "$package_name" "$description"
-)
-
-install_latest_github_debian_package() (
-    set -Eeuo pipefail
-
-    local repository="$1"
-    local asset_suffix="$2"
-    local package_name="$3"
-    local description="$4"
-    local installed_version release_tag release_version
-    local temporary_dir
-
-    temporary_dir="$(mktemp -d)"
-    trap 'rm -rf -- "$temporary_dir"' EXIT
-
-    info "checking latest ${description} GitHub release"
-    fetch_latest_github_release_metadata \
-        "$repository" \
-        "$temporary_dir/release.json" \
-        "$description"
-    release_tag="$(jq -r '.tag_name // empty' "$temporary_dir/release.json")"
-    release_version="${release_tag#v}"
-    [[ "$release_version" =~ ^[0-9]+(\.[0-9]+)+$ ]] ||
-        die "unexpected ${description} release tag: ${release_tag:-missing}"
-
-    installed_version="$(dpkg-query -W -f='${Version}' "$package_name" 2>/dev/null || true)"
-    if [[ -n "$installed_version" ]] &&
-        dpkg --compare-versions "$installed_version" ge "$release_version"; then
-        info "${description} ${installed_version} already matches latest release ${release_version}, skipping download"
-        return
-    fi
-
-    info "downloading ${description} package"
-    fetch_github_asset_from_metadata \
-        "suffix" \
-        "$asset_suffix" \
-        "$temporary_dir/package.deb" \
-        "$temporary_dir/release.json" \
-        "${description} package"
-    install_debian_package "$temporary_dir/package.deb" "$package_name" "$description"
-)
 
 install_kubectl() (
     set -Eeuo pipefail
@@ -2655,50 +2600,6 @@ install_termius() {
         "Termius"
 }
 
-install_latest_url_debian_package() (
-    set -Eeuo pipefail
-
-    local url="$1"
-    local expected_package="$2"
-    local description="$3"
-    local control_data installed_version package_architecture package_name package_version
-    local temporary_dir
-
-    temporary_dir="$(mktemp -d)"
-    trap 'rm -rf -- "$temporary_dir"' EXIT
-
-    installed_version="$(dpkg-query -W -f='${Version}' "$expected_package" 2>/dev/null || true)"
-    if [[ -n "$installed_version" ]]; then
-        info "checking latest ${description} version"
-        fetch_file_range "$url" "0-65535" "$temporary_dir/package-prefix.deb" ||
-            die "failed checking latest ${description} version"
-        control_data="$(
-            ar p "$temporary_dir/package-prefix.deb" control.tar.xz 2>/dev/null |
-                tar -xJOf - ./control 2>/dev/null
-        )" || die "could not read the latest ${description} package metadata"
-        package_name="$(awk -F ': ' '$1 == "Package" { print $2; exit }' <<<"$control_data")"
-        package_version="$(awk -F ': ' '$1 == "Version" { print $2; exit }' <<<"$control_data")"
-        package_architecture="$(awk -F ': ' '$1 == "Architecture" { print $2; exit }' <<<"$control_data")"
-
-        [[ "$package_name" == "$expected_package" ]] ||
-            die "unexpected ${description} package name: ${package_name:-missing}"
-        [[ "$package_architecture" == "amd64" ]] ||
-            die "unexpected ${description} package architecture: ${package_architecture:-missing}"
-        [[ -n "$package_version" ]] ||
-            die "latest ${description} package does not declare a version"
-
-        if dpkg --compare-versions "$installed_version" ge "$package_version"; then
-            info "${description} ${installed_version} already installed, skipping"
-            return
-        fi
-    fi
-
-    install_downloaded_debian_package \
-        "$url" \
-        "$expected_package" \
-        "$description"
-)
-
 install_chatgpt() {
     install_latest_url_debian_package "$CHATGPT_DEB_URL" "chatgpt" "ChatGPT"
 }
@@ -3182,41 +3083,6 @@ EOF
             warn "default terminal configuration not implemented for Ubuntu ${VERSION_ID}"
             ;;
     esac
-}
-
-install_snap_package() {
-    local snap_name="$1"
-    local display_name="$2"
-
-    if ! command -v snap >/dev/null 2>&1; then
-        warn "snap command not found; cannot install ${display_name}"
-        return 0
-    fi
-
-    if snap list "$snap_name" >/dev/null 2>&1; then
-        info "${display_name} snap already installed, skipping"
-        return 0
-    fi
-
-    if ! snap install "$snap_name"; then
-        die "failed installing ${display_name} snap (${snap_name})"
-    fi
-    ok "${display_name} snap installed"
-}
-
-connect_snap_interface() {
-    local connection="$1"
-    local description="$2"
-
-    if ! command -v snap >/dev/null 2>&1; then
-        return 0
-    fi
-
-    if snap connect "$connection" >/dev/null 2>&1; then
-        info "${description} interface connected"
-    else
-        warn "could not connect ${description} interface (${connection})"
-    fi
 }
 
 install_flameshot() (
