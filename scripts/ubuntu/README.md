@@ -17,7 +17,9 @@ The set covers:
 
 - Set `TARGET_USER` explicitly when an automated root run has more than one eligible local user.
 
-`02-provision-system.sh` and `03-customize-system.sh` share `lib/apt.sh` (one hardened `run_apt_get` with dpkg lock timeout, acquire retries, network timeouts and noninteractive conffile handling) and `lib/download.sh` (`fetch_file` with an outer retry loop and stall detection, plus `fetch_file_range` for reading package metadata without a full download).
+`02-provision-system.sh` and `03-customize-system.sh` share `lib/apt.sh` (one hardened `run_apt_get` with dpkg lock timeout, acquire retries, network timeouts and noninteractive conffile handling), `lib/download.sh` (`fetch_file` with an outer retry loop and stall detection, plus `fetch_file_range` for reading package metadata without a full download) and `lib/logging.sh` (`filter_log_output`, which turns the live console stream into the readable log-file transcript).
+
+- The console always shows progress live; only the log file is filtered. `filter_log_output` drops ANSI escapes and keeps just the final state of a carriage-return redrawn line, so a dpkg or curl progress meter contributes one line instead of hundreds — and contributes none at all when it never printed anything but percentages.
 
 `03-customize-system.sh` also sources `lib/custom-tools.sh`, which holds every third-party and custom tool installer grouped by how the tool is distributed (APT repository, direct `.deb` URL, GitHub release, Snap, vendor install script, archive, checksum-verified binary, pipx). **Add new tools there, following the template comment on the matching section.**
 
