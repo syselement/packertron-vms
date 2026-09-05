@@ -7,8 +7,8 @@
   repo-wide files are all in play.
 - Changes outside `scripts/ubuntu/` still have to clear the same bar. Packer
   HCL and cloud-init seeds are checked by
-  `.github/workflows/template-checks.yml`; run `packer fmt -check`,
-  `packer validate` and `cloud-init schema` locally before committing.
+  `.github/workflows/template-checks.yml`; run `scripts/check-templates.sh`
+  before committing, which runs those same checks locally.
 - Keep the guest-provisioning scripts hypervisor-agnostic. VMware, Proxmox and
   bare metal all run the same `00`/`01`/`02`/`03`, and that is what makes the
   Proxmox work cheap.
