@@ -1,3 +1,20 @@
+# [0.68.0](https://github.com/syselement/packertron-vms/compare/v0.67.3...v0.68.0) (2026-09-05)
+
+
+### Bug Fixes
+
+* **packer:** make the Kali template validate, without KeePass ([756e254](https://github.com/syselement/packertron-vms/commit/756e254648f1454f192f6b81a020107394b0118a))
+* **packer:** make the Ubuntu templates validate again ([5e9f6b7](https://github.com/syselement/packertron-vms/commit/5e9f6b747ba291415f1e3d5dd8117917fd78a011))
+* **packer:** make the Windows Server 2025 template validate ([f69cc9e](https://github.com/syselement/packertron-vms/commit/f69cc9eddc27996ba24ec8cf4b052c8f5ab0310d))
+* update comment formatting in .bash_aliases ([4fd13e7](https://github.com/syselement/packertron-vms/commit/4fd13e74d4d490b07760e9e5ddac2c04f9f15d2b))
+
+
+### Features
+
+* **packer:** add an Ubuntu Server 26.04 template ([975d403](https://github.com/syselement/packertron-vms/commit/975d403a06941ba10730104ab4f7df664eb151a0))
+
+
+
 ## [0.67.3](https://github.com/syselement/packertron-vms/compare/v0.67.2...v0.67.3) (2026-09-05)
 
 
@@ -40,15 +57,6 @@
 ### Features
 
 * add run_as_target_user_in_home function and update tests for home directory context ([f362356](https://github.com/syselement/packertron-vms/commit/f362356efba3d266332d863d4366ee819fc9d7fc))
-
-
-
-# [0.66.0](https://github.com/syselement/packertron-vms/compare/v0.65.0...v0.66.0) (2026-08-31)
-
-
-### Features
-
-* add run_as_target_user_in_home function and update tests for home directory context ([0a4fd51](https://github.com/syselement/packertron-vms/commit/0a4fd5191f3ee0ed0e62719c8217a0ef1bd91025))
 
 
 
