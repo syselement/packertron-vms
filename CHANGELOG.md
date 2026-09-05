@@ -1,3 +1,17 @@
+# [0.69.0](https://github.com/syselement/packertron-vms/compare/v0.68.1...v0.69.0) (2026-09-05)
+
+
+### Bug Fixes
+
+* **ci:** push releases with a token that the ruleset lets through ([338c9c3](https://github.com/syselement/packertron-vms/commit/338c9c3d4f584c1fad01b35363175a5de1db10bc))
+
+
+### Features
+
+* **scripts:** add check-templates.sh to run the CI checks locally ([d83041e](https://github.com/syselement/packertron-vms/commit/d83041efa59d01f528212493f1ea14257aec96bb))
+
+
+
 ## [0.68.1](https://github.com/syselement/packertron-vms/compare/v0.68.0...v0.68.1) (2026-09-05)
 
 
@@ -46,17 +60,6 @@
 * **ubuntu:** repair bare-metal bootstrap safety defects ([c07ef45](https://github.com/syselement/packertron-vms/commit/c07ef45526fd3d72f8faf6ee89a24d9094c2ae98))
 * **ubuntu:** stop dpkg conffile prompts and harden 01-cleanup-system ([f786cd5](https://github.com/syselement/packertron-vms/commit/f786cd5e9acd8b977d539284538c282edb7dc696))
 * **ubuntu:** stop dpkg progress meters filling the logs with blank lines ([14bf071](https://github.com/syselement/packertron-vms/commit/14bf071850b4202d7ee0f44cbedbaa8a056d1a3e))
-
-
-
-## [0.67.1](https://github.com/syselement/packertron-vms/compare/v0.67.0...v0.67.1) (2026-09-05)
-
-
-### Bug Fixes
-
-* **logging:** remove redundant comments and improve log file handling ([082fcdb](https://github.com/syselement/packertron-vms/commit/082fcdb0dd778da5908c7ef4793281744478abc2))
-* **ubuntu:** detect interactivity before stdout is redirected, tidy log output ([84b4780](https://github.com/syselement/packertron-vms/commit/84b478030ed17f7b9763855cabb7bb5a7847ef43))
-* **ubuntu:** stop Termius and Yubico downloading before checking versions ([bc0d588](https://github.com/syselement/packertron-vms/commit/bc0d5883aad9a92df0efdce91048d38f554116ff))
 
 
 
