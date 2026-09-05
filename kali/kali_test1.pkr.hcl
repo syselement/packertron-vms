@@ -1,10 +1,19 @@
-# Source: https://github.com/mttaggart/seclab/blob/main/Packer/kali/config.pkr.hcl
-# This file is used to configure the Packer build for Kali Linux.
-
-# Packer configuration file for Kali Linux
-
-# TO DO
-
+// Kali Linux template for Proxmox.
+// Adapted from https://github.com/mttaggart/seclab (Packer/kali/config.pkr.hcl).
+//
+// STATUS: stub. This parses, formats and validates, but it does not build yet:
+// http/kali.preseed does not exist, so the boot_command below has nothing to
+// fetch. Producing that seed is Proxmox-phase work.
+//
+// Credentials come from the environment, never from a file in this repository:
+//
+//   export PKR_VAR_proxmox_api_token_id="packer@pve!templates"
+//   export PKR_VAR_proxmox_api_token_secret="..."
+//   export PKR_VAR_ssh_password="..."
+//
+// The upstream template read these from a KeePass database two directories up.
+// That file is not part of this repository, which meant the template could not
+// even be validated, let alone built, by anyone cloning it.
 
 packer {
   required_plugins {
@@ -15,26 +24,6 @@ packer {
   }
 }
 
-variable "keepass_database" {
-  type = string
-  default = "../../seclab.kdbx"
-}
-
-variable "keepass_password" {
-  type = string
-  sensitive = true
-}
-
-variable "ca_cert_path" {
-  type = string
-  default = "../../pki/ca.crt"
-}
-
-data "keepass-credentials" "kpxc" {
-  keepass_file = "${var.keepass_database}"
-  keepass_password = "${var.keepass_password}"
-}
-
 variable "hostname" {
   type    = string
   default = "kali"
@@ -43,6 +32,20 @@ variable "hostname" {
 variable "proxmox_api_host" {
   type    = string
   default = "proxmox"
+}
+
+variable "proxmox_api_token_id" {
+  type        = string
+  description = "Proxmox API token id, as user@realm!tokenname"
+  sensitive   = true
+  default     = ""
+}
+
+variable "proxmox_api_token_secret" {
+  type        = string
+  description = "Proxmox API token secret"
+  sensitive   = true
+  default     = ""
 }
 
 variable "proxmox_node" {
@@ -65,51 +68,62 @@ variable "network_adapter" {
   default = "vmbr1"
 }
 
-locals {
-  username          = data.keepass-credentials.kpxc.map["/Passwords/Seclab/seclab_user-UserName"]
-  password          = data.keepass-credentials.kpxc.map["/Passwords/Seclab/seclab_user-Password"]
-  proxmox_api_id    = data.keepass-credentials.kpxc.map["/Passwords/Seclab/proxmox_api-UserName"]
-  proxmox_api_token = data.keepass-credentials.kpxc.map["/Passwords/Seclab/proxmox_api-Password"]
+variable "ssh_username" {
+  type    = string
+  default = "kali"
 }
 
+variable "ssh_password" {
+  type      = string
+  sensitive = true
+  default   = ""
+}
+
+variable "insecure_skip_tls_verify" {
+  type        = bool
+  description = "Skip Proxmox API certificate verification. Leave false unless the node uses a self-signed certificate you have chosen to accept."
+  default     = false
+}
 
 source "proxmox-iso" "seclab-kali" {
   proxmox_url = "https://${var.proxmox_api_host}:8006/api2/json"
-  node        = "${var.proxmox_node}"
-  username    = "${local.proxmox_api_id}"
-  token       = "${local.proxmox_api_token}"
+  node        = var.proxmox_node
+  username    = var.proxmox_api_token_id
+  token       = var.proxmox_api_token_secret
+
   boot_iso {
     type         = "ide"
-    iso_file     = "${iso_storage}:iso/kali.iso"
+    iso_file     = "${var.iso_storage}:iso/kali.iso"
     iso_checksum = "sha256:0b0f5560c21bcc1ee2b1fef2d8e21dca99cc6efa938a47108bbba63bec499779"
     unmount      = true
-
   }
-  ssh_username             = "${local.username}"
-  ssh_password             = "${local.password}"
-  ssh_handshake_attempts   = 100
-  ssh_timeout              = "4h"
-  http_directory           = "http"
+
+  ssh_username           = var.ssh_username
+  ssh_password           = var.ssh_password
+  ssh_handshake_attempts = 100
+  ssh_timeout            = "4h"
+
+  http_directory           = "${path.root}/http"
   cores                    = 4
   memory                   = 8192
   vm_name                  = "seclab-kali"
   qemu_agent               = true
   template_description     = "Kali"
-  insecure_skip_tls_verify = true
+  insecure_skip_tls_verify = var.insecure_skip_tls_verify
   machine                  = "pc-q35-9.0"
   cpu_type                 = "x86-64-v2-AES"
 
-
   network_adapters {
-    bridge = "${var.network_adapter}"
+    bridge = var.network_adapter
   }
 
   disks {
     type         = "virtio"
     disk_size    = "50G"
-    storage_pool = "${var.storage_pool}"
+    storage_pool = var.storage_pool
     format       = "raw"
   }
+
   boot_wait = "10s"
   boot_command = [
     "<esc><wait>",
@@ -123,17 +137,9 @@ source "proxmox-iso" "seclab-kali" {
   ]
 }
 
+// Deliberately no provisioners: this template stays script-free. The upstream
+// version copied in a CA certificate from ../../pki, which is not part of this
+// repository.
 build {
-  sources = ["sources.proxmox-iso.seclab-kali"]
-  provisioner "file" {
-    source = "${var.ca_cert_path}"
-    destination = "/tmp/ca.crt"
-  }
-  provisioner "shell" {
-    inline = [
-      "sudo cp /tmp/ca.crt /usr/local/share/ca-certificates",
-      "sudo rm /tmp/ca.crt",
-      "sudo update-ca-certificates"
-    ]
-  }
+  sources = ["source.proxmox-iso.seclab-kali"]
 }
