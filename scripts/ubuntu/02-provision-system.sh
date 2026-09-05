@@ -475,9 +475,7 @@ main() {
     ARCH="$(dpkg --print-architecture)"
 
     install -m 0600 /dev/null "$LOG_FILE"
-    # Match 03-customize-system.sh: the log file drops ANSI escapes and keeps
-    # only the final state of a carriage-return redrawn line, so dpkg and curl
-    # progress repaints do not accumulate. The console still shows them live.
+
     exec > >(tee >(sed -u -r -e 's/\x1B\[[0-9;]*[[:alpha:]]//g' -e 's/.*\r//' >"$LOG_FILE")) 2>&1
 
     printf '%s\n' "################################"
