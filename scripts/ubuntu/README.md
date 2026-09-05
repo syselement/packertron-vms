@@ -164,6 +164,14 @@ The scripted YAML files write `/usr/local/sbin/packertron-firstboot` and a tempo
 - Transient failures are retried.
 - After a successful run the service disables and removes itself.
 
+Pinning one revision keeps a single run coherent, but on its own it also means a commit that fails can never be superseded. The runner therefore counts attempts against the pinned revision in `/var/lib/packertron-bootstrap/attempts`:
+
+- after `MAX_PINNED_ATTEMPTS` (3) failures it adopts the current `origin/main` head, so **pushing a fix recovers the machine** with no manual intervention;
+- if the branch head is still the failing commit, it says so explicitly in the log rather than retrying silently;
+- a pinned commit that has disappeared entirely (force-push, GC) re-pins immediately.
+
+To reset the state by hand, delete `/var/lib/packertron-bootstrap/revision` and `.../attempts`.
+
 ---
 
 ## How to use these scripts
@@ -331,6 +339,7 @@ Run each on at least one Desktop and one Server.
 | Interrupted bootstrap | kill `90` between steps | resumes at `03`, does not repeat `02` |
 | Concurrent bootstrap | start `90` twice | the second exits **non-zero**, so the firstboot service keeps its retry instead of deleting itself |
 | Two human accounts | `adduser`, then re-run unattended | `TARGET_USER` is passed explicitly, so the run still succeeds |
+| Broken pinned commit | pin a commit that fails, then push a fix to `main` | the first three retries use the pin; the fourth adopts the new head and provisioning completes |
 | Non-git `/opt/packertron-vms` | `mkdir` it, then run | the directory is replaced and the clone proceeds |
 | Missing `git` | remove it before first boot | the runner reports git as missing, not an unreachable GitHub |
 | Failed repository config | point a repository at an unreachable host | the APT transaction rolls back to the previous sources; clear failure |
