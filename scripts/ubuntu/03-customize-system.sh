@@ -59,6 +59,7 @@ REBOOT_REQUIRED_FILE="${PACKERTRON_REBOOT_REQUIRED_FILE:-/var/run/reboot-require
 APT_TRANSACTION_DIR="${PACKERTRON_APT_TRANSACTION_DIR:-/var/lib/packertron-apt-transactions/customize-system}"
 HOMEBREW_PREFIX="${PACKERTRON_HOMEBREW_PREFIX:-/home/linuxbrew/.linuxbrew}"
 HOMEBREW_INSTALL_URL="${HOMEBREW_INSTALL_URL:-https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh}"
+HOMEBREW_INSTALL_ATTEMPTS="${PACKERTRON_HOMEBREW_INSTALL_ATTEMPTS:-3}"
 
 readonly -a APT_BOOTSTRAP_PACKAGES=(
     apt-transport-https
@@ -2860,6 +2861,7 @@ install_homebrew_package_array() {
     shift
     local brew_bin="${HOMEBREW_PREFIX}/bin/brew"
     local package
+    local attempt
     local -a packages=("$@")
 
     ((${#packages[@]} > 0)) || return 0
@@ -2875,14 +2877,28 @@ install_homebrew_package_array() {
         fi
 
         info "installing Homebrew package ${package}"
-        if ! run_as_target_user env \
-            HOMEBREW_NO_ASK=1 \
-            HOMEBREW_NO_AUTO_UPDATE=1 \
-            HOMEBREW_NO_ENV_HINTS=1 \
-            timeout --foreground --kill-after=10s 15m \
-            "$brew_bin" install "$package" </dev/null; then
-            die "Homebrew package ${package} installation failed or timed out"
-        fi
+        # Homebrew occasionally dies with "Broken pipe" partway through pouring
+        # a bottle; the same command then succeeds. Retry before giving up so a
+        # transient failure does not abort the whole run.
+        attempt=1
+        while true; do
+            if run_as_target_user env \
+                HOMEBREW_NO_ASK=1 \
+                HOMEBREW_NO_AUTO_UPDATE=1 \
+                HOMEBREW_NO_ENV_HINTS=1 \
+                HOMEBREW_NO_COLOR=1 \
+                HOMEBREW_NO_EMOJI=1 \
+                timeout --foreground --kill-after=10s 15m \
+                "$brew_bin" install "$package" </dev/null; then
+                break
+            fi
+            if ((attempt >= HOMEBREW_INSTALL_ATTEMPTS)); then
+                die "Homebrew package ${package} installation failed or timed out after ${attempt} attempts"
+            fi
+            warn "Homebrew package ${package} installation attempt ${attempt} failed; retrying"
+            attempt=$((attempt + 1))
+            sleep 5
+        done
         run_as_target_user "$brew_bin" list --formula "$package" >/dev/null 2>&1 ||
             die "Homebrew package ${package} installation could not be verified"
         ok "Homebrew package ${package} installed"

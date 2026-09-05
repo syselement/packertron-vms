@@ -2376,6 +2376,91 @@ FAKE_BREW
   [[ "$(wc -l <"$brew_record")" -eq 1 ]]
 }
 
+@test "Homebrew package installation retries a transient failure" {
+  # Homebrew sometimes dies with "Broken pipe" while pouring a bottle, and the
+  # identical command then succeeds.
+  local brew_record="$BATS_TEST_TMPDIR/brew-packages"
+  local brew_state="$BATS_TEST_TMPDIR/k9s-installed"
+  TARGET_USER="$(id -un)"
+  TARGET_HOME="$BATS_TEST_TMPDIR/home"
+  HOMEBREW_PREFIX="$BATS_TEST_TMPDIR/homebrew"
+  HOMEBREW_INSTALL_ATTEMPTS=3
+
+  mkdir -p "$TARGET_HOME" "$HOMEBREW_PREFIX/bin"
+  cat >"$HOMEBREW_PREFIX/bin/brew" <<'FAKE_BREW'
+#!/usr/bin/env bash
+case "$1" in
+  --prefix) printf '%s\n' "$FAKE_BREW_PREFIX" ;;
+  --version) printf 'Homebrew test-version\n' ;;
+  list) [[ -f "$FAKE_BREW_STATE" ]] ;;
+  install)
+    printf '%s\n' "$2" >>"$FAKE_BREW_RECORD"
+    if [[ "$(wc -l <"$FAKE_BREW_RECORD")" -lt 2 ]]; then
+      printf 'Error: %s: Broken pipe\n' "$2" >&2
+      exit 1
+    fi
+    touch "$FAKE_BREW_STATE"
+    ;;
+  *) exit 2 ;;
+esac
+FAKE_BREW
+  chmod +x "$HOMEBREW_PREFIX/bin/brew"
+
+  sleep() { :; }
+  run_as_target_user() {
+    HOME="$TARGET_HOME" \
+      FAKE_BREW_PREFIX="$HOMEBREW_PREFIX" \
+      FAKE_BREW_RECORD="$brew_record" \
+      FAKE_BREW_STATE="$brew_state" \
+      "$@"
+  }
+
+  run install_homebrew_package_array "managed" "${HOMEBREW_PACKAGES[@]}"
+
+  [[ "$status" -eq 0 ]]
+  [[ "$output" == *"attempt 1 failed; retrying"* ]]
+  [[ "$output" == *"Homebrew package derailed/k9s/k9s installed"* ]]
+  [[ "$(wc -l <"$brew_record")" -eq 2 ]]
+}
+
+@test "Homebrew package installation gives up after the configured attempts" {
+  local brew_record="$BATS_TEST_TMPDIR/brew-packages"
+  TARGET_USER="$(id -un)"
+  TARGET_HOME="$BATS_TEST_TMPDIR/home"
+  HOMEBREW_PREFIX="$BATS_TEST_TMPDIR/homebrew"
+  HOMEBREW_INSTALL_ATTEMPTS=2
+
+  mkdir -p "$TARGET_HOME" "$HOMEBREW_PREFIX/bin"
+  cat >"$HOMEBREW_PREFIX/bin/brew" <<'FAKE_BREW'
+#!/usr/bin/env bash
+case "$1" in
+  --prefix) printf '%s\n' "$FAKE_BREW_PREFIX" ;;
+  --version) printf 'Homebrew test-version\n' ;;
+  list) exit 1 ;;
+  install)
+    printf '%s\n' "$2" >>"$FAKE_BREW_RECORD"
+    exit 1
+    ;;
+  *) exit 2 ;;
+esac
+FAKE_BREW
+  chmod +x "$HOMEBREW_PREFIX/bin/brew"
+
+  sleep() { :; }
+  run_as_target_user() {
+    HOME="$TARGET_HOME" \
+      FAKE_BREW_PREFIX="$HOMEBREW_PREFIX" \
+      FAKE_BREW_RECORD="$brew_record" \
+      "$@"
+  }
+
+  run install_homebrew_package_array "managed" "${HOMEBREW_PACKAGES[@]}"
+
+  [[ "$status" -eq 1 ]]
+  [[ "$output" == *"failed or timed out after 2 attempts"* ]]
+  [[ "$(wc -l <"$brew_record")" -eq 2 ]]
+}
+
 @test "quiet command helper replays output only on failure" {
   noisy_success() {
     printf 'successful noise\n'
