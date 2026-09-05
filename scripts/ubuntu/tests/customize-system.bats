@@ -256,6 +256,45 @@ KUBECTL
   [[ "$(grep -c '/kubectl.sha256$' "$download_record")" -eq 1 ]]
 }
 
+@test "kubectl is staged beside its target and moved into place" {
+  local move_record="$BATS_TEST_TMPDIR/kubectl-move-record"
+
+  fetch_file() {
+    case "$1" in
+      "$KUBECTL_STABLE_URL") printf 'v1.36.2\n' >"$2" ;;
+      */kubectl)
+        cat >"$2" <<'KUBECTL'
+#!/usr/bin/env bash
+printf '{"clientVersion":{"gitVersion":"v1.36.2"}}\n'
+KUBECTL
+        ;;
+      */kubectl.sha256) sha256sum "${2%.sha256}" | awk '{print $1}' >"$2" ;;
+      *) return 2 ;;
+    esac
+  }
+
+  mv() {
+    printf '%s\n' "$*" >>"$move_record"
+    command mv "$@"
+  }
+
+  install -d -m 0755 "$LOCAL_BIN_DIR"
+  printf '#!/usr/bin/env bash\nprintf stale\n' >"$LOCAL_BIN_DIR/kubectl"
+  chmod 0755 "$LOCAL_BIN_DIR/kubectl"
+
+  run install_kubectl
+
+  [[ "$status" -eq 0 ]]
+  # The binary must arrive by rename from a staging file next to the target.
+  # `install` writing straight to the destination unlinks it first, so an
+  # interrupt would leave nothing usable at the path.
+  grep -Eq "^-f -- ${LOCAL_BIN_DIR}/kubectl\.tmp\.[A-Za-z0-9]+ ${LOCAL_BIN_DIR}/kubectl$" \
+    "$move_record"
+  # No staging file may survive the install.
+  [[ -z "$(find "$LOCAL_BIN_DIR" -name 'kubectl.tmp.*' -print -quit)" ]]
+  [[ -x "$LOCAL_BIN_DIR/kubectl" ]]
+}
+
 @test "kubectl rejects a binary that does not match the published checksum" {
   fetch_file() {
     case "$1" in
@@ -917,7 +956,7 @@ FAKE_GSETTINGS
   [[ "$output" != *"unexpected Cockpit socket mutation"* ]]
 }
 
-@test "Cockpit socket helper enables and starts a missing socket state" {
+@test "Cockpit socket helper loads the port drop-in before starting a stopped socket" {
   local command_record="$BATS_TEST_TMPDIR/cockpit-systemctl-record"
   mkdir -p "$SYSTEMD_RUNTIME_DIR"
 
@@ -936,8 +975,34 @@ FAKE_GSETTINGS
   [[ "$output" == *"Cockpit socket enabled and active"* ]]
   grep -Fqx 'enable cockpit.socket' "$command_record"
   grep -Fqx 'start cockpit.socket' "$command_record"
-  grep -Fqx 'daemon-reload' "$command_record"
-  grep -Fqx 'restart cockpit.socket' "$command_record"
+  # The reload has to precede the start, or the socket briefly comes up on the
+  # stock port 9090 before anything moves it to 9443.
+  [[ "$(grep -nFx 'daemon-reload' "$command_record" | cut -d: -f1)" -lt \
+    "$(grep -nFx 'start cockpit.socket' "$command_record" | cut -d: -f1)" ]]
+  # A socket started with the drop-in already loaded needs no bounce.
+  ! grep -Fq 'restart cockpit.socket' "$command_record"
+}
+
+@test "Cockpit socket helper leaves an already configured socket untouched" {
+  local command_record="$BATS_TEST_TMPDIR/cockpit-converged-record"
+  mkdir -p "$SYSTEMD_RUNTIME_DIR" "$SYSTEMD_CONFIG_DIR/cockpit.socket.d"
+  printf '[Socket]\nListenStream=\nListenStream=9443\n' \
+    >"$SYSTEMD_CONFIG_DIR/cockpit.socket.d/listen.conf"
+
+  systemctl() {
+    printf '%s\n' "$*" >>"$command_record"
+    case "$1" in
+      cat | is-enabled | is-active) return 0 ;;
+      *) return 2 ;;
+    esac
+  }
+
+  run configure_cockpit_socket
+
+  [[ "$status" -eq 0 ]]
+  [[ "$output" == *"Cockpit already listens on port 9443"* ]]
+  ! grep -Fq 'daemon-reload' "$command_record"
+  ! grep -Fq 'restart cockpit.socket' "$command_record"
 }
 
 @test "Cockpit socket activation is deferred when systemd is not running" {
@@ -992,6 +1057,8 @@ FAKE_GSETTINGS
   mkdir -p "$TARGET_HOME" "$SYSTEMD_USER_UNIT_DIR"
   touch "$SYSTEMD_USER_UNIT_DIR/syncthing.service"
 
+  # No loginctl, so lingering cannot be enabled and the old deferred-until-login
+  # behaviour is what remains.
   command() {
     [[ "$1" == "-v" && "$2" == "systemctl" ]]
   }
@@ -1013,6 +1080,63 @@ FAKE_GSETTINGS
 
   [[ "$status" -eq 0 ]]
   [[ "$(find "$TARGET_HOME/.config/systemd/user/default.target.wants" -type l | wc -l)" -eq 1 ]]
+}
+
+@test "a headless Syncthing enables lingering so the user manager starts at boot" {
+  local linger_record="$BATS_TEST_TMPDIR/linger-record"
+  TARGET_USER="$(id -un)"
+  TARGET_UID="$(id -u)"
+  TARGET_HOME="$BATS_TEST_TMPDIR/home"
+  SYSTEMD_USER_UNIT_DIR="$BATS_TEST_TMPDIR/usr/lib/systemd/user"
+  mkdir -p "$TARGET_HOME" "$SYSTEMD_USER_UNIT_DIR"
+  touch "$SYSTEMD_USER_UNIT_DIR/syncthing.service"
+
+  command() {
+    [[ "$1" == "-v" ]] || return 2
+    [[ "$2" == "systemctl" || "$2" == "loginctl" ]]
+  }
+  target_user_systemd_available() {
+    return 1
+  }
+  run_as_target_user() {
+    "$@"
+  }
+  loginctl() {
+    printf '%s\n' "$*" >>"$linger_record"
+    # An account with no session is not lingering yet.
+    [[ "$1" != "show-user" ]]
+  }
+
+  run configure_syncthing_service
+
+  [[ "$status" -eq 0 ]]
+  [[ "$output" == *"enabled lingering for ${TARGET_USER}"* ]]
+  [[ "$output" == *"Syncthing starts with the ${TARGET_USER} systemd manager at the next boot"* ]]
+  [[ "$output" != *"deferred until login"* ]]
+  grep -Fqx "enable-linger ${TARGET_USER}" "$linger_record"
+}
+
+@test "lingering that is already enabled is not set again" {
+  local linger_record="$BATS_TEST_TMPDIR/linger-repeat-record"
+  TARGET_USER="$(id -un)"
+
+  command() {
+    [[ "$1" == "-v" && "$2" == "loginctl" ]]
+  }
+  loginctl() {
+    if [[ "$1" == "show-user" ]]; then
+      printf 'yes\n'
+      return 0
+    fi
+    printf 'unexpected linger mutation: %s\n' "$*" >>"$linger_record"
+    return 99
+  }
+
+  run enable_target_user_linger
+
+  [[ "$status" -eq 0 ]]
+  [[ "$output" == *"lingering is already enabled"* ]]
+  [[ ! -e "$linger_record" ]]
 }
 
 @test "Cryptomator FUSE configuration writes only the required rules and reloads AppArmor" {
@@ -1116,6 +1240,38 @@ FAKE_GSETTINGS
   [[ "$status" -eq 0 ]]
   [[ "$output" == *"added testuser to the libvirt group"* ]]
   [[ "$(<"$usermod_record")" == "-aG libvirt testuser" ]]
+}
+
+@test "a libvirt socket that fails to start leaves no group membership behind" {
+  local usermod_record="$BATS_TEST_TMPDIR/libvirt-failed-usermod-record"
+  TARGET_USER="testuser"
+  mkdir -p "$SYSTEMD_RUNTIME_DIR"
+
+  getent() {
+    [[ "$1" == "group" && "$2" == "libvirt" ]]
+  }
+  id() {
+    printf 'testgroup\n'
+  }
+  usermod() {
+    printf '%s\n' "$*" >"$usermod_record"
+  }
+  systemctl() {
+    case "$1" in
+      cat | is-enabled) return 0 ;;
+      is-active) return 1 ;;
+      start) return 1 ;;
+      *) return 99 ;;
+    esac
+  }
+
+  run configure_libvirt
+
+  [[ "$status" -ne 0 ]]
+  [[ "$output" == *"failed starting Libvirt socket"* ]]
+  # The privilege grant is persistent; it must not outlive a daemon that never
+  # came up.
+  [[ ! -e "$usermod_record" ]]
 }
 
 @test "Libvirt configuration enables only its local Unix socket" {
@@ -1226,6 +1382,18 @@ FAKE_GSETTINGS
   [[ "$output" != *"unexpected snap mutation"* ]]
 }
 
+@test "snap mutations are bounded by a timeout" {
+  local recorded="$BATS_TEST_TMPDIR/timeout-arguments"
+
+  timeout() {
+    printf '%s\n' "$*" >"$recorded"
+  }
+
+  run_snap install example
+
+  [[ "$(<"$recorded")" == "--foreground --kill-after=30s 15m snap install example" ]]
+}
+
 @test "Snap package helper installs a missing package once" {
   snap() {
     case "$1" in
@@ -1236,6 +1404,13 @@ FAKE_GSETTINGS
         ;;
       *) return 2 ;;
     esac
+  }
+  # run_snap goes through the real timeout binary, which cannot see a stubbed
+  # snap function. Assert the wrapper's shape, then dispatch to the stub.
+  timeout() {
+    [[ "$1" == "--foreground" ]] || return 90
+    shift 3
+    "$@"
   }
 
   run install_snap_package telegram-desktop "Telegram Desktop"
@@ -1249,12 +1424,34 @@ FAKE_GSETTINGS
   snap() {
     return 1
   }
+  timeout() {
+    [[ "$1" == "--foreground" ]] || return 90
+    shift 3
+    "$@"
+  }
 
   run install_snap_package postman "Postman"
 
   [[ "$status" -ne 0 ]]
   [[ "$output" == *"failed installing Postman snap (postman)"* ]]
   [[ "$output" != *"Postman snap installed"* ]]
+}
+
+@test "a Snap installation that times out is reported as a failure" {
+  snap() {
+    printf 'unexpected direct snap invocation\n' >&2
+    return 99
+  }
+  # 124 is what timeout returns when it kills the command.
+  timeout() {
+    return 124
+  }
+
+  run install_snap_package postman "Postman"
+
+  [[ "$status" -ne 0 ]]
+  [[ "$output" == *"or the operation timed out"* ]]
+  [[ "$output" != *"unexpected direct snap invocation"* ]]
 }
 
 @test "Flameshot writes one exact target-owned configuration and skips an identical rerun" {

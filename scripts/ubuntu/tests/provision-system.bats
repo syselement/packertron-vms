@@ -167,6 +167,38 @@ setup() {
   [[ "$output" == *"remove them explicitly"* ]]
 }
 
+@test "a Docker daemon that fails to start leaves no group membership behind" {
+  local usermod_record="$BATS_TEST_TMPDIR/docker-failed-usermod-record"
+
+  docker() {
+    return 0
+  }
+  getent() {
+    [[ "$1" == "group" && "$2" == "docker" ]]
+  }
+  id() {
+    printf 'testuser\n'
+  }
+  usermod() {
+    printf '%s\n' "$*" >"$usermod_record"
+  }
+  systemctl() {
+    case "$1" in
+      cat|is-enabled) return 0 ;;
+      is-active|start) return 1 ;;
+      *) return 99 ;;
+    esac
+  }
+
+  run configure_docker
+
+  [[ "$status" -ne 0 ]]
+  [[ "$output" == *"failed starting Docker"* ]]
+  # The privilege grant is persistent; it must not outlive a daemon that never
+  # came up.
+  [[ ! -e "$usermod_record" ]]
+}
+
 @test "VS Code appears only in the Desktop toolchain manifests" {
   [[ " ${TOOLCHAIN_PACKAGES[*]} " != *" code "* ]]
   [[ " ${REQUIRED_TOOL_COMMANDS[*]} " != *" code "* ]]

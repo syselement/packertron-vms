@@ -799,23 +799,55 @@ configure_system_socket() {
 configure_cockpit_socket() {
     local override_directory="${SYSTEMD_CONFIG_DIR}/cockpit.socket.d"
     local override_file="${override_directory}/listen.conf"
+    local override_changed=false
+    local was_active=false
+    local temporary_file
 
     install -d -m 0755 "$override_directory"
-    cat >"$override_file" <<'EOF'
+
+    temporary_file="$(mktemp)"
+    cat >"$temporary_file" <<'EOF'
 [Socket]
 ListenStream=
 ListenStream=9443
 EOF
 
-    configure_system_socket "cockpit.socket" "Cockpit"
+    # write_file_if_changed keeps a converged run from rewriting the drop-in and
+    # bouncing Cockpit for no reason, and registers the file with the APT
+    # transaction so a later failure rolls it back.
+    if write_file_if_changed "$temporary_file" "$override_file"; then
+        override_changed=true
+    fi
+    rm -f -- "$temporary_file"
 
     if [[ -d "$SYSTEMD_RUNTIME_DIR" ]]; then
-        systemctl daemon-reload ||
-            die "failed reloading systemd after configuring Cockpit port"
+        if systemctl is-active --quiet cockpit.socket; then
+            was_active=true
+        fi
+
+        # Reload before configure_system_socket, not after: that function starts
+        # a stopped socket, and without the drop-in already loaded it would come
+        # up on the stock port 9090 until the restart below moved it.
+        if [[ "$override_changed" == true ]]; then
+            systemctl daemon-reload ||
+                die "failed reloading systemd after configuring Cockpit port"
+        fi
+    fi
+
+    configure_system_socket "cockpit.socket" "Cockpit"
+
+    if [[ "$override_changed" != true ]]; then
+        info "Cockpit already listens on port 9443"
+        return
+    fi
+
+    # Only a socket that was already running needs bouncing: one that
+    # configure_system_socket just started already picked up the new drop-in.
+    if [[ "$was_active" == true ]]; then
         systemctl restart cockpit.socket ||
             die "failed restarting Cockpit socket"
-        ok "Cockpit configured to listen on port 9443"
     fi
+    ok "Cockpit configured to listen on port 9443"
 }
 
 target_user_systemd_available() {
@@ -855,13 +887,43 @@ enable_target_user_service_offline() {
         die "failed enabling ${service_name} for ${TARGET_USER}"
 }
 
+# Without lingering, systemd only starts a user's manager when they log in
+# interactively. On a headless Server that never happens, so an "enabled"
+# target-user service stays permanently stopped. Best effort: failing to enable
+# lingering degrades to the old deferred-until-login behaviour.
+enable_target_user_linger() {
+    local linger_state
+
+    command -v loginctl >/dev/null 2>&1 || {
+        warn "loginctl is unavailable; target-user services start only after an interactive login"
+        return 1
+    }
+
+    linger_state="$(loginctl show-user "$TARGET_USER" --property=Linger --value 2>/dev/null)" ||
+        linger_state=""
+    if [[ "$linger_state" == "yes" ]]; then
+        info "lingering is already enabled for ${TARGET_USER}"
+        return 0
+    fi
+
+    loginctl enable-linger "$TARGET_USER" || {
+        warn "failed enabling lingering for ${TARGET_USER}; target-user services start only after an interactive login"
+        return 1
+    }
+    ok "enabled lingering for ${TARGET_USER} so target-user services start at boot"
+}
+
 configure_syncthing_service() {
     command -v systemctl >/dev/null 2>&1 ||
         die "systemctl is required to configure Syncthing"
 
     if ! target_user_systemd_available; then
         enable_target_user_service_offline syncthing.service
-        warn "target user systemd manager is not running; Syncthing startup is deferred until login"
+        if enable_target_user_linger; then
+            info "Syncthing starts with the ${TARGET_USER} systemd manager at the next boot"
+        else
+            warn "target user systemd manager is not running; Syncthing startup is deferred until login"
+        fi
         return
     fi
 
@@ -913,6 +975,13 @@ configure_libvirt() {
 
     getent group libvirt >/dev/null 2>&1 ||
         die "libvirt group is unavailable after package installation"
+
+    # Bring the socket up before granting membership. The privilege grant is
+    # persistent and the enable/start can die; doing it in this order never
+    # leaves an account in the libvirt group on a host where libvirtd never
+    # came up.
+    configure_system_socket "libvirtd.socket" "Libvirt"
+
     user_groups="$(id -nG "$TARGET_USER")" ||
         die "failed reading group membership for ${TARGET_USER}"
 
@@ -923,8 +992,6 @@ configure_libvirt() {
             die "failed adding ${TARGET_USER} to the libvirt group"
         ok "added ${TARGET_USER} to the libvirt group; membership applies after login or reboot"
     fi
-
-    configure_system_socket "libvirtd.socket" "Libvirt"
 }
 
 validate_virtualization_stack() {

@@ -378,15 +378,10 @@ configure_docker() {
     getent group docker >/dev/null 2>&1 ||
         die "Docker group is unavailable after package installation"
 
-    user_groups="$(id -nG "$USER_NAME")"
-    if [[ " ${user_groups} " != *" docker "* ]]; then
-        usermod -aG docker "$USER_NAME" ||
-            die "failed adding ${USER_NAME} to the docker group"
-        log "added ${USER_NAME} to the docker group; membership applies after login or reboot"
-    else
-        log "${USER_NAME} is already a member of the docker group"
-    fi
-
+    # Bring the daemon up before granting membership. The privilege grant is
+    # persistent and the enable/start can die; doing it in this order never
+    # leaves an account in the docker group on a host where Docker never
+    # started.
     if [[ -d "$SYSTEMD_RUNTIME_DIR" ]]; then
         systemctl cat docker.service >/dev/null 2>&1 ||
             die "Docker systemd unit is unavailable after package installation"
@@ -402,6 +397,15 @@ configure_docker() {
         log "Docker service enabled and active"
     else
         warn "systemd is not operational; Docker service activation deferred"
+    fi
+
+    user_groups="$(id -nG "$USER_NAME")"
+    if [[ " ${user_groups} " != *" docker "* ]]; then
+        usermod -aG docker "$USER_NAME" ||
+            die "failed adding ${USER_NAME} to the docker group"
+        log "added ${USER_NAME} to the docker group; membership applies after login or reboot"
+    else
+        log "${USER_NAME} is already a member of the docker group"
     fi
 }
 
