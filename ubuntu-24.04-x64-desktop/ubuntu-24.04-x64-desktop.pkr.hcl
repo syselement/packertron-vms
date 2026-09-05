@@ -73,7 +73,7 @@ variable "vm_name" {
 
 # Local values
 locals {
-  http_dir = "${path.root}/http"
+  http_dir          = "${path.root}/http"
   effective_iso_url = can(regex("^[A-Za-z]:/", var.iso_url)) ? (fileexists(var.iso_url) ? var.iso_url : var.iso_fallback_url) : var.iso_url
 }
 
@@ -81,7 +81,7 @@ locals {
 source "vmware-iso" "ubuntu2404_desktop" {
   # Ubuntu Desktop autoinstall via NoCloud-Net and local HTTP server
   # boot_command provides the necessary keystrokes to start the installation with autoinstall parameters
-  boot_wait         = "5s"
+  boot_wait = "5s"
   boot_command = [
     "e<wait>",
     "<down><down><down><end>",
@@ -98,17 +98,19 @@ source "vmware-iso" "ubuntu2404_desktop" {
   iso_checksum      = var.iso_checksum
   iso_url           = local.effective_iso_url
   memory            = var.vm_memory
-  output_directory  = "${var.output_dir}/${var.vm_name}"
-  shutdown_command  = "echo '${var.ssh_password}' | sudo -S shutdown -P now"
-  shutdown_timeout  = "10m"
-  skip_compaction   = false
-  ssh_password      = var.ssh_password
-  ssh_timeout       = "30m"
-  ssh_username      = var.ssh_username
-  usb               = true
-  vhv_enabled       = true # Enable nested virtualization
-  version           = "21"
-  vm_name           = var.vm_name
+  # Required since packer-plugin-vmware v2.1.6; builds fail validation without it.
+  network_adapter_type = "vmxnet3"
+  output_directory     = "${var.output_dir}/${var.vm_name}"
+  shutdown_command     = "echo '${var.ssh_password}' | sudo -S shutdown -P now"
+  shutdown_timeout     = "10m"
+  skip_compaction      = false
+  ssh_password         = var.ssh_password
+  ssh_timeout          = "30m"
+  ssh_username         = var.ssh_username
+  usb                  = true
+  vhv_enabled          = true # Enable nested virtualization
+  version              = "21"
+  vm_name              = var.vm_name
 }
 
 # Build block
@@ -126,6 +128,6 @@ build {
   # Package as Vagrant box
   post-processor "vagrant" {
     compression_level = 9
-    output = "${var.output_dir}/${var.vm_name}-vmware.box"
+    output            = "${var.output_dir}/${var.vm_name}-vmware.box"
   }
 }
