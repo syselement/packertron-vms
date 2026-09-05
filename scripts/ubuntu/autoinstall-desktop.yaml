@@ -77,6 +77,8 @@ autoinstall:
           STATE_DIR="/var/lib/packertron-bootstrap"
           REVISION_FILE="$STATE_DIR/revision"
           LOG_FILE="/var/log/packertron-firstboot.log"
+          # Must match the account created by the identity block above.
+          INSTALL_USER="syselement"
 
           install -d -m 0700 "$STATE_DIR"
           touch "$LOG_FILE"
@@ -87,6 +89,11 @@ autoinstall:
              [[ "$(<"$STATE_DIR/complete")" == "$(<"$REVISION_FILE")" ]]; then
             echo "Packertron bootstrap already completed for $(<"$REVISION_FILE")"
             exit 0
+          fi
+
+          if ! command -v git >/dev/null 2>&1; then
+            echo "ERROR: git is not installed; cannot fetch the provisioning repository" >&2
+            exit 1
           fi
 
           echo "Waiting for GitHub connectivity..."
@@ -110,8 +117,14 @@ autoinstall:
           if [[ -d "$REPO_DIR/.git" ]]; then
             echo "Updating managed repository checkout"
           else
+            if [[ -e "$REPO_DIR" ]]; then
+              # A leftover non-repository directory would make git clone fail
+              # identically on every retry, wedging the bootstrap forever.
+              echo "Replacing non-repository path at $REPO_DIR"
+              rm -rf -- "$REPO_DIR"
+            fi
             echo "Cloning managed repository checkout"
-            install -d -m 0755 "$(dirname "$REPO_DIR")"
+            [[ -d "$(dirname "$REPO_DIR")" ]] || install -d -m 0755 "$(dirname "$REPO_DIR")"
             git clone "$REPO_URL" "$REPO_DIR"
           fi
 
@@ -131,11 +144,22 @@ autoinstall:
             mv -f "$REVISION_FILE.tmp" "$REVISION_FILE"
           fi
 
-          git -C "$REPO_DIR" cat-file -e "$REPO_COMMIT^{commit}"
+          # A pinned commit that has disappeared (force-push, GC) would fail on
+          # every retry. Fall back to the current branch head and re-pin.
+          if ! git -C "$REPO_DIR" cat-file -e "$REPO_COMMIT^{commit}" 2>/dev/null; then
+            echo "Pinned revision $REPO_COMMIT is unavailable; re-pinning to origin/$REPO_BRANCH"
+            REPO_COMMIT="$(git -C "$REPO_DIR" rev-parse --verify "origin/$REPO_BRANCH^{commit}")"
+            printf '%s\n' "$REPO_COMMIT" >"$REVISION_FILE.tmp"
+            chmod 0600 "$REVISION_FILE.tmp"
+            mv -f "$REVISION_FILE.tmp" "$REVISION_FILE"
+          fi
           git -C "$REPO_DIR" checkout --detach "$REPO_COMMIT"
           git -C "$REPO_DIR" reset --hard "$REPO_COMMIT"
 
-          PACKERTRON_BOOTSTRAP_REVISION="$REPO_COMMIT" exec \
+          # TARGET_USER is resolved here and passed down: under systemd there is
+          # no SUDO_USER, and discovery fails once a second account exists.
+          PACKERTRON_BOOTSTRAP_REVISION="$REPO_COMMIT" \
+            TARGET_USER="$INSTALL_USER" exec \
             "$REPO_DIR/scripts/ubuntu/90-bootstrap-baremetal.sh"
 
       - path: /etc/systemd/system/packertron-firstboot.service
