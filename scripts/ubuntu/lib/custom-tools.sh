@@ -4,7 +4,21 @@
 #
 # This file holds every per-tool installer, grouped by how the tool is
 # distributed. To add a tool, find the matching section below and follow the
-# template comment at the top of it.
+# template comment at the top of it:
+#
+#   Type 1  plain APT package          no code here - add the name to
+#                                      COMMON_PACKAGES or DESKTOP_PACKAGES
+#   Type 2  APT third-party repository  ensure_<tool>_repository()
+#   Type 3  direct .deb URL             install_downloaded_debian_package /
+#                                       install_latest_url_debian_package
+#   Type 4  GitHub release .deb         install_latest_github_debian_package
+#   Type 5  Snap                        install_snap_package
+#   Type 6  vendor install script       per-tool function
+#   Type 7  archive into /opt           per-tool function
+#   Type 8  checksum-verified binary    per-tool function
+#   Type 9  pipx                        per-tool function
+#   Flatpak / Homebrew                  no code here - add the id or formula
+#                                       to FLATPAK_PACKAGES / HOMEBREW_PACKAGES
 #
 # Dependencies: these functions call helpers defined in the sourcing script
 # (03-customize-system.sh): die, log/info/ok/warn, fetch_file,
@@ -28,7 +42,20 @@ CHATGPT_DEB_URL="${CHATGPT_DEB_URL:-https://persistent.oaistatic.com/codex-app-p
 CLOCKIFY_DEB_URL="${CLOCKIFY_DEB_URL:-https://clockify.me/downloads/Clockify_Setup_x64.deb}"
 STRAWBERRY_FILES_URL="${STRAWBERRY_FILES_URL:-https://files.strawberrymusicplayer.org}"
 
-# SECTION: repository
+# -----------------------------------------------------------------------------
+# Type 2: APT third-party repository + package
+# -----------------------------------------------------------------------------
+# Add a repository-based tool:
+#   1. Write ensure_<tool>_repository() below, following an existing one:
+#      fetch the signing key, validate its fingerprint, dearmor it into
+#      "$SYSTEM_KEYRING_DIR", write the .sources file into "$APT_SOURCES_DIR",
+#      record both with apt_transaction_record_file, validate the result with
+#      validate_repository_source, then `return 10` when sources changed.
+#   2. Call it from main() as: apply_repository_setup ensure_<tool>_repository
+#   3. Add the package name to COMMON_PACKAGES or DESKTOP_PACKAGES in
+#      03-customize-system.sh.
+# Exit code 10 is the "APT sources changed" signal that apply_repository_setup
+# translates into APT_SOURCES_CHANGED=true.
 
 ensure_fastfetch_ppa() {
     local ppa="ppa:zhangsongcui3371/fastfetch"
@@ -571,7 +598,17 @@ EOF
     [[ "$changed" == false ]] || return 10
 )
 
-# SECTION: deb-url
+# -----------------------------------------------------------------------------
+# Type 3: direct .deb URL
+# -----------------------------------------------------------------------------
+# Add a tool published as a .deb at a stable URL:
+#   install_<tool>() {
+#       install_downloaded_debian_package "<url>" "<dpkg-package-name>" "<Display Name>"
+#   }
+# Use install_latest_url_debian_package instead when the vendor serves a
+# "latest" URL and the installed version should be compared before
+# downloading the whole package. Gate on "$ARCH" when the vendor ships amd64
+# only (see install_termius).
 
 install_downloaded_debian_package() (
     set -Eeuo pipefail
@@ -790,7 +827,17 @@ install_strawberry() (
     install_debian_package "$temporary_dir/package.deb" "strawberry" "Strawberry"
 )
 
-# SECTION: github-release
+# -----------------------------------------------------------------------------
+# Type 4: GitHub latest-release .deb
+# -----------------------------------------------------------------------------
+# Add a tool released as a .deb asset on GitHub:
+#   install_<tool>() {
+#       install_latest_github_debian_package \
+#           "<owner>/<repo>" "<asset-suffix>" "<dpkg-package-name>" "<Display Name>"
+#   }
+# The asset suffix selects the release asset (e.g. "_amd64.deb"); map it per
+# architecture with a case on "$ARCH" when the project ships several (see
+# install_rustdesk).
 
 install_latest_github_debian_package() (
     set -Eeuo pipefail
@@ -877,7 +924,13 @@ install_pandoc() {
         "Pandoc"
 }
 
-# SECTION: snap
+# -----------------------------------------------------------------------------
+# Type 5: Snap
+# -----------------------------------------------------------------------------
+# Add a snap by calling it straight from main()'s Desktop block:
+#   install_snap_package <snap-name> "<Display Name>"
+#   connect_snap_interface <snap>:<interface> "<description>"   # only if needed
+# No per-tool function is required.
 
 install_snap_package() {
     local snap_name="$1"
@@ -914,7 +967,15 @@ connect_snap_interface() {
     fi
 }
 
-# SECTION: vendor-script
+# -----------------------------------------------------------------------------
+# Type 6: vendor install script
+# -----------------------------------------------------------------------------
+# For tools whose only supported install path is an upstream shell script.
+# Never pipe a download straight into a shell. Follow install_starship:
+# fetch_file the script to a temporary file, sanity-check its content, run it
+# under run_as_target_user when the tool installs into the user's home, then
+# verify the resulting binary. Put the URL in a *_INSTALL_URL variable at the
+# top of this file so it stays overridable from the environment.
 
 install_starship() (
     set -Eeuo pipefail
@@ -1123,7 +1184,15 @@ install_zed() (
     ok "${version_output%%$'\n'*} installed for ${TARGET_USER}"
 )
 
-# SECTION: archive
+# -----------------------------------------------------------------------------
+# Type 7: archive extracted to /opt
+# -----------------------------------------------------------------------------
+# For tarball/zip releases with no package. Follow install_yubico_authenticator:
+# download the archive, validate it (validate_tar_gzip_archive or
+# validate_zip_archive reject path traversal), extract into a versioned
+# directory under /opt, symlink the entry point into "$LOCAL_BIN_DIR", and
+# install any .desktop entry and icon. Keep the install directory in a
+# *_INSTALL_DIR variable at the top of this file.
 
 install_yubico_authenticator() (
     set -Eeuo pipefail
@@ -1615,7 +1684,14 @@ install_obsidian() (
     ok "Obsidian ${installed_version} installed from the official GitHub release"
 )
 
-# SECTION: binary
+# -----------------------------------------------------------------------------
+# Type 8: checksum-verified upstream binary
+# -----------------------------------------------------------------------------
+# For single binaries published alongside a checksum file. Follow
+# install_kubectl: resolve the current version, download the binary and its
+# published checksum, compare them, and only then install into
+# "$LOCAL_BIN_DIR" with an explicit mode. Never install a binary whose
+# checksum was not verified.
 
 install_kubectl() (
     set -Eeuo pipefail
@@ -1674,7 +1750,17 @@ install_kubectl() (
     ok "kubectl ${installed_version} installed"
 )
 
-# SECTION: pipx
+# -----------------------------------------------------------------------------
+# Type 9: pipx
+# -----------------------------------------------------------------------------
+# For Python CLIs. Follow install_tldr_pipx: install as the target user with
+# run_as_target_user so the venv lands in their home, and skip when the tool
+# is already present.
+#
+# Flatpak and Homebrew need no code here: add the application id to
+# FLATPAK_PACKAGES or the formula to HOMEBREW_PACKAGES in
+# 03-customize-system.sh and the existing array installers handle the rest.
+# The same applies to plain APT packages (COMMON_PACKAGES / DESKTOP_PACKAGES).
 
 install_tldr_pipx() {
     local installed_packages

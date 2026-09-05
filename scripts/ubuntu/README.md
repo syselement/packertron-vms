@@ -16,6 +16,8 @@ The set covers:
 `02-provision-system.sh` and `03-customize-system.sh` share `lib/ubuntu-context.sh`. The helper verifies Ubuntu, detects Desktop or Server from installed Ubuntu metapackages, defaults to Server when no flavor metapackage is installed, records whether execution is interactive, and resolves the non-root target user.
 Set `TARGET_USER` explicitly when an automated root run has more than one eligible local user.
 
+`03-customize-system.sh` also sources `lib/custom-tools.sh`, which holds every third-party and custom tool installer grouped by how the tool is distributed (APT repository, direct `.deb` URL, GitHub release, Snap, vendor install script, archive, checksum-verified binary, pipx). Add new tools there, following the template comment on the matching section.
+
 ---
 
 ## Files
