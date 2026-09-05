@@ -37,16 +37,17 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # win-11 and win-srv-2025 are deliberately absent: both currently fail
-        # validation (network_adapter_type became required in
-        # packer-plugin-vmware v2.1.6, and win-11 has an unrepaired build
-        # block). Add them here in the same change that fixes them.
+        # win-11 is deliberately absent: its build block is still unrepaired
+        # (sources. instead of source.) and it depends on a KeePass database
+        # that is not in this repository. Add it here in the same change that
+        # fixes it.
         template:
           - kali
           - ubuntu-24.04-x64-desktop
           - ubuntu-26.04-x64-desktop
           - ubuntu-24.04-x64-server
           - ubuntu-26.04-x64-server
+          - win-srv-2025
 
     steps:
       # Actions are pinned to commits rather than tags; Dependabot keeps them current.
