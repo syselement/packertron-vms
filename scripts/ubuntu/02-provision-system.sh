@@ -34,6 +34,7 @@ SYSTEM_KEYRING_DIR="${PACKERTRON_SYSTEM_KEYRING_DIR:-/usr/share/keyrings}"
 APT_SOURCES_DIR="${PACKERTRON_APT_SOURCES_DIR:-/etc/apt/sources.list.d}"
 SYSTEMD_RUNTIME_DIR="${PACKERTRON_SYSTEMD_RUNTIME_DIR:-/run/systemd/system}"
 APT_TRANSACTION_DIR="${PACKERTRON_APT_TRANSACTION_DIR:-/var/lib/packertron-apt-transactions/provision-system}"
+REBOOT_REQUIRED_FILE="${PACKERTRON_REBOOT_REQUIRED_FILE:-/var/run/reboot-required}"
 ROOT_VG_NAME="${ROOT_VG_NAME:-ubuntu-vg}"
 ROOT_LV_PATH="${ROOT_LV_PATH:-/dev/ubuntu-vg/ubuntu-lv}"
 USER_NAME=""
@@ -71,7 +72,6 @@ readonly -a DOCKER_CONFLICT_PACKAGES=(
 
 readonly -a TOOLCHAIN_PACKAGES=(
     ansible
-    code
     docker-ce
     docker-ce-cli
     containerd.io
@@ -82,7 +82,16 @@ readonly -a TOOLCHAIN_PACKAGES=(
     vagrant
 )
 
-readonly -a REQUIRED_TOOL_COMMANDS=(ansible code docker packer tofu vagrant)
+# VS Code is a GUI application, so its repository, its package and its version
+# check are all Desktop-only. Installed unconditionally it drags an unused X
+# stack onto Server hosts, and `code --version` then fails there, taking the
+# whole run down with it. Vagrant and the rest are CLI tools and stay on both.
+readonly -a DESKTOP_TOOLCHAIN_PACKAGES=(
+    code
+)
+
+readonly -a REQUIRED_TOOL_COMMANDS=(ansible docker packer tofu vagrant)
+readonly -a DESKTOP_REQUIRED_TOOL_COMMANDS=(code)
 
 # --- Logging setup ---
 _ts() { date +'%F %T'; }
@@ -370,15 +379,10 @@ configure_docker() {
     getent group docker >/dev/null 2>&1 ||
         die "Docker group is unavailable after package installation"
 
-    user_groups="$(id -nG "$USER_NAME")"
-    if [[ " ${user_groups} " != *" docker "* ]]; then
-        usermod -aG docker "$USER_NAME" ||
-            die "failed adding ${USER_NAME} to the docker group"
-        log "added ${USER_NAME} to the docker group; membership applies after login or reboot"
-    else
-        log "${USER_NAME} is already a member of the docker group"
-    fi
-
+    # Bring the daemon up before granting membership. The privilege grant is
+    # persistent and the enable/start can die; doing it in this order never
+    # leaves an account in the docker group on a host where Docker never
+    # started.
     if [[ -d "$SYSTEMD_RUNTIME_DIR" ]]; then
         systemctl cat docker.service >/dev/null 2>&1 ||
             die "Docker systemd unit is unavailable after package installation"
@@ -395,6 +399,15 @@ configure_docker() {
     else
         warn "systemd is not operational; Docker service activation deferred"
     fi
+
+    user_groups="$(id -nG "$USER_NAME")"
+    if [[ " ${user_groups} " != *" docker "* ]]; then
+        usermod -aG docker "$USER_NAME" ||
+            die "failed adding ${USER_NAME} to the docker group"
+        log "added ${USER_NAME} to the docker group; membership applies after login or reboot"
+    else
+        log "${USER_NAME} is already a member of the docker group"
+    fi
 }
 
 validate_toolchain() {
@@ -405,8 +418,13 @@ validate_toolchain() {
     local packer_version
     local tofu_version
     local vagrant_version
+    local -a required_commands=("${REQUIRED_TOOL_COMMANDS[@]}")
 
-    for command_name in "${REQUIRED_TOOL_COMMANDS[@]}"; do
+    if [[ "$UBUNTU_VARIANT" == "desktop" ]]; then
+        required_commands+=("${DESKTOP_REQUIRED_TOOL_COMMANDS[@]}")
+    fi
+
+    for command_name in "${required_commands[@]}"; do
         command -v "$command_name" >/dev/null 2>&1 ||
             die "required command is unavailable after installation: ${command_name}"
     done
@@ -415,9 +433,11 @@ validate_toolchain() {
     ansible --version 2>/dev/null | sed -n '1p' ||
         die "Ansible version check failed"
 
-    code_version="$(sudo -u "$USER_NAME" -H code --version 2>/dev/null)" ||
-        die "VS Code version check failed for ${USER_NAME}"
-    printf 'code:    %s\n' "${code_version%%$'\n'*}"
+    if [[ "$UBUNTU_VARIANT" == "desktop" ]]; then
+        code_version="$(sudo -u "$USER_NAME" -H code --version 2>/dev/null)" ||
+            die "VS Code version check failed for ${USER_NAME}"
+        printf 'code:    %s\n' "${code_version%%$'\n'*}"
+    fi
 
     compose_version="$(docker compose version 2>/dev/null)" ||
         die "Docker Compose version check failed"
@@ -438,6 +458,31 @@ validate_toolchain() {
     vagrant_version="$(vagrant --version 2>/dev/null)" ||
         die "Vagrant version check failed"
     printf 'vagrant: %s\n' "${vagrant_version%%$'\n'*}"
+}
+
+# update-notifier-common drops /var/run/reboot-required when a package that
+# needs a restart (kernel, systemd, glibc) is installed. This script runs
+# dist-upgrade, so it is the one most likely to create it.
+report_pending_reboot() {
+    local -a pending_packages=()
+
+    if [[ ! -f "$REBOOT_REQUIRED_FILE" ]]; then
+        log "no reboot is pending"
+        return
+    fi
+
+    if [[ -r "${REBOOT_REQUIRED_FILE}.pkgs" ]]; then
+        mapfile -t pending_packages <"${REBOOT_REQUIRED_FILE}.pkgs"
+    fi
+
+    if ((${#pending_packages[@]} > 0)); then
+        warn "a reboot is required to finish installing: ${pending_packages[*]}"
+    else
+        warn "a reboot is required to finish applying the installed updates"
+    fi
+
+    [[ "$REBOOT_AT_END" == "true" ]] ||
+        warn "reboot when convenient: sudo systemctl reboot"
 }
 
 cleanup_apt() {
@@ -504,8 +549,10 @@ main() {
 
     log "configure Ansible repository"
     setup_ansible_repo
-    log "configure VS Code repository"
-    setup_vscode_repo
+    if [[ "$UBUNTU_VARIANT" == "desktop" ]]; then
+        log "configure VS Code repository"
+        setup_vscode_repo
+    fi
     log "configure Docker repository"
     setup_docker_repo
     log "configure OpenTofu repository"
@@ -523,11 +570,16 @@ main() {
 
     log "install toolchain packages (missing only)"
     install_missing_packages "${TOOLCHAIN_PACKAGES[@]}"
+    if [[ "$UBUNTU_VARIANT" == "desktop" ]]; then
+        log "install Desktop toolchain packages (missing only)"
+        install_missing_packages "${DESKTOP_TOOLCHAIN_PACKAGES[@]}"
+    fi
 
     configure_docker
     cleanup_apt
     validate_toolchain
     show_system_info
+    report_pending_reboot
 
     end_ts="$(date +%s)"
     elapsed="$((end_ts - start_ts))"

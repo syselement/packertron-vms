@@ -76,7 +76,14 @@ autoinstall:
           REPO_DIR="/opt/packertron-vms"
           STATE_DIR="/var/lib/packertron-bootstrap"
           REVISION_FILE="$STATE_DIR/revision"
+          ATTEMPTS_FILE="$STATE_DIR/attempts"
+          # After this many failed attempts on one pinned revision, adopt the
+          # current branch head instead. Without it a bad pin retries every
+          # RestartSec forever and pushing a fix to the branch has no effect.
+          MAX_PINNED_ATTEMPTS=3
           LOG_FILE="/var/log/packertron-firstboot.log"
+          # Must match the account created by the identity block above.
+          INSTALL_USER="syselement"
 
           install -d -m 0700 "$STATE_DIR"
           touch "$LOG_FILE"
@@ -87,6 +94,19 @@ autoinstall:
              [[ "$(<"$STATE_DIR/complete")" == "$(<"$REVISION_FILE")" ]]; then
             echo "Packertron bootstrap already completed for $(<"$REVISION_FILE")"
             exit 0
+          fi
+
+          # Record the revision the next run should start from, and echo it back.
+          pin_revision() {
+            printf '%s\n' "$1" >"$REVISION_FILE.tmp"
+            chmod 0600 "$REVISION_FILE.tmp"
+            mv -f "$REVISION_FILE.tmp" "$REVISION_FILE"
+            printf '%s\n' "$1"
+          }
+
+          if ! command -v git >/dev/null 2>&1; then
+            echo "ERROR: git is not installed; cannot fetch the provisioning repository" >&2
+            exit 1
           fi
 
           echo "Waiting for GitHub connectivity..."
@@ -110,8 +130,14 @@ autoinstall:
           if [[ -d "$REPO_DIR/.git" ]]; then
             echo "Updating managed repository checkout"
           else
+            if [[ -e "$REPO_DIR" ]]; then
+              # A leftover non-repository directory would make git clone fail
+              # identically on every retry, wedging the bootstrap forever.
+              echo "Replacing non-repository path at $REPO_DIR"
+              rm -rf -- "$REPO_DIR"
+            fi
             echo "Cloning managed repository checkout"
-            install -d -m 0755 "$(dirname "$REPO_DIR")"
+            [[ -d "$(dirname "$REPO_DIR")" ]] || install -d -m 0755 "$(dirname "$REPO_DIR")"
             git clone "$REPO_URL" "$REPO_DIR"
           fi
 
@@ -125,17 +151,51 @@ autoinstall:
               exit 1
             }
           else
-            REPO_COMMIT="$(git -C "$REPO_DIR" rev-parse --verify "origin/$REPO_BRANCH^{commit}")"
-            printf '%s\n' "$REPO_COMMIT" >"$REVISION_FILE.tmp"
-            chmod 0600 "$REVISION_FILE.tmp"
-            mv -f "$REVISION_FILE.tmp" "$REVISION_FILE"
+            REPO_COMMIT="$(pin_revision "$(git -C "$REPO_DIR" rev-parse --verify "origin/$REPO_BRANCH^{commit}")")"
           fi
 
-          git -C "$REPO_DIR" cat-file -e "$REPO_COMMIT^{commit}"
+          # A pinned commit that has disappeared (force-push, GC) would fail on
+          # every retry. Fall back to the current branch head and re-pin.
+          if ! git -C "$REPO_DIR" cat-file -e "$REPO_COMMIT^{commit}" 2>/dev/null; then
+            echo "Pinned revision $REPO_COMMIT is unavailable; re-pinning to origin/$REPO_BRANCH"
+            REPO_COMMIT="$(pin_revision "$(git -C "$REPO_DIR" rev-parse --verify "origin/$REPO_BRANCH^{commit}")")"
+          fi
+
+          # Count attempts against the pinned revision. The pin keeps one run
+          # coherent, but on its own it also means a commit that fails can never
+          # be superseded: the runner would retry it every RestartSec forever,
+          # and a fix pushed to the branch would never be picked up.
+          attempts=0
+          if [[ -s "$ATTEMPTS_FILE" ]]; then
+            read -r recorded_revision recorded_attempts <"$ATTEMPTS_FILE" || true
+            if [[ "$recorded_revision" == "$REPO_COMMIT" && "$recorded_attempts" =~ ^[0-9]+$ ]]; then
+              attempts="$recorded_attempts"
+            fi
+          fi
+
+          if (( attempts >= MAX_PINNED_ATTEMPTS )); then
+            branch_head="$(git -C "$REPO_DIR" rev-parse --verify "origin/$REPO_BRANCH^{commit}")"
+            if [[ "$branch_head" != "$REPO_COMMIT" ]]; then
+              echo "Pinned revision $REPO_COMMIT failed $attempts times; adopting origin/$REPO_BRANCH ($branch_head)"
+              REPO_COMMIT="$(pin_revision "$branch_head")"
+              attempts=0
+            else
+              echo "WARNING: pinned revision $REPO_COMMIT has failed $attempts times and origin/$REPO_BRANCH still points at it; push a fix to recover"
+            fi
+          fi
+
+          printf '%s %s\n' "$REPO_COMMIT" "$(( attempts + 1 ))" >"$ATTEMPTS_FILE.tmp"
+          chmod 0600 "$ATTEMPTS_FILE.tmp"
+          mv -f "$ATTEMPTS_FILE.tmp" "$ATTEMPTS_FILE"
+          echo "Bootstrap attempt $(( attempts + 1 )) for revision $REPO_COMMIT"
+
           git -C "$REPO_DIR" checkout --detach "$REPO_COMMIT"
           git -C "$REPO_DIR" reset --hard "$REPO_COMMIT"
 
-          PACKERTRON_BOOTSTRAP_REVISION="$REPO_COMMIT" exec \
+          # TARGET_USER is resolved here and passed down: under systemd there is
+          # no SUDO_USER, and discovery fails once a second account exists.
+          PACKERTRON_BOOTSTRAP_REVISION="$REPO_COMMIT" \
+            TARGET_USER="$INSTALL_USER" exec \
             "$REPO_DIR/scripts/ubuntu/90-bootstrap-baremetal.sh"
 
       - path: /etc/systemd/system/packertron-firstboot.service

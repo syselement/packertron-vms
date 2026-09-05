@@ -167,6 +167,119 @@ setup() {
   [[ "$output" == *"remove them explicitly"* ]]
 }
 
+@test "a pending reboot is reported with the packages that need one" {
+  REBOOT_REQUIRED_FILE="$BATS_TEST_TMPDIR/reboot-required"
+  REBOOT_AT_END="false"
+  printf 'placeholder\n' >"$REBOOT_REQUIRED_FILE"
+  printf 'linux-image-generic\nsystemd\n' >"${REBOOT_REQUIRED_FILE}.pkgs"
+
+  run report_pending_reboot
+
+  [[ "$status" -eq 0 ]]
+  [[ "$output" == *"a reboot is required to finish installing: linux-image-generic systemd"* ]]
+  [[ "$output" == *"reboot when convenient: sudo systemctl reboot"* ]]
+}
+
+@test "no pending reboot is stated explicitly" {
+  REBOOT_REQUIRED_FILE="$BATS_TEST_TMPDIR/absent-reboot-required"
+  REBOOT_AT_END="false"
+
+  run report_pending_reboot
+
+  [[ "$status" -eq 0 ]]
+  [[ "$output" == *"no reboot is pending"* ]]
+  [[ "$output" != *"reboot when convenient"* ]]
+}
+
+@test "an orchestrated run is not told to reboot manually" {
+  REBOOT_REQUIRED_FILE="$BATS_TEST_TMPDIR/orchestrated-reboot-required"
+  REBOOT_AT_END="true"
+  printf 'placeholder\n' >"$REBOOT_REQUIRED_FILE"
+
+  run report_pending_reboot
+
+  [[ "$status" -eq 0 ]]
+  [[ "$output" == *"a reboot is required to finish applying the installed updates"* ]]
+  [[ "$output" != *"reboot when convenient"* ]]
+}
+
+@test "a Docker daemon that fails to start leaves no group membership behind" {
+  local usermod_record="$BATS_TEST_TMPDIR/docker-failed-usermod-record"
+
+  docker() {
+    return 0
+  }
+  getent() {
+    [[ "$1" == "group" && "$2" == "docker" ]]
+  }
+  id() {
+    printf 'testuser\n'
+  }
+  usermod() {
+    printf '%s\n' "$*" >"$usermod_record"
+  }
+  systemctl() {
+    case "$1" in
+      cat|is-enabled) return 0 ;;
+      is-active|start) return 1 ;;
+      *) return 99 ;;
+    esac
+  }
+
+  run configure_docker
+
+  [[ "$status" -ne 0 ]]
+  [[ "$output" == *"failed starting Docker"* ]]
+  # The privilege grant is persistent; it must not outlive a daemon that never
+  # came up.
+  [[ ! -e "$usermod_record" ]]
+}
+
+@test "VS Code appears only in the Desktop toolchain manifests" {
+  [[ " ${TOOLCHAIN_PACKAGES[*]} " != *" code "* ]]
+  [[ " ${REQUIRED_TOOL_COMMANDS[*]} " != *" code "* ]]
+  [[ " ${DESKTOP_TOOLCHAIN_PACKAGES[*]} " == *" code "* ]]
+  [[ " ${DESKTOP_REQUIRED_TOOL_COMMANDS[*]} " == *" code "* ]]
+}
+
+@test "Server validation neither requires nor invokes VS Code" {
+  UBUNTU_VARIANT="server"
+  command() {
+    [[ "$1" == "-v" ]] || return 2
+    [[ "$2" != "code" ]]
+  }
+  code() {
+    printf 'unexpected VS Code invocation\n' >&2
+    return 99
+  }
+  sudo() {
+    printf 'sudo %s\n' "$*"
+  }
+  ansible() { printf 'ansible 2.0\n'; }
+  docker() { printf 'docker 1.0\n'; }
+  tofu() { printf 'tofu 1.0\n'; }
+  vagrant() { printf 'vagrant 1.0\n'; }
+
+  run validate_toolchain
+
+  [[ "$status" -eq 0 ]]
+  [[ "$output" != *"unexpected"* ]]
+  [[ "$output" != *"code:"* ]]
+}
+
+@test "Desktop validation still fails when VS Code is missing" {
+  UBUNTU_VARIANT="desktop"
+  command() {
+    [[ "$1" == "-v" ]] || return 2
+    [[ "$2" != "code" ]]
+  }
+
+  run validate_toolchain
+
+  [[ "$status" -ne 0 ]]
+  [[ "$output" == *"required command is unavailable after installation: code"* ]]
+}
+
 @test "Docker setup avoids repeated group and service changes" {
   docker() {
     return 0

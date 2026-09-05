@@ -53,6 +53,7 @@ SYSTEMD_USER_UNIT_DIR="${PACKERTRON_SYSTEMD_USER_UNIT_DIR:-/usr/lib/systemd/user
 LOCAL_BIN_DIR="${PACKERTRON_LOCAL_BIN_DIR:-/usr/local/bin}"
 APPARMOR_PROFILE_DIR="${PACKERTRON_APPARMOR_PROFILE_DIR:-/etc/apparmor.d}"
 KVM_DEVICE="${PACKERTRON_KVM_DEVICE:-/dev/kvm}"
+REBOOT_REQUIRED_FILE="${PACKERTRON_REBOOT_REQUIRED_FILE:-/var/run/reboot-required}"
 APT_TRANSACTION_DIR="${PACKERTRON_APT_TRANSACTION_DIR:-/var/lib/packertron-apt-transactions/customize-system}"
 HOMEBREW_PREFIX="${PACKERTRON_HOMEBREW_PREFIX:-/home/linuxbrew/.linuxbrew}"
 HOMEBREW_INSTALL_URL="${HOMEBREW_INSTALL_URL:-https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh}"
@@ -707,19 +708,29 @@ install_package_array() {
     ok "${description} package installation completed"
 }
 
+# Install what this release actually offers instead of failing the whole run on
+# the first package that does not exist here. The manifests are shared between
+# releases, so a package added to Ubuntu after 24.04 is simply absent there.
 install_available_package_array() {
     local description="$1"
     shift
     local package
     local -a available=()
+    local -a unavailable=()
 
     for package in "$@"; do
         if apt-cache show "$package" >/dev/null 2>&1; then
             available+=("$package")
         else
+            unavailable+=("$package")
             info "${package} is unavailable for Ubuntu ${VERSION_ID}; skipping"
         fi
     done
+
+    # Warn as well as list: an absent package is usually a release difference,
+    # but a third-party repository that failed to configure looks identical.
+    ((${#unavailable[@]} == 0)) ||
+        warn "${description}: skipped ${#unavailable[@]} unavailable package(s): ${unavailable[*]}"
 
     ((${#available[@]} > 0)) || return 0
     install_package_array "$description" "${available[@]}"
@@ -789,23 +800,55 @@ configure_system_socket() {
 configure_cockpit_socket() {
     local override_directory="${SYSTEMD_CONFIG_DIR}/cockpit.socket.d"
     local override_file="${override_directory}/listen.conf"
+    local override_changed=false
+    local was_active=false
+    local temporary_file
 
     install -d -m 0755 "$override_directory"
-    cat >"$override_file" <<'EOF'
+
+    temporary_file="$(mktemp)"
+    cat >"$temporary_file" <<'EOF'
 [Socket]
 ListenStream=
 ListenStream=9443
 EOF
 
-    configure_system_socket "cockpit.socket" "Cockpit"
+    # write_file_if_changed keeps a converged run from rewriting the drop-in and
+    # bouncing Cockpit for no reason, and registers the file with the APT
+    # transaction so a later failure rolls it back.
+    if write_file_if_changed "$temporary_file" "$override_file"; then
+        override_changed=true
+    fi
+    rm -f -- "$temporary_file"
 
     if [[ -d "$SYSTEMD_RUNTIME_DIR" ]]; then
-        systemctl daemon-reload ||
-            die "failed reloading systemd after configuring Cockpit port"
+        if systemctl is-active --quiet cockpit.socket; then
+            was_active=true
+        fi
+
+        # Reload before configure_system_socket, not after: that function starts
+        # a stopped socket, and without the drop-in already loaded it would come
+        # up on the stock port 9090 until the restart below moved it.
+        if [[ "$override_changed" == true ]]; then
+            systemctl daemon-reload ||
+                die "failed reloading systemd after configuring Cockpit port"
+        fi
+    fi
+
+    configure_system_socket "cockpit.socket" "Cockpit"
+
+    if [[ "$override_changed" != true ]]; then
+        info "Cockpit already listens on port 9443"
+        return
+    fi
+
+    # Only a socket that was already running needs bouncing: one that
+    # configure_system_socket just started already picked up the new drop-in.
+    if [[ "$was_active" == true ]]; then
         systemctl restart cockpit.socket ||
             die "failed restarting Cockpit socket"
-        ok "Cockpit configured to listen on port 9443"
     fi
+    ok "Cockpit configured to listen on port 9443"
 }
 
 target_user_systemd_available() {
@@ -845,13 +888,43 @@ enable_target_user_service_offline() {
         die "failed enabling ${service_name} for ${TARGET_USER}"
 }
 
+# Without lingering, systemd only starts a user's manager when they log in
+# interactively. On a headless Server that never happens, so an "enabled"
+# target-user service stays permanently stopped. Best effort: failing to enable
+# lingering degrades to the old deferred-until-login behaviour.
+enable_target_user_linger() {
+    local linger_state
+
+    command -v loginctl >/dev/null 2>&1 || {
+        warn "loginctl is unavailable; target-user services start only after an interactive login"
+        return 1
+    }
+
+    linger_state="$(loginctl show-user "$TARGET_USER" --property=Linger --value 2>/dev/null)" ||
+        linger_state=""
+    if [[ "$linger_state" == "yes" ]]; then
+        info "lingering is already enabled for ${TARGET_USER}"
+        return 0
+    fi
+
+    loginctl enable-linger "$TARGET_USER" || {
+        warn "failed enabling lingering for ${TARGET_USER}; target-user services start only after an interactive login"
+        return 1
+    }
+    ok "enabled lingering for ${TARGET_USER} so target-user services start at boot"
+}
+
 configure_syncthing_service() {
     command -v systemctl >/dev/null 2>&1 ||
         die "systemctl is required to configure Syncthing"
 
     if ! target_user_systemd_available; then
         enable_target_user_service_offline syncthing.service
-        warn "target user systemd manager is not running; Syncthing startup is deferred until login"
+        if enable_target_user_linger; then
+            info "Syncthing starts with the ${TARGET_USER} systemd manager at the next boot"
+        else
+            warn "target user systemd manager is not running; Syncthing startup is deferred until login"
+        fi
         return
     fi
 
@@ -903,6 +976,13 @@ configure_libvirt() {
 
     getent group libvirt >/dev/null 2>&1 ||
         die "libvirt group is unavailable after package installation"
+
+    # Bring the socket up before granting membership. The privilege grant is
+    # persistent and the enable/start can die; doing it in this order never
+    # leaves an account in the libvirt group on a host where libvirtd never
+    # came up.
+    configure_system_socket "libvirtd.socket" "Libvirt"
+
     user_groups="$(id -nG "$TARGET_USER")" ||
         die "failed reading group membership for ${TARGET_USER}"
 
@@ -913,8 +993,6 @@ configure_libvirt() {
             die "failed adding ${TARGET_USER} to the libvirt group"
         ok "added ${TARGET_USER} to the libvirt group; membership applies after login or reboot"
     fi
-
-    configure_system_socket "libvirtd.socket" "Libvirt"
 }
 
 validate_virtualization_stack() {
@@ -3058,6 +3136,32 @@ show_manual_setup_hints() {
     manual_line "Documentation: https://github.com/iximiuz/labctl"
 }
 
+# update-notifier-common drops /var/run/reboot-required when a package that
+# needs a restart (kernel, systemd, glibc) is installed. Nothing used to read
+# it, so a REBOOT_AT_END=false run - the documented way to run this script by
+# hand - ended silently on the old kernel.
+report_pending_reboot() {
+    local -a pending_packages=()
+
+    if [[ ! -f "$REBOOT_REQUIRED_FILE" ]]; then
+        info "no reboot is pending"
+        return
+    fi
+
+    if [[ -r "${REBOOT_REQUIRED_FILE}.pkgs" ]]; then
+        mapfile -t pending_packages <"${REBOOT_REQUIRED_FILE}.pkgs"
+    fi
+
+    if ((${#pending_packages[@]} > 0)); then
+        warn "a reboot is required to finish installing: ${pending_packages[*]}"
+    else
+        warn "a reboot is required to finish applying the installed updates"
+    fi
+
+    [[ "$REBOOT_AT_END" == "true" ]] ||
+        warn "reboot when convenient: sudo systemctl reboot"
+}
+
 # -----------------------------------------------------------------------------
 # Main entry point
 # -----------------------------------------------------------------------------
@@ -3162,7 +3266,7 @@ main() {
     configure_syncthing_service
     install_pandoc
     if [[ "$UBUNTU_VARIANT" == "desktop" ]]; then
-        install_package_array "Desktop" "${DESKTOP_PACKAGES[@]}"
+        install_available_package_array "Desktop" "${DESKTOP_PACKAGES[@]}"
         configure_flathub
         install_flatpak_package_array "Desktop Flatpak" "${FLATPAK_PACKAGES[@]}"
         configure_cryptomator_fuse_access
@@ -3252,6 +3356,7 @@ main() {
     ok "cleanup completed"
 
     show_manual_setup_hints
+    report_pending_reboot
 
     end_ts="$(date +%s)"
     elapsed="$((end_ts - start_ts))"

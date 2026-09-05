@@ -24,6 +24,14 @@ die() {
     exit 1
 }
 
+# Create a directory only when it is missing, leaving the mode and ownership of
+# an existing one untouched.
+ensure_directory() {
+    local directory="$1"
+
+    [[ -d "$directory" ]] || install -d -m 0755 "$directory"
+}
+
 resolve_bootstrap_revision() {
     local revision="${PACKERTRON_BOOTSTRAP_REVISION:-}"
 
@@ -67,8 +75,13 @@ run_step() {
 
     printf 'RUN: %s (%s)\n' "$name" "$BOOTSTRAP_REVISION"
 
-    REBOOT_AT_END=false \
-        bash "$SCRIPT_DIR/$script"
+    # TARGET_USER is passed through explicitly when set. Under systemd there is
+    # no SUDO_USER, so without it the step falls back to discovering a single
+    # eligible account, which fails permanently once a second one exists.
+    local -a step_environment=(REBOOT_AT_END=false)
+    [[ -z "${TARGET_USER:-}" ]] || step_environment+=("TARGET_USER=${TARGET_USER}")
+
+    env "${step_environment[@]}" bash "$SCRIPT_DIR/$script"
 
     write_revision_marker "$marker"
     printf 'DONE: %s (%s)\n' "$name" "$BOOTSTRAP_REVISION"
@@ -77,15 +90,21 @@ run_step() {
 schedule_reboot() {
     sync
 
+    # Warn anyone already logged in: provisioning can take long enough for a
+    # desktop session to be in use by the time this fires.
+    wall 'Packertron bootstrap finished; this system reboots in 2 minutes.' 2>/dev/null || true
+
     systemd-run \
         --unit=packertron-bootstrap-reboot \
         --on-active=2m \
-        /usr/bin/systemctl reboot -i ||
+        /usr/bin/systemctl reboot ||
         die "failed scheduling the required reboot; bootstrap remains incomplete"
 }
 
 finalize_bootstrap() {
-    schedule_reboot || return
+    # schedule_reboot dies on failure today, so this guard is belt-and-braces:
+    # completion must never be recorded unless the reboot timer was accepted.
+    schedule_reboot || return 1
     write_revision_marker "$STATE_DIR/complete"
 }
 
@@ -95,7 +114,13 @@ main() {
     BOOTSTRAP_REVISION="$(resolve_bootstrap_revision)"
 
     install -d -m 0700 "$STATE_DIR"
-    install -d -m 0755 "$(dirname -- "$LOG_FILE")" "$(dirname -- "$LOCK_FILE")"
+    # Only create these when they are missing. "install -d -m" also applies the
+    # mode to directories that already exist, and the defaults here are
+    # /var/log and /run/lock: forcing 0755 on those strips group-write from
+    # /var/log (rsyslog can then no longer create files) and clears the sticky
+    # bit on /run/lock.
+    ensure_directory "$(dirname -- "$LOG_FILE")"
+    ensure_directory "$(dirname -- "$LOCK_FILE")"
     touch "$LOG_FILE"
     chmod 0600 "$LOG_FILE"
 
@@ -103,8 +128,10 @@ main() {
 
     exec 9>"$LOCK_FILE"
     if ! flock -n 9; then
-        printf 'Another bootstrap execution is already running\n'
-        return
+        # Must not return success: systemd removes the first-boot service once
+        # ExecStart succeeds, which would tear down the retry mechanism without
+        # any provisioning having happened.
+        die "another bootstrap execution is already running"
     fi
 
     if marker_matches_revision "$STATE_DIR/complete"; then

@@ -941,6 +941,16 @@ install_pandoc() {
 #   connect_snap_interface <snap>:<interface> "<description>"   # only if needed
 # No per-tool function is required.
 
+# snapd blocks indefinitely while it seeds on a freshly installed system, and
+# the Desktop path installs several snaps back to back. Bound every snap
+# mutation the way the "snap refresh" in 03-customize-system.sh already is.
+# Read-only queries (snap list) return immediately and stay unwrapped.
+SNAP_OPERATION_TIMEOUT="${SNAP_OPERATION_TIMEOUT:-15m}"
+
+run_snap() {
+    timeout --foreground --kill-after=30s "$SNAP_OPERATION_TIMEOUT" snap "$@"
+}
+
 install_snap_package() {
     local snap_name="$1"
     local display_name="$2"
@@ -955,8 +965,8 @@ install_snap_package() {
         return 0
     fi
 
-    if ! snap install "$snap_name"; then
-        die "failed installing ${display_name} snap (${snap_name})"
+    if ! run_snap install "$snap_name"; then
+        die "failed installing ${display_name} snap (${snap_name}) or the operation timed out"
     fi
     ok "${display_name} snap installed"
 }
@@ -1675,7 +1685,8 @@ install_obsidian() (
         dpkg --compare-versions "$installed_version" ge "$latest_version"; then
         if [[ "$snap_installed" == true ]]; then
             info "removing duplicate Obsidian snap"
-            snap remove obsidian || die "failed removing duplicate Obsidian snap"
+            run_snap remove obsidian ||
+                die "failed removing the duplicate Obsidian snap, or the operation timed out"
         fi
         info "Obsidian ${installed_version} already installed, skipping"
         return
@@ -1736,7 +1747,8 @@ install_obsidian() (
 
     if [[ "$snap_installed" == true ]]; then
         info "removing duplicate Obsidian snap"
-        snap remove obsidian || die "failed removing duplicate Obsidian snap"
+        run_snap remove obsidian ||
+            die "failed removing the duplicate Obsidian snap, or the operation timed out"
     fi
 
     ok "Obsidian ${installed_version} installed from the official GitHub release"
@@ -1757,6 +1769,7 @@ install_kubectl() (
     local kubectl_bin="${LOCAL_BIN_DIR}/kubectl"
     local installed_version=""
     local published_checksum
+    local staged_binary
     local stable_version
     local temporary_dir
 
@@ -1799,7 +1812,21 @@ install_kubectl() (
     [[ ! -L "$kubectl_bin" ]] ||
         die "refusing to replace symlinked kubectl binary: ${kubectl_bin}"
     install -d -m 0755 "$LOCAL_BIN_DIR"
-    install -m 0755 "$temporary_dir/kubectl" "$kubectl_bin"
+
+    # Stage beside the target and rename, like write_file_if_changed and
+    # install_target_config_file do. "install" unlinks the destination and
+    # writes a fresh file, so an interrupt mid-write leaves either no kubectl at
+    # all or a truncated but still executable one. A rename is atomic: the path
+    # always holds a complete binary.
+    staged_binary="$(mktemp "${kubectl_bin}.tmp.XXXXXX")"
+    if ! install -m 0755 "$temporary_dir/kubectl" "$staged_binary"; then
+        rm -f -- "$staged_binary"
+        die "failed staging kubectl ${stable_version}"
+    fi
+    if ! mv -f -- "$staged_binary" "$kubectl_bin"; then
+        rm -f -- "$staged_binary"
+        die "failed installing kubectl ${stable_version}"
+    fi
 
     installed_version="$("$kubectl_bin" version --client --output=json 2>/dev/null |
         jq -r '.clientVersion.gitVersion // empty' 2>/dev/null || true)"
