@@ -1,4 +1,15 @@
-# This is a basic workflow to help you get started with Actions
+# Release automation: bumps version.yaml, regenerates CHANGELOG.md, tags.
+#
+# Two things to know before touching branch protection:
+#
+# 1. There is no pull_request trigger here, so this workflow never reports a
+#    status on a PR. Never add it to a ruleset's required status checks: the
+#    check would be permanently "expected" and no PR could ever merge.
+#
+# 2. It pushes the release commit and tag straight to main. A ruleset that
+#    requires a pull request before merging will block that push, which breaks
+#    releases. Give the release actor a bypass entry in the ruleset, or leave
+#    "Require a pull request before merging" off.
 
 name: Changelog CI
 

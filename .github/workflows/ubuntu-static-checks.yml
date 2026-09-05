@@ -1,11 +1,12 @@
 name: Ubuntu static checks
 
 on:
+  # No paths filter on pull_request, deliberately. A path-filtered workflow
+  # does not run at all on a PR that touches nothing matching, so it never
+  # reports a status; a branch ruleset that requires this check would then wait
+  # forever on exactly those PRs. Filtering stays on push, where nothing is
+  # gated on the result.
   pull_request:
-    paths:
-      - "scripts/ubuntu/**"
-      - "ubuntu-24.04-x64-desktop/Vagrantfile"
-      - "ubuntu-26.04-x64-desktop/Vagrantfile"
   push:
     branches:
       - main
@@ -20,6 +21,9 @@ permissions:
 
 jobs:
   static-checks:
+    # This name is the status check context. Keep it stable: the branch ruleset
+    # refers to it by this exact string.
+    name: Ubuntu static checks
     runs-on: ubuntu-latest
     timeout-minutes: 15
     defaults:

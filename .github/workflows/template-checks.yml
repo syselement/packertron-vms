@@ -6,14 +6,12 @@ name: Template checks
 # cloud-init seeds, and scans the tree for committed secrets.
 
 on:
+  # No paths filter on pull_request, deliberately. A path-filtered workflow
+  # does not run at all on a PR that touches nothing matching, so it never
+  # reports a status; a branch ruleset that requires one of these checks would
+  # then wait forever on exactly those PRs. Filtering stays on push, where
+  # nothing is gated on the result.
   pull_request:
-    paths:
-      - "**/*.pkr.hcl"
-      - "**/*.pkrvars.hcl"
-      - "**/http/user-data"
-      - "**/http/meta-data"
-      - "scripts/ubuntu/autoinstall-*.yaml"
-      - ".github/workflows/template-checks.yml"
   push:
     branches:
       - main
@@ -139,3 +137,41 @@ jobs:
         uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  template-checks:
+    # This is the single job to mark as a required status check, rather than
+    # the jobs above. The packer job is a matrix, so it produces one context
+    # per template ("packer: kali", ...): requiring those directly means the
+    # ruleset silently breaks every time a template is added or renamed, and a
+    # removed entry leaves a required check that can never report again.
+    #
+    # if: always() matters. Without it this job is skipped when anything it
+    # needs fails, and a skipped required check blocks the PR with no failure
+    # to look at.
+    name: Template checks complete
+    if: always()
+    needs:
+      - packer
+      - cloud-init
+      - secrets
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Verify that every check passed
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          printf 'upstream results: %s\n' "$RESULTS"
+          status=0
+          for result in $RESULTS; do
+            case "$result" in
+              # skipped counts as a pass so a future "if:" on one of the jobs
+              # above does not wedge the gate. None of them is conditional today.
+              success | skipped) ;;
+              *)
+                printf 'a required job reported: %s\n' "$result" >&2
+                status=1
+                ;;
+            esac
+          done
+          exit "$status"
