@@ -204,91 +204,26 @@ readonly -a VIRTUALIZATION_DESKTOP_PACKAGES=(
 # Runtime and logging
 # -----------------------------------------------------------------------------
 
-require_root() {
-    if [[ "${EUID}" -ne 0 ]]; then
-        echo "[${SCRIPT_NAME}] ERROR must run as root (use: sudo bash $0)" >&2
-        exit 1
-    fi
-}
-
 USER_NAME=""
 VERSION_ID=""
 CODENAME=""
 ARCH=""
-t_bold=""
-t_dim=""
-t_cyan=""
-t_green=""
-t_yellow=""
-t_red=""
-t_reset=""
 
 initialize_runtime() {
     require_root
 
-    # Both of these must run before stdout is redirected below: afterwards
-    # stdout is a pipe, so terminal detection can only ever answer false.
+    # Both of these must run before start_log_file: afterwards stdout is a
+    # pipe, so terminal detection can only ever answer false.
     ubuntu_context_capture_tty
+    enable_colors
 
-    # Console keeps ANSI colors, while the log file stores plain text.
-    if [[ -t 1 && "${TERM:-dumb}" != "dumb" && -z "${NO_COLOR+x}" ]]; then
-        t_bold=$'\e[1m'
-        t_dim=$'\e[2m'
-        t_cyan=$'\e[36m'
-        t_green=$'\e[32m'
-        t_yellow=$'\e[33m'
-        t_red=$'\e[31m'
-        t_reset=$'\e[0m'
-    fi
-    install -m 0600 /dev/null "$LOG_FILE"
-    # The console keeps live progress; the log file gets the filtered
-    # transcript. See lib/logging.sh for what is stripped and why.
-    exec > >(tee >(filter_log_output >"$LOG_FILE")) 2>&1
+    start_log_file
 
     initialize_ubuntu_context
     USER_NAME="$TARGET_USER"
     VERSION_ID="$UBUNTU_VERSION_ID"
     CODENAME="$UBUNTU_CODENAME"
     ARCH="$(dpkg --print-architecture)"
-}
-
-_ts() { date +'%F %T'; }
-log() {
-    local level="$1"
-    local level_color="$2"
-    shift 2
-
-    local message="$*"
-    local ts
-
-    ts="$(_ts)"
-    printf '%s %s %s%-5s%s %s\n' \
-        "[$ts]" \
-        "$LOG_PREFIX" \
-        "$level_color" \
-        "$level" \
-        "$t_reset" \
-        "$message"
-}
-section() {
-    printf '\n'
-    log "STEP" "${t_cyan}${t_bold}" "==================== $* ===================="
-}
-info() { log "INFO" "$t_dim" "$@"; }
-ok() { log "OK" "${t_green}${t_bold}" "$@"; }
-warn() { log "WARN" "${t_yellow}${t_bold}" "$@"; }
-error() { log "ERROR" "${t_red}${t_bold}" "$@"; }
-manual_step() {
-    printf '\n'
-    printf '    %s\n' "------------------------------------------------------------"
-    log "STEP" "${t_cyan}${t_bold}" "--- $* ---"
-}
-manual_line() { printf '    %s\n' "$*"; }
-manual_item() { printf '    • %s\n' "$*"; }
-manual_command() { printf '      $ %s\n' "$*"; }
-die() {
-    error "$*"
-    exit 1
 }
 
 # -----------------------------------------------------------------------------
@@ -888,43 +823,13 @@ enable_target_user_service_offline() {
         die "failed enabling ${service_name} for ${TARGET_USER}"
 }
 
-# Without lingering, systemd only starts a user's manager when they log in
-# interactively. On a headless Server that never happens, so an "enabled"
-# target-user service stays permanently stopped. Best effort: failing to enable
-# lingering degrades to the old deferred-until-login behaviour.
-enable_target_user_linger() {
-    local linger_state
-
-    command -v loginctl >/dev/null 2>&1 || {
-        warn "loginctl is unavailable; target-user services start only after an interactive login"
-        return 1
-    }
-
-    linger_state="$(loginctl show-user "$TARGET_USER" --property=Linger --value 2>/dev/null)" ||
-        linger_state=""
-    if [[ "$linger_state" == "yes" ]]; then
-        info "lingering is already enabled for ${TARGET_USER}"
-        return 0
-    fi
-
-    loginctl enable-linger "$TARGET_USER" || {
-        warn "failed enabling lingering for ${TARGET_USER}; target-user services start only after an interactive login"
-        return 1
-    }
-    ok "enabled lingering for ${TARGET_USER} so target-user services start at boot"
-}
-
 configure_syncthing_service() {
     command -v systemctl >/dev/null 2>&1 ||
         die "systemctl is required to configure Syncthing"
 
     if ! target_user_systemd_available; then
         enable_target_user_service_offline syncthing.service
-        if enable_target_user_linger; then
-            info "Syncthing starts with the ${TARGET_USER} systemd manager at the next boot"
-        else
-            warn "target user systemd manager is not running; Syncthing startup is deferred until login"
-        fi
+        warn "target user systemd manager is not running; Syncthing startup is deferred until login"
         return
     fi
 

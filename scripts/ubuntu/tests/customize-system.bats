@@ -183,8 +183,10 @@ setup() {
 @test "provisioning logs enforce mode 0600 before capture" {
   local scripts_dir="$BATS_TEST_DIRNAME/.."
 
-  grep -Fq 'install -m 0600 /dev/null "$LOG_FILE"' "$scripts_dir/02-provision-system.sh"
-  grep -Fq 'install -m 0600 /dev/null "$LOG_FILE"' "$scripts_dir/03-customize-system.sh"
+  # 02 and 03 both open their log through start_log_file in lib/logging.sh.
+  grep -Fq 'install -m 0600 /dev/null "$LOG_FILE"' "$scripts_dir/lib/logging.sh"
+  grep -Fq 'start_log_file' "$scripts_dir/02-provision-system.sh"
+  grep -Fq 'start_log_file' "$scripts_dir/03-customize-system.sh"
   grep -Fq 'chmod 0600 "$LOG_FILE"' "$scripts_dir/90-bootstrap-baremetal.sh"
   grep -Fq 'chmod 0600 "$LOG_FILE"' "$scripts_dir/autoinstall-desktop.yaml"
   grep -Fq 'chmod 0600 "$LOG_FILE"' "$scripts_dir/autoinstall-server.yaml"
@@ -1057,8 +1059,6 @@ FAKE_GSETTINGS
   mkdir -p "$TARGET_HOME" "$SYSTEMD_USER_UNIT_DIR"
   touch "$SYSTEMD_USER_UNIT_DIR/syncthing.service"
 
-  # No loginctl, so lingering cannot be enabled and the old deferred-until-login
-  # behaviour is what remains.
   command() {
     [[ "$1" == "-v" && "$2" == "systemctl" ]]
   }
@@ -1080,63 +1080,6 @@ FAKE_GSETTINGS
 
   [[ "$status" -eq 0 ]]
   [[ "$(find "$TARGET_HOME/.config/systemd/user/default.target.wants" -type l | wc -l)" -eq 1 ]]
-}
-
-@test "a headless Syncthing enables lingering so the user manager starts at boot" {
-  local linger_record="$BATS_TEST_TMPDIR/linger-record"
-  TARGET_USER="$(id -un)"
-  TARGET_UID="$(id -u)"
-  TARGET_HOME="$BATS_TEST_TMPDIR/home"
-  SYSTEMD_USER_UNIT_DIR="$BATS_TEST_TMPDIR/usr/lib/systemd/user"
-  mkdir -p "$TARGET_HOME" "$SYSTEMD_USER_UNIT_DIR"
-  touch "$SYSTEMD_USER_UNIT_DIR/syncthing.service"
-
-  command() {
-    [[ "$1" == "-v" ]] || return 2
-    [[ "$2" == "systemctl" || "$2" == "loginctl" ]]
-  }
-  target_user_systemd_available() {
-    return 1
-  }
-  run_as_target_user() {
-    "$@"
-  }
-  loginctl() {
-    printf '%s\n' "$*" >>"$linger_record"
-    # An account with no session is not lingering yet.
-    [[ "$1" != "show-user" ]]
-  }
-
-  run configure_syncthing_service
-
-  [[ "$status" -eq 0 ]]
-  [[ "$output" == *"enabled lingering for ${TARGET_USER}"* ]]
-  [[ "$output" == *"Syncthing starts with the ${TARGET_USER} systemd manager at the next boot"* ]]
-  [[ "$output" != *"deferred until login"* ]]
-  grep -Fqx "enable-linger ${TARGET_USER}" "$linger_record"
-}
-
-@test "lingering that is already enabled is not set again" {
-  local linger_record="$BATS_TEST_TMPDIR/linger-repeat-record"
-  TARGET_USER="$(id -un)"
-
-  command() {
-    [[ "$1" == "-v" && "$2" == "loginctl" ]]
-  }
-  loginctl() {
-    if [[ "$1" == "show-user" ]]; then
-      printf 'yes\n'
-      return 0
-    fi
-    printf 'unexpected linger mutation: %s\n' "$*" >>"$linger_record"
-    return 99
-  }
-
-  run enable_target_user_linger
-
-  [[ "$status" -eq 0 ]]
-  [[ "$output" == *"lingering is already enabled"* ]]
-  [[ ! -e "$linger_record" ]]
 }
 
 @test "Cryptomator FUSE configuration writes only the required rules and reloads AppArmor" {

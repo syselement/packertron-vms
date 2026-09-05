@@ -95,14 +95,8 @@ readonly -a DESKTOP_TOOLCHAIN_PACKAGES=(
 readonly -a REQUIRED_TOOL_COMMANDS=(ansible docker packer tofu vagrant)
 readonly -a DESKTOP_REQUIRED_TOOL_COMMANDS=(code)
 
-# --- Logging setup ---
-_ts() { date +'%F %T'; }
-log() { printf '[%s] %s %s\n' "$(_ts)" "$LOG_PREFIX" "$*"; }
-warn() { printf '[%s] %s WARN: %s\n' "$(_ts)" "$LOG_PREFIX" "$*"; }
-die() {
-    printf '[%s] %s ERROR: %s\n' "$(_ts)" "$LOG_PREFIX" "$*" >&2
-    exit 1
-}
+# Logging comes from lib/logging.sh: section, info, ok, warn, error and die,
+# in the same format 03-customize-system.sh uses.
 
 install_missing_packages() {
     local -a missing=()
@@ -114,11 +108,11 @@ install_missing_packages() {
     done
 
     if ((${#missing[@]} == 0)); then
-        log "all requested packages already installed"
+        info "all requested packages already installed"
         return 0
     fi
 
-    log "install missing packages: ${missing[*]}"
+    info "install missing packages: ${missing[*]}"
     run_apt_get install -y -qq --no-install-recommends "${missing[@]}"
 }
 
@@ -133,7 +127,7 @@ install_file_if_changed() {
     install -d -m 0755 "$destination_dir"
 
     if [[ -f "$destination_file" ]] && cmp -s "$source_file" "$destination_file"; then
-        log "already current: ${destination_file}"
+        info "already current: ${destination_file}"
         return 0
     fi
 
@@ -149,7 +143,7 @@ install_file_if_changed() {
         die "failed installing ${destination_file}"
     fi
 
-    log "installed: ${destination_file}"
+    ok "installed: ${destination_file}"
 }
 
 validate_signing_key() {
@@ -179,7 +173,7 @@ setup_ansible_repo() {
     local ppa="ppa:ansible/ansible"
 
     if grep -Rqs -- "ansible/ansible" "$APT_SOURCES_DIR" 2>/dev/null; then
-        log "Ansible PPA already configured"
+        info "Ansible PPA already configured"
         return 0
     fi
 
@@ -299,7 +293,7 @@ expand_root_lvm_if_present() {
     case "$EXPAND_LVM_ROOT" in
         true) ;;
         false)
-            log "LVM root expansion disabled"
+            info "LVM root expansion disabled"
             return 0
             ;;
         *) die "EXPAND_LVM_ROOT must be true or false" ;;
@@ -313,7 +307,7 @@ expand_root_lvm_if_present() {
     fi
 
     if ! lvs "$ROOT_LV_PATH" >/dev/null 2>&1; then
-        log "LVM root not present at ${ROOT_LV_PATH}; expansion skipped"
+        info "LVM root not present at ${ROOT_LV_PATH}; expansion skipped"
         return 0
     fi
 
@@ -327,17 +321,17 @@ expand_root_lvm_if_present() {
         die "invalid free-extent count for ${ROOT_VG_NAME}: ${free_extents:-empty}"
 
     if ((free_extents == 0)); then
-        log "LVM root already uses all free extents"
+        info "LVM root already uses all free extents"
         return 0
     fi
 
-    log "expanding ${ROOT_LV_PATH} by ${free_extents} free extents"
+    info "expanding ${ROOT_LV_PATH} by ${free_extents} free extents"
     lvextend -r -l +100%FREE "$ROOT_LV_PATH" ||
         die "failed expanding ${ROOT_LV_PATH}"
 }
 
 update_and_upgrade_system() {
-    log "apt update / dist-upgrade"
+    info "apt update / dist-upgrade"
     run_apt_get update -qq
     run_apt_get dist-upgrade -y -qq
 }
@@ -345,16 +339,16 @@ update_and_upgrade_system() {
 configure_ntp() {
     local ntp_enabled
 
-    log "enable NTP"
+    info "enable NTP"
     if ! command -v timedatectl >/dev/null 2>&1; then
         warn "timedatectl is unavailable; NTP configuration skipped"
     elif ntp_enabled="$(timedatectl show --property=NTP --value 2>/dev/null)" &&
         [[ "$ntp_enabled" == "yes" ]]; then
-        log "NTP is already enabled"
+        info "NTP is already enabled"
     elif ! timedatectl set-ntp true; then
         warn "could not enable NTP in this execution environment"
     else
-        log "NTP enabled"
+        ok "NTP enabled"
     fi
 }
 
@@ -397,7 +391,7 @@ configure_docker() {
             systemctl start docker.service ||
                 die "failed starting Docker"
         fi
-        log "Docker service enabled and active"
+        ok "Docker service enabled and active"
     else
         warn "systemd is not operational; Docker service activation deferred"
     fi
@@ -406,9 +400,9 @@ configure_docker() {
     if [[ " ${user_groups} " != *" docker "* ]]; then
         usermod -aG docker "$USER_NAME" ||
             die "failed adding ${USER_NAME} to the docker group"
-        log "added ${USER_NAME} to the docker group; membership applies after login or reboot"
+        ok "added ${USER_NAME} to the docker group; membership applies after login or reboot"
     else
-        log "${USER_NAME} is already a member of the docker group"
+        info "${USER_NAME} is already a member of the docker group"
     fi
 }
 
@@ -431,7 +425,7 @@ validate_toolchain() {
             die "required command is unavailable after installation: ${command_name}"
     done
 
-    log "validate toolchain"
+    info "validate toolchain"
     ansible --version 2>/dev/null | sed -n '1p' ||
         die "Ansible version check failed"
 
@@ -469,7 +463,7 @@ report_pending_reboot() {
     local -a pending_packages=()
 
     if [[ ! -f "$REBOOT_REQUIRED_FILE" ]]; then
-        log "no reboot is pending"
+        info "no reboot is pending"
         return
     fi
 
@@ -488,14 +482,14 @@ report_pending_reboot() {
 }
 
 cleanup_apt() {
-    log "apt cleanup"
+    info "apt cleanup"
     run_apt_get autoremove -y --purge
     run_apt_get clean
     rm -rf /var/lib/apt/lists/*
 }
 
 show_system_info() {
-    log "system info"
+    info "system info"
     printf '%s\n' "---uname---"
     uname -a || true
     printf '%s\n' "---lsb---"
@@ -509,101 +503,111 @@ show_system_info() {
     lscpu || true
 }
 
-main() {
-    local start_ts end_ts elapsed
+initialize_runtime() {
+    require_root
 
-    if [[ "${EUID}" -ne 0 ]]; then
-        printf '[%s] ERROR must run as root\n' "$SCRIPT_NAME" >&2
-        return 1
-    fi
+    # Both of these must run before start_log_file: afterwards stdout is a
+    # pipe, so terminal detection can only ever answer false.
+    ubuntu_context_capture_tty
+    enable_colors
+
+    start_log_file
 
     initialize_ubuntu_context
     USER_NAME="$TARGET_USER"
     ARCH="$(dpkg --print-architecture)"
+}
 
-    install -m 0600 /dev/null "$LOG_FILE"
+main() {
+    local end_ts elapsed start_ts
 
-    # The console keeps live progress; the log file gets the filtered
-    # transcript. See lib/logging.sh for what is stripped and why.
-    exec > >(tee >(filter_log_output >"$LOG_FILE")) 2>&1
+    initialize_runtime
 
-    printf '%s\n' "################################"
-    printf '%s\n' "# Provision System"
-    printf '%s\n' "################################"
-    log "start: $(date -Is)"
+    section "Run Context"
+    info "run_id=${RUN_ID}"
+    info "started_at=$(date -Is)"
     start_ts="$(date +%s)"
 
-    log "distro version=${UBUNTU_VERSION_ID} codename=${UBUNTU_CODENAME} variant=${UBUNTU_VARIANT} variant_source=${UBUNTU_VARIANT_SOURCE} arch=${ARCH}"
-    log "execution mode=${EXECUTION_MODE} context=${EXECUTION_CONTEXT} interactive=${EXECUTION_INTERACTIVE}"
-    log "target user=${TARGET_USER} home=${TARGET_HOME}"
+    info "distro version=${UBUNTU_VERSION_ID} codename=${UBUNTU_CODENAME} variant=${UBUNTU_VARIANT} variant_source=${UBUNTU_VARIANT_SOURCE} arch=${ARCH}"
+    info "execution mode=${EXECUTION_MODE} context=${EXECUTION_CONTEXT} interactive=${EXECUTION_INTERACTIVE}"
+    ok "target user=${TARGET_USER} home=${TARGET_HOME}"
 
     apt_transaction_recover
 
+    section "Storage"
     expand_root_lvm_if_present
+
+    section "System Update"
     update_and_upgrade_system
 
-    log "install baseline packages (missing only)"
+    info "install baseline packages (missing only)"
     install_missing_packages "${BASELINE_PACKAGES[@]}"
 
     configure_ntp
     check_docker_package_conflicts
 
+    section "Repositories"
     install -m 0755 -d "$APT_KEYRING_DIR" "$SYSTEM_KEYRING_DIR" "$APT_SOURCES_DIR"
     apt_transaction_begin
 
-    log "configure Ansible repository"
+    info "configure Ansible repository"
     setup_ansible_repo
     if [[ "$UBUNTU_VARIANT" == "desktop" ]]; then
-        log "configure VS Code repository"
+        info "configure VS Code repository"
         setup_vscode_repo
     fi
-    log "configure Docker repository"
+    info "configure Docker repository"
     setup_docker_repo
-    log "configure OpenTofu repository"
+    info "configure OpenTofu repository"
     setup_opentofu_repo
-    log "configure HashiCorp repository"
+    info "configure HashiCorp repository"
     setup_hashicorp_repo
 
-    log "apt update after repository configuration"
+    info "apt update after repository configuration"
     if ! run_apt_get update -qq; then
         warn "APT update failed after repository changes; restoring previous repository state"
         apt_transaction_rollback
         die "APT repository validation failed; previous repository state restored"
     fi
     apt_transaction_commit
+    ok "Repository configuration completed"
 
-    log "install toolchain packages (missing only)"
+    section "Packages"
+    info "install toolchain packages (missing only)"
     install_missing_packages "${TOOLCHAIN_PACKAGES[@]}"
     if [[ "$UBUNTU_VARIANT" == "desktop" ]]; then
-        log "install Desktop toolchain packages (missing only)"
+        info "install Desktop toolchain packages (missing only)"
         install_missing_packages "${DESKTOP_TOOLCHAIN_PACKAGES[@]}"
     fi
+    ok "Package installation completed"
 
+    section "Docker"
     configure_docker
+
+    section "Cleanup"
     cleanup_apt
+
+    section "Validation"
     validate_toolchain
     show_system_info
     report_pending_reboot
 
     end_ts="$(date +%s)"
     elapsed="$((end_ts - start_ts))"
-    log "done: $(date -Is)"
-    log "elapsed: $(printf '%02d:%02d:%02d' "$((elapsed / 3600))" "$((elapsed % 3600 / 60))" "$((elapsed % 60))")"
-    log "log file: ${LOG_FILE}"
-    log "run_id: ${RUN_ID}"
-    log "================= RUN END ================="
-
-    printf '%s\n' "################################"
-    printf '%s\n' "# System Provisioning Complete"
-    printf '%s\n' "################################"
+    section "Summary"
+    info "completed_at=$(date -Is)"
+    info "elapsed=$(printf '%02d:%02d:%02d' "$((elapsed / 3600))" "$((elapsed % 3600 / 60))" "$((elapsed % 60))")"
+    info "log_file=${LOG_FILE}"
+    info "run_id=${RUN_ID}"
+    ok "System provisioning complete"
 
     if [[ "$REBOOT_AT_END" == "true" ]]; then
-        printf '[%s] rebooting in 5 seconds...\n' "$SCRIPT_NAME"
+        info "rebooting in 5 seconds"
         sleep 5
         sync
         shutdown -r now
     else
-        printf '[%s] reboot deferred to orchestrator\n' "$SCRIPT_NAME"
+        info "reboot deferred to orchestrator"
     fi
 }
 
