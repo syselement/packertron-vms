@@ -707,19 +707,29 @@ install_package_array() {
     ok "${description} package installation completed"
 }
 
+# Install what this release actually offers instead of failing the whole run on
+# the first package that does not exist here. The manifests are shared between
+# releases, so a package added to Ubuntu after 24.04 is simply absent there.
 install_available_package_array() {
     local description="$1"
     shift
     local package
     local -a available=()
+    local -a unavailable=()
 
     for package in "$@"; do
         if apt-cache show "$package" >/dev/null 2>&1; then
             available+=("$package")
         else
+            unavailable+=("$package")
             info "${package} is unavailable for Ubuntu ${VERSION_ID}; skipping"
         fi
     done
+
+    # Warn as well as list: an absent package is usually a release difference,
+    # but a third-party repository that failed to configure looks identical.
+    ((${#unavailable[@]} == 0)) ||
+        warn "${description}: skipped ${#unavailable[@]} unavailable package(s): ${unavailable[*]}"
 
     ((${#available[@]} > 0)) || return 0
     install_package_array "$description" "${available[@]}"
@@ -3162,7 +3172,7 @@ main() {
     configure_syncthing_service
     install_pandoc
     if [[ "$UBUNTU_VARIANT" == "desktop" ]]; then
-        install_package_array "Desktop" "${DESKTOP_PACKAGES[@]}"
+        install_available_package_array "Desktop" "${DESKTOP_PACKAGES[@]}"
         configure_flathub
         install_flatpak_package_array "Desktop Flatpak" "${FLATPAK_PACKAGES[@]}"
         configure_cryptomator_fuse_access

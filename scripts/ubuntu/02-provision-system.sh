@@ -71,7 +71,6 @@ readonly -a DOCKER_CONFLICT_PACKAGES=(
 
 readonly -a TOOLCHAIN_PACKAGES=(
     ansible
-    code
     docker-ce
     docker-ce-cli
     containerd.io
@@ -82,7 +81,16 @@ readonly -a TOOLCHAIN_PACKAGES=(
     vagrant
 )
 
-readonly -a REQUIRED_TOOL_COMMANDS=(ansible code docker packer tofu vagrant)
+# VS Code is a GUI application, so its repository, its package and its version
+# check are all Desktop-only. Installed unconditionally it drags an unused X
+# stack onto Server hosts, and `code --version` then fails there, taking the
+# whole run down with it. Vagrant and the rest are CLI tools and stay on both.
+readonly -a DESKTOP_TOOLCHAIN_PACKAGES=(
+    code
+)
+
+readonly -a REQUIRED_TOOL_COMMANDS=(ansible docker packer tofu vagrant)
+readonly -a DESKTOP_REQUIRED_TOOL_COMMANDS=(code)
 
 # --- Logging setup ---
 _ts() { date +'%F %T'; }
@@ -405,8 +413,13 @@ validate_toolchain() {
     local packer_version
     local tofu_version
     local vagrant_version
+    local -a required_commands=("${REQUIRED_TOOL_COMMANDS[@]}")
 
-    for command_name in "${REQUIRED_TOOL_COMMANDS[@]}"; do
+    if [[ "$UBUNTU_VARIANT" == "desktop" ]]; then
+        required_commands+=("${DESKTOP_REQUIRED_TOOL_COMMANDS[@]}")
+    fi
+
+    for command_name in "${required_commands[@]}"; do
         command -v "$command_name" >/dev/null 2>&1 ||
             die "required command is unavailable after installation: ${command_name}"
     done
@@ -415,9 +428,11 @@ validate_toolchain() {
     ansible --version 2>/dev/null | sed -n '1p' ||
         die "Ansible version check failed"
 
-    code_version="$(sudo -u "$USER_NAME" -H code --version 2>/dev/null)" ||
-        die "VS Code version check failed for ${USER_NAME}"
-    printf 'code:    %s\n' "${code_version%%$'\n'*}"
+    if [[ "$UBUNTU_VARIANT" == "desktop" ]]; then
+        code_version="$(sudo -u "$USER_NAME" -H code --version 2>/dev/null)" ||
+            die "VS Code version check failed for ${USER_NAME}"
+        printf 'code:    %s\n' "${code_version%%$'\n'*}"
+    fi
 
     compose_version="$(docker compose version 2>/dev/null)" ||
         die "Docker Compose version check failed"
@@ -504,8 +519,10 @@ main() {
 
     log "configure Ansible repository"
     setup_ansible_repo
-    log "configure VS Code repository"
-    setup_vscode_repo
+    if [[ "$UBUNTU_VARIANT" == "desktop" ]]; then
+        log "configure VS Code repository"
+        setup_vscode_repo
+    fi
     log "configure Docker repository"
     setup_docker_repo
     log "configure OpenTofu repository"
@@ -523,6 +540,10 @@ main() {
 
     log "install toolchain packages (missing only)"
     install_missing_packages "${TOOLCHAIN_PACKAGES[@]}"
+    if [[ "$UBUNTU_VARIANT" == "desktop" ]]; then
+        log "install Desktop toolchain packages (missing only)"
+        install_missing_packages "${DESKTOP_TOOLCHAIN_PACKAGES[@]}"
+    fi
 
     configure_docker
     cleanup_apt

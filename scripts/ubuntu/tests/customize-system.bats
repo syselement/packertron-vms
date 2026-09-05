@@ -838,6 +838,47 @@ FAKE_GSETTINGS
   [[ "$output" != *"unexpected package installation"* ]]
 }
 
+@test "unavailable packages are summarised as a warning, not just an info line" {
+  VERSION_ID="24.04"
+  warn() {
+    printf 'WARN: %s\n' "$*"
+  }
+  apt-cache() {
+    [[ "$2" != "hardinfo2" ]]
+  }
+  install_package_array() {
+    printf 'installing: %s\n' "$*"
+  }
+
+  run install_available_package_array "Desktop" gparted hardinfo2 meld
+
+  [[ "$status" -eq 0 ]]
+  [[ "$output" == *"WARN: Desktop: skipped 1 unavailable package(s): hardinfo2"* ]]
+  [[ "$output" == *"installing: Desktop gparted meld"* ]]
+}
+
+@test "Desktop packages tolerate an entry missing from this release" {
+  # DESKTOP_PACKAGES is shared across releases, so a package that entered
+  # Ubuntu after 24.04 must not abort the entire customization run.
+  VERSION_ID="24.04"
+  warn() {
+    printf 'WARN: %s\n' "$*"
+  }
+  apt-cache() {
+    return 1
+  }
+  install_package_array() {
+    printf 'unexpected package installation\n' >&2
+    return 99
+  }
+
+  run install_available_package_array "Desktop" "${DESKTOP_PACKAGES[@]}"
+
+  [[ "$status" -eq 0 ]]
+  [[ "$output" != *"unexpected package installation"* ]]
+  [[ "$output" == *"WARN: Desktop: skipped ${#DESKTOP_PACKAGES[@]} unavailable package(s)"* ]]
+}
+
 @test "release-optional packages install entries available on Ubuntu 26.04" {
   local install_record="$BATS_TEST_TMPDIR/install-record"
 

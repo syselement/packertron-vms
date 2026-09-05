@@ -167,6 +167,51 @@ setup() {
   [[ "$output" == *"remove them explicitly"* ]]
 }
 
+@test "VS Code appears only in the Desktop toolchain manifests" {
+  [[ " ${TOOLCHAIN_PACKAGES[*]} " != *" code "* ]]
+  [[ " ${REQUIRED_TOOL_COMMANDS[*]} " != *" code "* ]]
+  [[ " ${DESKTOP_TOOLCHAIN_PACKAGES[*]} " == *" code "* ]]
+  [[ " ${DESKTOP_REQUIRED_TOOL_COMMANDS[*]} " == *" code "* ]]
+}
+
+@test "Server validation neither requires nor invokes VS Code" {
+  UBUNTU_VARIANT="server"
+  command() {
+    [[ "$1" == "-v" ]] || return 2
+    [[ "$2" != "code" ]]
+  }
+  code() {
+    printf 'unexpected VS Code invocation\n' >&2
+    return 99
+  }
+  sudo() {
+    printf 'sudo %s\n' "$*"
+  }
+  ansible() { printf 'ansible 2.0\n'; }
+  docker() { printf 'docker 1.0\n'; }
+  tofu() { printf 'tofu 1.0\n'; }
+  vagrant() { printf 'vagrant 1.0\n'; }
+
+  run validate_toolchain
+
+  [[ "$status" -eq 0 ]]
+  [[ "$output" != *"unexpected"* ]]
+  [[ "$output" != *"code:"* ]]
+}
+
+@test "Desktop validation still fails when VS Code is missing" {
+  UBUNTU_VARIANT="desktop"
+  command() {
+    [[ "$1" == "-v" ]] || return 2
+    [[ "$2" != "code" ]]
+  }
+
+  run validate_toolchain
+
+  [[ "$status" -ne 0 ]]
+  [[ "$output" == *"required command is unavailable after installation: code"* ]]
+}
+
 @test "Docker setup avoids repeated group and service changes" {
   docker() {
     return 0
