@@ -17,7 +17,15 @@ The set covers:
 
 - Set `TARGET_USER` explicitly when an automated root run has more than one eligible local user.
 
-`02-provision-system.sh` and `03-customize-system.sh` share `lib/apt.sh` (one hardened `run_apt_get` with dpkg lock timeout, acquire retries, network timeouts and noninteractive conffile handling), `lib/download.sh` (`fetch_file` with an outer retry loop and stall detection, plus `fetch_file_range` for reading package metadata without a full download) and `lib/logging.sh` (`filter_log_output`, which turns the live console stream into the readable log-file transcript).
+`02-provision-system.sh` and `03-customize-system.sh` share `lib/apt.sh` (one hardened `run_apt_get` with dpkg lock timeout, acquire retries, network timeouts and noninteractive conffile handling), `lib/download.sh` (`fetch_file` with an outer retry loop and stall detection, plus `fetch_file_range` for reading package metadata without a full download) and `lib/logging.sh` (the whole logger, so both scripts produce identical output).
+
+Both scripts log in one format, with `STEP` section banners and `INFO` / `OK` / `WARN` / `ERROR` levels, coloured on a terminal and plain in the log file:
+
+```text
+[2026-09-05 15:27:12] [customize-system] STEP  ==================== Repositories ====================
+[2026-09-05 15:27:13] [customize-system] OK    configured AZLux repository
+[2026-09-05 15:30:05] [customize-system] WARN  a reboot is required to finish installing: linux-image-generic
+```
 
 - The console always shows progress live; only the log file is filtered. `filter_log_output` drops ANSI escapes and keeps just the final state of a carriage-return redrawn line, so a dpkg or curl progress meter contributes one line instead of hundreds — and contributes none at all when it never printed anything but percentages.
 
@@ -132,7 +140,7 @@ Set `REBOOT_AT_END=false` when an orchestrator such as Vagrant owns the reboot. 
 
 Desktop packages are installed with an availability check rather than a hard failure. The manifests are shared between releases, so a package that entered Ubuntu after 24.04 is simply absent there; skipped packages are listed in a single warning line, because a third-party repository that failed to configure looks the same as a release difference.
 
-On Server, Syncthing's user service is enabled and lingering is turned on for the target user, so systemd starts the user manager at boot. Without it an "enabled" user service on a headless host stays permanently stopped, because nothing ever logs in interactively.
+On Server, Syncthing's user unit is enabled by linking it into the target user's `default.target.wants`, but it only starts once that user logs in — systemd does not run a user manager for an account with no session. Lingering is deliberately not enabled; start it by hand, or enable `loginctl enable-linger`, if the service is wanted on a headless host.
 
 ---
 
