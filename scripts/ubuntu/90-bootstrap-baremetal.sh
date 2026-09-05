@@ -95,7 +95,13 @@ main() {
     BOOTSTRAP_REVISION="$(resolve_bootstrap_revision)"
 
     install -d -m 0700 "$STATE_DIR"
-    install -d -m 0755 "$(dirname -- "$LOG_FILE")" "$(dirname -- "$LOCK_FILE")"
+    # Only create these when they are missing. "install -d -m" also applies the
+    # mode to directories that already exist, and the defaults here are
+    # /var/log and /run/lock: forcing 0755 on those strips group-write from
+    # /var/log (rsyslog can then no longer create files) and clears the sticky
+    # bit on /run/lock.
+    ensure_directory "$(dirname -- "$LOG_FILE")"
+    ensure_directory "$(dirname -- "$LOCK_FILE")"
     touch "$LOG_FILE"
     chmod 0600 "$LOG_FILE"
 
@@ -103,8 +109,10 @@ main() {
 
     exec 9>"$LOCK_FILE"
     if ! flock -n 9; then
-        printf 'Another bootstrap execution is already running\n'
-        return
+        # Must not return success: systemd removes the first-boot service once
+        # ExecStart succeeds, which would tear down the retry mechanism without
+        # any provisioning having happened.
+        die "another bootstrap execution is already running"
     fi
 
     if marker_matches_revision "$STATE_DIR/complete"; then
