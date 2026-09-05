@@ -1,3 +1,12 @@
+## [0.68.1](https://github.com/syselement/packertron-vms/compare/v0.68.0...v0.68.1) (2026-09-05)
+
+
+### Bug Fixes
+
+* **ci:** drop the custom Dependabot labels ([c9340bd](https://github.com/syselement/packertron-vms/commit/c9340bd9cd20ef4e0f2ddf5f98949e1d2556e73b))
+
+
+
 # [0.68.0](https://github.com/syselement/packertron-vms/compare/v0.67.3...v0.68.0) (2026-09-05)
 
 
@@ -48,15 +57,6 @@
 * **logging:** remove redundant comments and improve log file handling ([082fcdb](https://github.com/syselement/packertron-vms/commit/082fcdb0dd778da5908c7ef4793281744478abc2))
 * **ubuntu:** detect interactivity before stdout is redirected, tidy log output ([84b4780](https://github.com/syselement/packertron-vms/commit/84b478030ed17f7b9763855cabb7bb5a7847ef43))
 * **ubuntu:** stop Termius and Yubico downloading before checking versions ([bc0d588](https://github.com/syselement/packertron-vms/commit/bc0d5883aad9a92df0efdce91048d38f554116ff))
-
-
-
-# [0.67.0](https://github.com/syselement/packertron-vms/compare/v0.66.0...v0.67.0) (2026-09-05)
-
-
-### Features
-
-* add run_as_target_user_in_home function and update tests for home directory context ([f362356](https://github.com/syselement/packertron-vms/commit/f362356efba3d266332d863d4366ee819fc9d7fc))
 
 
 
