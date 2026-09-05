@@ -36,7 +36,7 @@ jobs:
         with:
           fetch-depth: 0
       - name: "✏️ Conventional Changelog Action"
-        uses: TriPSs/conventional-changelog-action@67139193614f5b9e8db87da1bd4240922b34d765 # v6.0.0
+        uses: TriPSs/conventional-changelog-action@469f0e5e35831fbd1962706f29f65daf0a5723f2 # v6.5.0
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           skip-git-pull: "true"
