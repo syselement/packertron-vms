@@ -1,3 +1,13 @@
+## [0.67.3](https://github.com/syselement/packertron-vms/compare/v0.67.2...v0.67.3) (2026-09-05)
+
+
+### Bug Fixes
+
+* **ubuntu:** increase reboot delay to 10 seconds after provisioning ([0c80538](https://github.com/syselement/packertron-vms/commit/0c805380c19d66a7d5b0885383d3bffd2c864c59))
+* **ubuntu:** retry a Homebrew formula install before failing the run ([5e7c550](https://github.com/syselement/packertron-vms/commit/5e7c550f916bec31eafd5a62b87508851c17814f))
+
+
+
 ## [0.67.2](https://github.com/syselement/packertron-vms/compare/v0.67.1...v0.67.2) (2026-09-05)
 
 
@@ -39,15 +49,6 @@
 ### Features
 
 * add run_as_target_user_in_home function and update tests for home directory context ([0a4fd51](https://github.com/syselement/packertron-vms/commit/0a4fd5191f3ee0ed0e62719c8217a0ef1bd91025))
-
-
-
-# [0.65.0](https://github.com/syselement/packertron-vms/compare/v0.64.0...v0.65.0) (2026-08-31)
-
-
-### Features
-
-* add support for user-level systemd services and update tests for Syncthing ([ec40b9a](https://github.com/syselement/packertron-vms/commit/ec40b9a85a5a046670951e1bc891a7ae6393e101))
 
 
 
