@@ -34,6 +34,7 @@ SYSTEM_KEYRING_DIR="${PACKERTRON_SYSTEM_KEYRING_DIR:-/usr/share/keyrings}"
 APT_SOURCES_DIR="${PACKERTRON_APT_SOURCES_DIR:-/etc/apt/sources.list.d}"
 SYSTEMD_RUNTIME_DIR="${PACKERTRON_SYSTEMD_RUNTIME_DIR:-/run/systemd/system}"
 APT_TRANSACTION_DIR="${PACKERTRON_APT_TRANSACTION_DIR:-/var/lib/packertron-apt-transactions/provision-system}"
+REBOOT_REQUIRED_FILE="${PACKERTRON_REBOOT_REQUIRED_FILE:-/var/run/reboot-required}"
 ROOT_VG_NAME="${ROOT_VG_NAME:-ubuntu-vg}"
 ROOT_LV_PATH="${ROOT_LV_PATH:-/dev/ubuntu-vg/ubuntu-lv}"
 USER_NAME=""
@@ -459,6 +460,31 @@ validate_toolchain() {
     printf 'vagrant: %s\n' "${vagrant_version%%$'\n'*}"
 }
 
+# update-notifier-common drops /var/run/reboot-required when a package that
+# needs a restart (kernel, systemd, glibc) is installed. This script runs
+# dist-upgrade, so it is the one most likely to create it.
+report_pending_reboot() {
+    local -a pending_packages=()
+
+    if [[ ! -f "$REBOOT_REQUIRED_FILE" ]]; then
+        log "no reboot is pending"
+        return
+    fi
+
+    if [[ -r "${REBOOT_REQUIRED_FILE}.pkgs" ]]; then
+        mapfile -t pending_packages <"${REBOOT_REQUIRED_FILE}.pkgs"
+    fi
+
+    if ((${#pending_packages[@]} > 0)); then
+        warn "a reboot is required to finish installing: ${pending_packages[*]}"
+    else
+        warn "a reboot is required to finish applying the installed updates"
+    fi
+
+    [[ "$REBOOT_AT_END" == "true" ]] ||
+        warn "reboot when convenient: sudo systemctl reboot"
+}
+
 cleanup_apt() {
     log "apt cleanup"
     run_apt_get autoremove -y --purge
@@ -553,6 +579,7 @@ main() {
     cleanup_apt
     validate_toolchain
     show_system_info
+    report_pending_reboot
 
     end_ts="$(date +%s)"
     elapsed="$((end_ts - start_ts))"

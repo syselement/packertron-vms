@@ -167,6 +167,42 @@ setup() {
   [[ "$output" == *"remove them explicitly"* ]]
 }
 
+@test "a pending reboot is reported with the packages that need one" {
+  REBOOT_REQUIRED_FILE="$BATS_TEST_TMPDIR/reboot-required"
+  REBOOT_AT_END="false"
+  printf 'placeholder\n' >"$REBOOT_REQUIRED_FILE"
+  printf 'linux-image-generic\nsystemd\n' >"${REBOOT_REQUIRED_FILE}.pkgs"
+
+  run report_pending_reboot
+
+  [[ "$status" -eq 0 ]]
+  [[ "$output" == *"a reboot is required to finish installing: linux-image-generic systemd"* ]]
+  [[ "$output" == *"reboot when convenient: sudo systemctl reboot"* ]]
+}
+
+@test "no pending reboot is stated explicitly" {
+  REBOOT_REQUIRED_FILE="$BATS_TEST_TMPDIR/absent-reboot-required"
+  REBOOT_AT_END="false"
+
+  run report_pending_reboot
+
+  [[ "$status" -eq 0 ]]
+  [[ "$output" == *"no reboot is pending"* ]]
+  [[ "$output" != *"reboot when convenient"* ]]
+}
+
+@test "an orchestrated run is not told to reboot manually" {
+  REBOOT_REQUIRED_FILE="$BATS_TEST_TMPDIR/orchestrated-reboot-required"
+  REBOOT_AT_END="true"
+  printf 'placeholder\n' >"$REBOOT_REQUIRED_FILE"
+
+  run report_pending_reboot
+
+  [[ "$status" -eq 0 ]]
+  [[ "$output" == *"a reboot is required to finish applying the installed updates"* ]]
+  [[ "$output" != *"reboot when convenient"* ]]
+}
+
 @test "a Docker daemon that fails to start leaves no group membership behind" {
   local usermod_record="$BATS_TEST_TMPDIR/docker-failed-usermod-record"
 

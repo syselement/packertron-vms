@@ -1382,6 +1382,38 @@ FAKE_GSETTINGS
   [[ "$output" != *"unexpected snap mutation"* ]]
 }
 
+@test "a kernel upgrade during a deferred run is reported, not left silent" {
+  REBOOT_REQUIRED_FILE="$BATS_TEST_TMPDIR/reboot-required"
+  REBOOT_AT_END="false"
+  printf 'placeholder\n' >"$REBOOT_REQUIRED_FILE"
+  printf 'linux-image-generic\n' >"${REBOOT_REQUIRED_FILE}.pkgs"
+
+  warn() {
+    printf 'WARN: %s\n' "$*"
+  }
+
+  run report_pending_reboot
+
+  [[ "$status" -eq 0 ]]
+  [[ "$output" == *"WARN: a reboot is required to finish installing: linux-image-generic"* ]]
+  [[ "$output" == *"WARN: reboot when convenient: sudo systemctl reboot"* ]]
+}
+
+@test "a run with no pending reboot says so" {
+  REBOOT_REQUIRED_FILE="$BATS_TEST_TMPDIR/absent-reboot-required"
+  REBOOT_AT_END="false"
+
+  warn() {
+    printf 'WARN: %s\n' "$*"
+  }
+
+  run report_pending_reboot
+
+  [[ "$status" -eq 0 ]]
+  [[ "$output" == *"no reboot is pending"* ]]
+  [[ "$output" != *"WARN:"* ]]
+}
+
 @test "snap mutations are bounded by a timeout" {
   local recorded="$BATS_TEST_TMPDIR/timeout-arguments"
 

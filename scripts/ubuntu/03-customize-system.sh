@@ -53,6 +53,7 @@ SYSTEMD_USER_UNIT_DIR="${PACKERTRON_SYSTEMD_USER_UNIT_DIR:-/usr/lib/systemd/user
 LOCAL_BIN_DIR="${PACKERTRON_LOCAL_BIN_DIR:-/usr/local/bin}"
 APPARMOR_PROFILE_DIR="${PACKERTRON_APPARMOR_PROFILE_DIR:-/etc/apparmor.d}"
 KVM_DEVICE="${PACKERTRON_KVM_DEVICE:-/dev/kvm}"
+REBOOT_REQUIRED_FILE="${PACKERTRON_REBOOT_REQUIRED_FILE:-/var/run/reboot-required}"
 APT_TRANSACTION_DIR="${PACKERTRON_APT_TRANSACTION_DIR:-/var/lib/packertron-apt-transactions/customize-system}"
 HOMEBREW_PREFIX="${PACKERTRON_HOMEBREW_PREFIX:-/home/linuxbrew/.linuxbrew}"
 HOMEBREW_INSTALL_URL="${HOMEBREW_INSTALL_URL:-https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh}"
@@ -3135,6 +3136,32 @@ show_manual_setup_hints() {
     manual_line "Documentation: https://github.com/iximiuz/labctl"
 }
 
+# update-notifier-common drops /var/run/reboot-required when a package that
+# needs a restart (kernel, systemd, glibc) is installed. Nothing used to read
+# it, so a REBOOT_AT_END=false run - the documented way to run this script by
+# hand - ended silently on the old kernel.
+report_pending_reboot() {
+    local -a pending_packages=()
+
+    if [[ ! -f "$REBOOT_REQUIRED_FILE" ]]; then
+        info "no reboot is pending"
+        return
+    fi
+
+    if [[ -r "${REBOOT_REQUIRED_FILE}.pkgs" ]]; then
+        mapfile -t pending_packages <"${REBOOT_REQUIRED_FILE}.pkgs"
+    fi
+
+    if ((${#pending_packages[@]} > 0)); then
+        warn "a reboot is required to finish installing: ${pending_packages[*]}"
+    else
+        warn "a reboot is required to finish applying the installed updates"
+    fi
+
+    [[ "$REBOOT_AT_END" == "true" ]] ||
+        warn "reboot when convenient: sudo systemctl reboot"
+}
+
 # -----------------------------------------------------------------------------
 # Main entry point
 # -----------------------------------------------------------------------------
@@ -3329,6 +3356,7 @@ main() {
     ok "cleanup completed"
 
     show_manual_setup_hints
+    report_pending_reboot
 
     end_ts="$(date +%s)"
     elapsed="$((end_ts - start_ts))"
