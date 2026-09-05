@@ -14,15 +14,16 @@ The set covers:
 - retryable first-boot orchestration for autoinstall
 
 `02-provision-system.sh` and `03-customize-system.sh` share `lib/ubuntu-context.sh`. The helper verifies Ubuntu, detects Desktop or Server from installed Ubuntu metapackages, defaults to Server when no flavor metapackage is installed, records whether execution is interactive, and resolves the non-root target user.
-Set `TARGET_USER` explicitly when an automated root run has more than one eligible local user.
 
-`03-customize-system.sh` also sources `lib/custom-tools.sh`, which holds every third-party and custom tool installer grouped by how the tool is distributed (APT repository, direct `.deb` URL, GitHub release, Snap, vendor install script, archive, checksum-verified binary, pipx). Add new tools there, following the template comment on the matching section.
+- Set `TARGET_USER` explicitly when an automated root run has more than one eligible local user.
 
 `02-provision-system.sh` and `03-customize-system.sh` share `lib/apt.sh` (one hardened `run_apt_get` with dpkg lock timeout, acquire retries, network timeouts and noninteractive conffile handling) and `lib/download.sh` (`fetch_file` with an outer retry loop and stall detection, plus `fetch_file_range` for reading package metadata without a full download).
 
+`03-customize-system.sh` also sources `lib/custom-tools.sh`, which holds every third-party and custom tool installer grouped by how the tool is distributed (APT repository, direct `.deb` URL, GitHub release, Snap, vendor install script, archive, checksum-verified binary, pipx). **Add new tools there, following the template comment on the matching section.**
+
 `00-update-system.sh` and `01-cleanup-system.sh` each keep their own copy of the APT wrapper, because Packer's shell provisioner uploads those two on their own with no `lib/` directory beside them. `tests/update-system.bats` and `tests/cleanup-system.bats` assert the copies stay identical to the shared one.
 
-The `Dpkg::Options::=--force-confdef` / `--force-confold` in that wrapper are not redundant with `DEBIAN_FRONTEND=noninteractive`: that governs debconf, while dpkg's own *"Configuration file '…' — what would you like to do about it?"* prompt is separate. Without them, a run started from a terminal — the documented way to run `02` and `03` — blocks indefinitely on any locally modified conffile.
+- The `Dpkg::Options::=--force-confdef` / `--force-confold` in that wrapper are not redundant with `DEBIAN_FRONTEND=noninteractive`: that governs debconf, while dpkg's own *"Configuration file '…' what would you like to do about it?"* prompt is separate. Without them, a run started from a terminal - the documented way to run `02` and `03` - blocks indefinitely on any locally modified conffile.
 
 ---
 
@@ -53,11 +54,16 @@ Seals a VM template so clones start clean. It:
 - removes temporary files
 - cleans cloud-init state if present
 
-**This is destructive on a running system.** It truncates the machine-id (breaking systemd/D-Bus identity, journald and DHCP DUIDs on the next boot) and deletes everything under `/tmp` and `/var/tmp`, including other processes' files. It therefore refuses to run unless Packer set `PACKER_BUILD_NAME`/`PACKER_BUILDER_TYPE`, or `PACKERTRON_ALLOW_CLEANUP=true` is passed explicitly.
+**This is destructive on a running system.**
+
+- It truncates the machine-id (breaking systemd/D-Bus identity, journald and DHCP DUIDs on the next boot) and deletes everything under `/tmp` and `/var/tmp`, including other processes' files.
+- It therefore refuses to run unless Packer set `PACKER_BUILD_NAME`/`PACKER_BUILDER_TYPE`, or `PACKERTRON_ALLOW_CLEANUP=true` is passed explicitly.
 
 The machine-id truncation and the cloud-init clean are fatal on failure, deliberately. Both produce a template that looks fine and only misbehaves after cloning: clones sharing a machine-id collide on DHCP DUIDs and journal identities, and leftover cloud-init state marks every clone as already provisioned.
 
-Run it last in a template build, after every other provisioning step. `90-bootstrap-baremetal.sh` never calls it.
+Run it last in a template build, after every other provisioning step.
+
+`90-bootstrap-baremetal.sh` never calls it.
 
 ---
 
@@ -152,7 +158,11 @@ It deliberately skips `00` (guest agents do not apply to bare metal) and `01` (t
 - `autoinstall-server.yaml` installs Ubuntu Server and creates the same first-boot workflow.
 - `autoinstall-noscripts.yaml` is the intentional negative control: it performs the unattended installation but invokes no provisioning scripts.
 
-The scripted YAML files write `/usr/local/sbin/packertron-firstboot` and a temporary systemd service. The runner checks out one fixed repository revision and invokes `90-bootstrap-baremetal.sh`. Transient failures are retried; after a successful run the service disables and removes itself.
+The scripted YAML files write `/usr/local/sbin/packertron-firstboot` and a temporary systemd service.
+
+- The runner checks out one fixed repository revision and invokes `90-bootstrap-baremetal.sh`.
+- Transient failures are retried.
+- After a successful run the service disables and removes itself.
 
 ---
 
@@ -180,7 +190,7 @@ Rules that follow from this:
 
 The autoinstall YAML files and the Packer `http/user-data` files contain **hardcoded credentials**, intentionally, for a single-operator lab:
 
-- the `syselement` account's SHA-512 password hash is the same in every file, and the plaintext (`packer`) is documented alongside it — a published salt plus a published plaintext is a published console password. `allow-pw: false` only disables SSH password authentication; console, TTY and GDM login are unaffected.
+- the `syselement` account's SHA-512 password hash is the same in every file, and the plaintext (`packer`) is documented alongside it - a published salt plus a published plaintext is a published console password. `allow-pw: false` only disables SSH password authentication; console, TTY and GDM login are unaffected.
 - a fixed ed25519 public key is authorized on every image.
 - `/etc/sudoers.d/99-syselement` grants permanent `NOPASSWD:ALL` and is never removed after bootstrap.
 
@@ -193,11 +203,15 @@ These images are not suitable for a shared or internet-reachable network as ship
 ### Packer template build
 
 ```text
-00-update-system.sh → 01-cleanup-system.sh                       # Desktop templates
-00-update-system.sh → 02-provision-system.sh → 01-cleanup-system.sh   # 24.04 Server
+# Desktop templates
+00-update-system.sh → 01-cleanup-system.sh
+
+# 24.04 Server
+00-update-system.sh → 02-provision-system.sh → 01-cleanup-system.sh
 ```
 
-`01` always runs last: it seals the template, and anything after it would put per-machine state straight back into the image. The Server template stages the whole `scripts/ubuntu` tree with a `file` provisioner before running `02`, because `02` sources `lib/*.sh` and a Packer `scripts` list uploads each file on its own with no `lib/` beside it.
+- `01` always runs last: it seals the template, and anything after it would put per-machine state straight back into the image.
+- The Server template stages the whole `scripts/ubuntu` tree with a `file` provisioner before running `02`, because `02` sources `lib/*.sh` and a Packer `scripts` list uploads each file on its own with no `lib/` beside it.
 
 ### Vagrant-provisioned workstation
 
@@ -257,11 +271,11 @@ The numeric prefixes describe the logical stage, not a sequence to run end to en
 
 ### APT update behavior
 
-The repeated APT metadata refreshes in the update and provisioning phases are
-intentional. Each script must remain independently executable and cannot
-assume a previous phase completed successfully — `02` and `03` therefore both
-run `dist-upgrade` unconditionally, including when `90` invokes them
-back to back.
+The repeated APT metadata refreshes in the update and provisioning phases are intentional.
+
+Each script must remain independently executable and cannot assume a previous phase completed successfully.
+
+`02` and `03` therefore both run `dist-upgrade` unconditionally, including when `90` invokes them back to back.
 
 ## Validation
 
@@ -286,9 +300,9 @@ cloud-init schema --config-file autoinstall-server.yaml --annotate
 
 ### Never run these on a machine you use
 
-- `01-cleanup-system.sh` in full — it truncates the machine-id and clears `/tmp` and `/var/tmp`. The template guard now refuses, but do not override it.
-- `90-bootstrap-baremetal.sh` — it runs `02` and `03` end to end and schedules a reboot.
-- a complete `02` or `03` run — both `dist-upgrade`, add repositories and restart services.
+- `01-cleanup-system.sh` in full - it truncates the machine-id and clears `/tmp` and `/var/tmp`. The template guard now refuses, but do not override it.
+- `90-bootstrap-baremetal.sh` - it runs `02` and `03` end to end and schedules a reboot.
+- a complete `02` or `03` run - both `dist-upgrade`, add repositories and restart services.
 
 Everything below needs a disposable VM or real hardware.
 
