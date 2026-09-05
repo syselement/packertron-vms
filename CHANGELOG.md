@@ -1,3 +1,14 @@
+## [0.67.1](https://github.com/syselement/packertron-vms/compare/v0.67.0...v0.67.1) (2026-09-05)
+
+
+### Bug Fixes
+
+* **logging:** remove redundant comments and improve log file handling ([082fcdb](https://github.com/syselement/packertron-vms/commit/082fcdb0dd778da5908c7ef4793281744478abc2))
+* **ubuntu:** detect interactivity before stdout is redirected, tidy log output ([84b4780](https://github.com/syselement/packertron-vms/commit/84b478030ed17f7b9763855cabb7bb5a7847ef43))
+* **ubuntu:** stop Termius and Yubico downloading before checking versions ([bc0d588](https://github.com/syselement/packertron-vms/commit/bc0d5883aad9a92df0efdce91048d38f554116ff))
+
+
+
 # [0.67.0](https://github.com/syselement/packertron-vms/compare/v0.66.0...v0.67.0) (2026-09-05)
 
 
@@ -31,16 +42,6 @@
 ### Features
 
 * update dock favorites to include Termix ([d7ceb89](https://github.com/syselement/packertron-vms/commit/d7ceb89a35d8117642a5d53fac8fa3506c1527aa))
-
-
-
-# [0.63.0](https://github.com/syselement/packertron-vms/compare/v0.62.0...v0.63.0) (2026-08-23)
-
-
-### Features
-
-* add installation support for Clockify ([4c0f176](https://github.com/syselement/packertron-vms/commit/4c0f176fe137238d8ad18a02d8ad614bdc0172e2))
-* add installation support for Strawberry Music Player and related tests, inxi and hardinfo2 tools ([5ac3d4d](https://github.com/syselement/packertron-vms/commit/5ac3d4d124fbf5eb75a40d864d008c5c0e871919))
 
 
 
