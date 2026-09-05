@@ -29,7 +29,10 @@ jobs:
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v7
+        # Pinned to a commit rather than a tag: a tag can be moved, and this
+        # repository will hold infrastructure credentials. Dependabot keeps the
+        # pin current.
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
           persist-credentials: false
