@@ -27,7 +27,7 @@ Both scripts log in one format, with `STEP` section banners and `INFO` / `OK` / 
 [2026-09-05 15:30:05] [customize-system] WARN  a reboot is required to finish installing: linux-image-generic
 ```
 
-- The console always shows progress live; only the log file is filtered. `filter_log_output` drops ANSI escapes and keeps just the final state of a carriage-return redrawn line, so a dpkg or curl progress meter contributes one line instead of hundreds — and contributes none at all when it never printed anything but percentages.
+- The console always shows progress live; only the log file is filtered. `filter_log_output` drops ANSI escapes and keeps just the final state of a carriage-return redrawn line, so a dpkg or curl progress meter contributes one line instead of hundreds - and contributes none at all when it never printed anything but percentages.
 
 `03-customize-system.sh` also sources `lib/custom-tools.sh`, which holds every third-party and custom tool installer grouped by how the tool is distributed (APT repository, direct `.deb` URL, GitHub release, Snap, vendor install script, archive, checksum-verified binary, pipx). **Add new tools there, following the template comment on the matching section.**
 
@@ -140,7 +140,7 @@ Set `REBOOT_AT_END=false` when an orchestrator such as Vagrant owns the reboot. 
 
 Desktop packages are installed with an availability check rather than a hard failure. The manifests are shared between releases, so a package that entered Ubuntu after 24.04 is simply absent there; skipped packages are listed in a single warning line, because a third-party repository that failed to configure looks the same as a release difference.
 
-On Server, Syncthing's user unit is enabled by linking it into the target user's `default.target.wants`, but it only starts once that user logs in — systemd does not run a user manager for an account with no session. Lingering is deliberately not enabled; start it by hand, or enable `loginctl enable-linger`, if the service is wanted on a headless host.
+On Server, Syncthing's user unit is enabled by linking it into the target user's `default.target.wants`, but it only starts once that user logs in - systemd does not run a user manager for an account with no session. Lingering is deliberately not enabled; start it by hand, or enable `loginctl enable-linger`, if the service is wanted on a headless host.
 
 ---
 
@@ -331,7 +331,7 @@ Snapshot before each run. Record the release, the detected variant and the exact
 | # | Configuration | Entry path | What to assert |
 | --- | --- | --- | --- |
 | 1 | 24.04 Desktop | Vagrant (`02` → `03`) | full toolchain; GNOME applied; `variant=desktop` in the log; the `24.*` release arm is taken (`software-properties-common`, fastfetch PPA); any package missing on noble is listed in the skip warning rather than failing the run |
-| 2 | 24.04 Server | bare-metal autoinstall | no GNOME, dconf, flatpak or snap work attempted; VS Code **absent** and `02` still passes its toolchain validation; `loginctl show-user <user> --property=Linger` is `yes` and `systemctl --user status syncthing` is running after a reboot; `stat -c '%A' /var/log` is still group-writable (`drwxrwxr-x`) |
+| 2 | 24.04 Server | bare-metal autoinstall | no GNOME, dconf, flatpak or snap work attempted; VS Code **absent** and `02` still passes its toolchain validation; Syncthing's user unit is linked into `~/.config/systemd/user/default.target.wants` and the run logs the deferred-start warning - it is **not** running before the user logs in, and lingering is deliberately not enabled (see above); `stat -c '%A' /var/log` is still group-writable (`drwxrwxr-x`) |
 | 3 | 26.04 Desktop | Vagrant and bare-metal | as #1 but the `26.*` arm (PPA skipped) |
 | 4 | 26.04 Server | bare-metal autoinstall only | as #2. No Packer or Vagrant path exists for this combination |
 | 5 | Second execution | all four above | no `installing` or `downloading` lines; no repository rewrites; Cockpit not restarted; `SET … dock-position` is expected (a deliberate persisted value) |
