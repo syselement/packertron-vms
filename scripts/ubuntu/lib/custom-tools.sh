@@ -30,6 +30,547 @@ STRAWBERRY_FILES_URL="${STRAWBERRY_FILES_URL:-https://files.strawberrymusicplaye
 
 # SECTION: repository
 
+ensure_fastfetch_ppa() {
+    local ppa="ppa:zhangsongcui3371/fastfetch"
+    local source_file
+
+    case "$VERSION_ID" in
+        24.*)
+            if grep -Rqs "zhangsongcui3371/fastfetch" /etc/apt/sources.list /etc/apt/sources.list.d 2>/dev/null; then
+                info "fastfetch PPA already present"
+                return
+            fi
+
+            if ! command -v add-apt-repository >/dev/null 2>&1; then
+                die "add-apt-repository is required for the fastfetch PPA on Ubuntu ${VERSION_ID}"
+            fi
+
+            if add-apt-repository --yes --no-update "$ppa" >/dev/null 2>&1; then
+                while IFS= read -r -d '' source_file; do
+                    apt_transaction_record_created_file "$source_file"
+                done < <(grep -RlZ -- "zhangsongcui3371/fastfetch" "$APT_SOURCES_DIR" 2>/dev/null || true)
+                # Owned by 03-customize-system.sh; main() reads it to decide
+                # whether an apt update is needed after repository changes.
+                # shellcheck disable=SC2034
+                APT_SOURCES_CHANGED=true
+                ok "added fastfetch PPA for Ubuntu ${VERSION_ID}"
+            else
+                warn "failed to add fastfetch PPA; fastfetch may not be available"
+            fi
+            ;;
+        26.*)
+            info "Ubuntu ${VERSION_ID} provides fastfetch; skipping fastfetch PPA"
+            ;;
+        *)
+            warn "Ubuntu ${VERSION_ID} is not explicitly handled for the fastfetch PPA; using configured repositories"
+            ;;
+    esac
+}
+
+ensure_docker_ctop_repository() (
+    set -Eeuo pipefail
+
+    local changed=false
+    local key_file="${SYSTEM_KEYRING_DIR}/azlux-archive-keyring.gpg"
+    local source_file="${APT_SOURCES_DIR}/azlux.sources"
+    local temporary_dir
+    temporary_dir="$(mktemp -d)"
+    trap 'rm -rf -- "$temporary_dir"' EXIT
+
+    fetch_file "https://azlux.fr/repo.gpg" "$temporary_dir/azlux.asc" ||
+        die "failed downloading the AZLux repository signing key"
+    dearmor_openpgp_key "$temporary_dir/azlux.asc" "$temporary_dir/azlux.gpg" "AZLux"
+    validate_openpgp_key \
+        "$temporary_dir/azlux.gpg" \
+        "AZLux" \
+        "98B824A5FA7D3A10FDB225B7CA548A0A0312D8E6"
+
+    cat >"$temporary_dir/azlux.sources" <<EOF
+Types: deb
+URIs: https://packages.azlux.fr/debian/
+Suites: stable
+Components: main
+Signed-By: ${key_file}
+EOF
+    validate_repository_source \
+        "$temporary_dir/azlux.sources" \
+        "https://packages.azlux.fr/debian/" \
+        "$key_file"
+
+    if write_file_if_changed "$temporary_dir/azlux.gpg" "$key_file"; then
+        changed=true
+        ok "installed AZLux repository signing key"
+    else
+        info "AZLux repository signing key already current"
+    fi
+    if write_file_if_changed "$temporary_dir/azlux.sources" "$source_file"; then
+        changed=true
+        ok "configured AZLux repository"
+    else
+        info "AZLux repository already configured"
+    fi
+
+    [[ "$changed" == false ]] || return 10
+)
+
+ensure_tailscale_repository() (
+    set -Eeuo pipefail
+
+    local changed=false
+    local key_file="${SYSTEM_KEYRING_DIR}/tailscale-archive-keyring.gpg"
+    local repository_url="https://pkgs.tailscale.com/stable/ubuntu"
+    local source_file="${APT_SOURCES_DIR}/tailscale.list"
+    local temporary_dir
+
+    case "$CODENAME" in
+        noble | resolute) ;;
+        *)
+            die "Tailscale repository is not configured for Ubuntu codename ${CODENAME}"
+            ;;
+    esac
+
+    temporary_dir="$(mktemp -d)"
+    trap 'rm -rf -- "$temporary_dir"' EXIT
+
+    fetch_file \
+        "${repository_url}/${CODENAME}.noarmor.gpg" \
+        "$temporary_dir/tailscale-archive-keyring.gpg" ||
+        die "failed downloading the Tailscale signing key"
+    validate_openpgp_key "$temporary_dir/tailscale-archive-keyring.gpg" "Tailscale"
+
+    cat >"$temporary_dir/tailscale.list" <<EOF
+deb [signed-by=${key_file}] ${repository_url} ${CODENAME} main
+EOF
+    validate_repository_source \
+        "$temporary_dir/tailscale.list" \
+        "$repository_url" \
+        "$key_file"
+
+    if write_file_if_changed "$temporary_dir/tailscale-archive-keyring.gpg" "$key_file"; then
+        changed=true
+        ok "installed Tailscale repository signing key"
+    else
+        info "Tailscale repository signing key already current"
+    fi
+    if write_file_if_changed "$temporary_dir/tailscale.list" "$source_file"; then
+        changed=true
+        ok "configured Tailscale repository"
+    else
+        info "Tailscale repository already configured"
+    fi
+
+    [[ "$changed" == false ]] || return 10
+)
+
+ensure_syncthing_repository() (
+    set -Eeuo pipefail
+
+    local changed=false
+    local key_file="${SYSTEM_KEYRING_DIR}/syncthing-archive-keyring.gpg"
+    local source_file="${APT_SOURCES_DIR}/syncthing.list"
+    local temporary_dir
+    temporary_dir="$(mktemp -d)"
+    trap 'rm -rf -- "$temporary_dir"' EXIT
+
+    fetch_file \
+        "https://syncthing.net/release-key.gpg" \
+        "$temporary_dir/syncthing-archive-keyring.gpg" ||
+        die "failed downloading the Syncthing signing key"
+    validate_openpgp_key \
+        "$temporary_dir/syncthing-archive-keyring.gpg" \
+        "Syncthing"
+
+    cat >"$temporary_dir/syncthing.list" <<EOF
+deb [signed-by=${key_file}] https://apt.syncthing.net/ syncthing stable-v2
+EOF
+    validate_repository_source \
+        "$temporary_dir/syncthing.list" \
+        "https://apt.syncthing.net/" \
+        "$key_file"
+
+    if write_file_if_changed "$temporary_dir/syncthing-archive-keyring.gpg" "$key_file"; then
+        changed=true
+        ok "installed Syncthing repository signing key"
+    else
+        info "Syncthing repository signing key already current"
+    fi
+    if write_file_if_changed "$temporary_dir/syncthing.list" "$source_file"; then
+        changed=true
+        ok "configured Syncthing stable-v2 repository"
+    else
+        info "Syncthing stable-v2 repository already configured"
+    fi
+
+    [[ "$changed" == false ]] || return 10
+)
+
+ensure_helm_repository() (
+    set -Eeuo pipefail
+
+    local changed=false
+    local key_file="${SYSTEM_KEYRING_DIR}/helm.gpg"
+    local source_file="${APT_SOURCES_DIR}/helm-stable-debian.list"
+    local temporary_dir
+
+    temporary_dir="$(mktemp -d)"
+    trap 'rm -rf -- "$temporary_dir"' EXIT
+
+    fetch_file \
+        "https://packages.buildkite.com/helm-linux/helm-debian/gpgkey" \
+        "$temporary_dir/helm.asc" ||
+        die "failed downloading the Helm repository signing key"
+    dearmor_openpgp_key "$temporary_dir/helm.asc" "$temporary_dir/helm.gpg" "Helm"
+    validate_openpgp_key \
+        "$temporary_dir/helm.gpg" \
+        "Helm" \
+        "DDF78C3E6EBB2D2CC223C95C62BA89D07698DBC6"
+
+    cat >"$temporary_dir/helm-stable-debian.list" <<EOF
+deb [arch=amd64 signed-by=${key_file}] https://packages.buildkite.com/helm-linux/helm-debian/any/ any main
+EOF
+    validate_repository_source \
+        "$temporary_dir/helm-stable-debian.list" \
+        "https://packages.buildkite.com/helm-linux/helm-debian/any/" \
+        "$key_file"
+
+    if write_file_if_changed "$temporary_dir/helm.gpg" "$key_file"; then
+        changed=true
+        ok "installed Helm repository signing key"
+    else
+        info "Helm repository signing key already current"
+    fi
+    if write_file_if_changed "$temporary_dir/helm-stable-debian.list" "$source_file"; then
+        changed=true
+        ok "configured Helm repository"
+    else
+        info "Helm repository already configured"
+    fi
+
+    [[ "$changed" == false ]] || return 10
+)
+
+ensure_sublime_text_repository() (
+    set -Eeuo pipefail
+
+    local changed=false
+    local key_file="${SYSTEM_KEYRING_DIR}/sublimehq-pub.asc"
+    local source_file="${APT_SOURCES_DIR}/sublime-text.sources"
+    local temporary_dir
+    temporary_dir="$(mktemp -d)"
+    trap 'rm -rf -- "$temporary_dir"' EXIT
+
+    fetch_file \
+        "https://download.sublimetext.com/sublimehq-pub.gpg" \
+        "$temporary_dir/sublimehq-pub.asc" || die "failed downloading the Sublime Text signing key"
+    validate_openpgp_key "$temporary_dir/sublimehq-pub.asc" "Sublime Text"
+
+    cat >"$temporary_dir/sublime-text.sources" <<EOF
+Types: deb
+URIs: https://download.sublimetext.com/
+Suites: apt/stable/
+Signed-By: ${key_file}
+EOF
+    validate_repository_source \
+        "$temporary_dir/sublime-text.sources" \
+        "https://download.sublimetext.com/" \
+        "$key_file"
+
+    if write_file_if_changed "$temporary_dir/sublimehq-pub.asc" "$key_file"; then
+        changed=true
+        ok "installed Sublime Text repository signing key"
+    else
+        info "Sublime Text repository signing key already current"
+    fi
+    if write_file_if_changed "$temporary_dir/sublime-text.sources" "$source_file"; then
+        changed=true
+        ok "configured Sublime Text repository"
+    else
+        info "Sublime Text repository already configured"
+    fi
+
+    [[ "$changed" == false ]] || return 10
+)
+
+ensure_brave_browser_repository() (
+    set -Eeuo pipefail
+
+    local changed=false
+    local key_file="${SYSTEM_KEYRING_DIR}/brave-browser-archive-keyring.gpg"
+    local source_file="${APT_SOURCES_DIR}/brave-browser-release.sources"
+    local temporary_dir
+    local legacy_file
+    local -a legacy_files=()
+    temporary_dir="$(mktemp -d)"
+    trap 'rm -rf -- "$temporary_dir"' EXIT
+
+    fetch_file \
+        "https://brave-browser-apt-release.s3.brave.com/brave-browser-archive-keyring.gpg" \
+        "$temporary_dir/brave-browser-archive-keyring.gpg" || die "failed downloading the Brave signing key"
+    fetch_file \
+        "https://brave-browser-apt-release.s3.brave.com/brave-browser.sources" \
+        "$temporary_dir/brave-browser-release.sources" || die "failed downloading the Brave repository definition"
+    validate_openpgp_key "$temporary_dir/brave-browser-archive-keyring.gpg" "Brave"
+    validate_repository_source \
+        "$temporary_dir/brave-browser-release.sources" \
+        "https://brave-browser-apt-release.s3.brave.com" \
+        "$key_file"
+
+    if write_file_if_changed "$temporary_dir/brave-browser-archive-keyring.gpg" "$key_file"; then
+        changed=true
+        ok "installed Brave repository signing key"
+    else
+        info "Brave repository signing key already current"
+    fi
+    if write_file_if_changed "$temporary_dir/brave-browser-release.sources" "$source_file"; then
+        changed=true
+        ok "configured Brave repository"
+    else
+        info "Brave repository already configured"
+    fi
+
+    shopt -s nullglob
+    legacy_files=("${APT_SOURCES_DIR}"/brave-browser-*.list)
+    shopt -u nullglob
+    for legacy_file in "${legacy_files[@]}"; do
+        apt_transaction_record_file "$legacy_file"
+        rm -f -- "$legacy_file"
+        changed=true
+        info "removed legacy Brave repository file: ${legacy_file}"
+    done
+
+    [[ "$changed" == false ]] || return 10
+)
+
+ensure_claude_desktop_repository() (
+    set -Eeuo pipefail
+
+    local changed=false
+    local key_file="${SYSTEM_KEYRING_DIR}/claude-desktop-archive-keyring.asc"
+    local source_file="${APT_SOURCES_DIR}/claude-desktop.list"
+    local temporary_dir
+    temporary_dir="$(mktemp -d)"
+    trap 'rm -rf -- "$temporary_dir"' EXIT
+
+    fetch_file \
+        "https://downloads.claude.ai/claude-desktop/key.asc" \
+        "$temporary_dir/claude-desktop-archive-keyring.asc" ||
+        die "failed downloading the Claude Desktop signing key"
+    validate_openpgp_key \
+        "$temporary_dir/claude-desktop-archive-keyring.asc" \
+        "Claude Desktop" \
+        "31DDDE24DDFAB679F42D7BD2BAA929FF1A7ECACE"
+
+    cat >"$temporary_dir/claude-desktop.list" <<EOF
+deb [arch=amd64 signed-by=${key_file}] https://downloads.claude.ai/claude-desktop/apt/stable stable main
+EOF
+    validate_repository_source \
+        "$temporary_dir/claude-desktop.list" \
+        "https://downloads.claude.ai/claude-desktop/apt/stable" \
+        "$key_file"
+
+    if write_file_if_changed "$temporary_dir/claude-desktop-archive-keyring.asc" "$key_file"; then
+        changed=true
+        ok "installed Claude Desktop repository signing key"
+    else
+        info "Claude Desktop repository signing key already current"
+    fi
+    if write_file_if_changed "$temporary_dir/claude-desktop.list" "$source_file"; then
+        changed=true
+        ok "configured Claude Desktop repository"
+    else
+        info "Claude Desktop repository already configured"
+    fi
+
+    [[ "$changed" == false ]] || return 10
+)
+
+ensure_dbeaver_repository() (
+    set -Eeuo pipefail
+
+    local changed=false
+    local key_file="${SYSTEM_KEYRING_DIR}/dbeaver.gpg.key"
+    local source_file="${APT_SOURCES_DIR}/dbeaver.list"
+    local temporary_dir
+    temporary_dir="$(mktemp -d)"
+    trap 'rm -rf -- "$temporary_dir"' EXIT
+
+    fetch_file \
+        "https://dbeaver.io/debs/dbeaver.gpg.key" \
+        "$temporary_dir/dbeaver.asc" || die "failed downloading the DBeaver signing key"
+    dearmor_openpgp_key "$temporary_dir/dbeaver.asc" "$temporary_dir/dbeaver.gpg" "DBeaver"
+    validate_openpgp_key "$temporary_dir/dbeaver.gpg" "DBeaver"
+
+    cat >"$temporary_dir/dbeaver.list" <<EOF
+deb [signed-by=${key_file}] https://dbeaver.io/debs/dbeaver-ce /
+EOF
+    validate_repository_source \
+        "$temporary_dir/dbeaver.list" \
+        "https://dbeaver.io/debs/dbeaver-ce" \
+        "$key_file"
+
+    if write_file_if_changed "$temporary_dir/dbeaver.gpg" "$key_file"; then
+        changed=true
+        ok "installed DBeaver repository signing key"
+    else
+        info "DBeaver repository signing key already current"
+    fi
+    if write_file_if_changed "$temporary_dir/dbeaver.list" "$source_file"; then
+        changed=true
+        ok "configured DBeaver repository"
+    else
+        info "DBeaver repository already configured"
+    fi
+
+    [[ "$changed" == false ]] || return 10
+)
+
+ensure_mullvad_repository() (
+    set -Eeuo pipefail
+
+    local architecture
+    local changed=false
+    local key_file="${SYSTEM_KEYRING_DIR}/mullvad-keyring.asc"
+    local source_file="${APT_SOURCES_DIR}/mullvad.list"
+    local temporary_dir
+    temporary_dir="$(mktemp -d)"
+    trap 'rm -rf -- "$temporary_dir"' EXIT
+
+    if [[ "$UBUNTU_VARIANT" != "desktop" ]]; then
+        info "Mullvad VPN is desktop-only; skipping"
+        return 0
+    fi
+
+    architecture="$(dpkg --print-architecture)"
+    fetch_file \
+        "https://repository.mullvad.net/deb/mullvad-keyring.asc" \
+        "$temporary_dir/mullvad-keyring.asc" || die "failed downloading the Mullvad signing key"
+    validate_openpgp_key "$temporary_dir/mullvad-keyring.asc" "Mullvad"
+
+    cat >"$temporary_dir/mullvad.list" <<EOF
+deb [signed-by=${key_file} arch=${architecture}] https://repository.mullvad.net/deb/stable stable main
+EOF
+    validate_repository_source \
+        "$temporary_dir/mullvad.list" \
+        "https://repository.mullvad.net/deb/stable" \
+        "$key_file"
+
+    if write_file_if_changed "$temporary_dir/mullvad-keyring.asc" "$key_file"; then
+        changed=true
+        ok "installed Mullvad repository signing key"
+    else
+        info "Mullvad repository signing key already current"
+    fi
+    if write_file_if_changed "$temporary_dir/mullvad.list" "$source_file"; then
+        changed=true
+        ok "configured Mullvad repository"
+    else
+        info "Mullvad repository already configured"
+    fi
+
+    [[ "$changed" == false ]] || return 10
+)
+
+ensure_mkvtoolnix_repository() (
+    set -Eeuo pipefail
+
+    local changed=false
+    local key_file="${SYSTEM_KEYRING_DIR}/gpg-pub-moritzbunkus.gpg"
+    local repository_url="https://mkvtoolnix.download/ubuntu/"
+    local source_file="${APT_SOURCES_DIR}/mkvtoolnix.download.list"
+    local temporary_dir
+
+    case "$CODENAME" in
+        noble | resolute) ;;
+        *)
+            die "MKVToolNix repository is not configured for Ubuntu codename ${CODENAME}"
+            ;;
+    esac
+
+    temporary_dir="$(mktemp -d)"
+    trap 'rm -rf -- "$temporary_dir"' EXIT
+
+    fetch_file \
+        "https://mkvtoolnix.download/gpg-pub-moritzbunkus.gpg" \
+        "$temporary_dir/gpg-pub-moritzbunkus.gpg" ||
+        die "failed downloading the MKVToolNix repository signing key"
+    validate_openpgp_key \
+        "$temporary_dir/gpg-pub-moritzbunkus.gpg" \
+        "MKVToolNix" \
+        "D9199745B0545F2E8197062B0F92290A445B9007"
+
+    cat >"$temporary_dir/mkvtoolnix.download.list" <<EOF
+deb [arch=amd64 signed-by=${key_file}] ${repository_url} ${CODENAME} main
+deb-src [arch=amd64 signed-by=${key_file}] ${repository_url} ${CODENAME} main
+EOF
+    validate_repository_source \
+        "$temporary_dir/mkvtoolnix.download.list" \
+        "$repository_url" \
+        "$key_file"
+
+    if write_file_if_changed "$temporary_dir/gpg-pub-moritzbunkus.gpg" "$key_file"; then
+        changed=true
+        ok "installed MKVToolNix repository signing key"
+    else
+        info "MKVToolNix repository signing key already current"
+    fi
+    if write_file_if_changed "$temporary_dir/mkvtoolnix.download.list" "$source_file"; then
+        changed=true
+        ok "configured MKVToolNix repository"
+    else
+        info "MKVToolNix repository already configured"
+    fi
+
+    [[ "$changed" == false ]] || return 10
+)
+
+ensure_typora_repository() (
+    set -Eeuo pipefail
+
+    local changed=false
+    local key_file="${SYSTEM_KEYRING_DIR}/typora.gpg"
+    local legacy_key_file="${APT_TRUSTED_KEY_DIR}/typora.asc"
+    local source_file="${APT_SOURCES_DIR}/typora.list"
+    local temporary_dir
+
+    temporary_dir="$(mktemp -d)"
+    trap 'rm -rf -- "$temporary_dir"' EXIT
+
+    fetch_file \
+        "https://downloads.typora.io/typora.gpg" \
+        "$temporary_dir/typora.gpg" ||
+        die "failed downloading the Typora signing key"
+    validate_openpgp_key "$temporary_dir/typora.gpg" "Typora"
+
+    cat >"$temporary_dir/typora.list" <<EOF
+deb [signed-by=${key_file}] https://downloads.typora.io/linux ./
+EOF
+    validate_repository_source \
+        "$temporary_dir/typora.list" \
+        "https://downloads.typora.io/linux" \
+        "$key_file"
+
+    if write_file_if_changed "$temporary_dir/typora.gpg" "$key_file"; then
+        changed=true
+        ok "installed Typora repository signing key"
+    else
+        info "Typora repository signing key already current"
+    fi
+    if write_file_if_changed "$temporary_dir/typora.list" "$source_file"; then
+        changed=true
+        ok "configured Typora repository"
+    else
+        info "Typora repository already configured"
+    fi
+    if [[ -e "$legacy_key_file" ]]; then
+        apt_transaction_record_file "$legacy_key_file"
+        rm -f -- "$legacy_key_file"
+        changed=true
+        info "removed obsolete Typora repository key: ${legacy_key_file}"
+    fi
+
+    [[ "$changed" == false ]] || return 10
+)
+
 # SECTION: deb-url
 
 install_downloaded_debian_package() (
