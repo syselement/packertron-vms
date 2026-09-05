@@ -2323,6 +2323,8 @@ Maintainer: Test <test@example.invalid>
 Description: ChatGPT test package
 EOF
   dpkg-deb -Zxz --build "$package_dir" "$package_file" >/dev/null
+  # Built with xz here and with gzip in the Termius test below, so the metadata
+  # read cannot regress to assuming one control-member compression.
 
   dpkg-query() {
     printf '26.818.41705\n'
@@ -2342,6 +2344,54 @@ EOF
   [[ "$status" -eq 0 ]]
   [[ "$output" == *"ChatGPT 26.818.41705 already installed, skipping"* ]]
   [[ "$output" != *"unexpected full ChatGPT download"* ]]
+}
+
+@test "current Termius installation is detected from a gzip control member without a full download" {
+  local package_dir="$BATS_TEST_TMPDIR/termius-package"
+  local package_file="$BATS_TEST_TMPDIR/termius.deb"
+
+  ARCH="amd64"
+  mkdir -p "$package_dir/DEBIAN"
+  cat >"$package_dir/DEBIAN/control" <<'EOF'
+Package: termius-app
+Version: 9.43.1
+Architecture: amd64
+Maintainer: Test <test@example.invalid>
+Description: Termius test package
+EOF
+  # Termius really does ship control.tar.gz while ChatGPT ships control.tar.xz.
+  dpkg-deb -Zgzip --build "$package_dir" "$package_file" >/dev/null
+
+  dpkg-query() {
+    printf '9.43.1\n'
+  }
+  fetch_file_range() {
+    [[ "$2" == "0-65535" ]]
+    cp "$package_file" "$3"
+  }
+  install_downloaded_debian_package() {
+    printf 'unexpected full Termius download\n' >&2
+    return 99
+  }
+
+  run install_termius
+
+  [[ "$status" -eq 0 ]]
+  [[ "$output" == *"Termius 9.43.1 already installed, skipping"* ]]
+  [[ "$output" != *"unexpected full Termius download"* ]]
+}
+
+@test "Termius is skipped on unsupported architectures" {
+  ARCH="arm64"
+  install_latest_url_debian_package() {
+    printf 'unexpected Termius installation\n' >&2
+    return 99
+  }
+
+  run install_termius
+
+  [[ "$status" -eq 0 ]]
+  [[ "$output" == *"only configured for amd64"* ]]
 }
 
 @test "Clockify uses the official latest AMD64 Debian package" {
@@ -2666,6 +2716,12 @@ FAKE_INSTALLER
     [[ "$1" == "$YUBICO_AUTHENTICATOR_URL" ]]
     tar -czf "$2" -C "$fixture_directory" "$YUBICO_TEST_ARCHIVE_ROOT"
   }
+  # Stands in for the redirect probe so the test stays offline; mirrors the
+  # version the fixture archive currently carries.
+  yubico_authenticator_published_version() {
+    [[ "$YUBICO_TEST_ARCHIVE_ROOT" =~ ^yubico-authenticator-([0-9]+(\.[0-9]+)+)-linux$ ]]
+    printf '%s\n' "${BASH_REMATCH[1]}"
+  }
   run_as_target_user() {
     [[ "$(stat -c '%a' "$YUBICO_AUTHENTICATOR_INSTALL_DIR")" == "755" ]] || return 99
     [[ "$(stat -c '%a' "$YUBICO_AUTHENTICATOR_INSTALL_DIR/desktop_integration.sh")" == "755" ]] || return 99
@@ -2709,6 +2765,55 @@ FAKE_INSTALLER
     "$desktop_file"
   [[ ! -e "$YUBICO_AUTHENTICATOR_INSTALL_DIR/7.4.1" ]]
   [[ ! -e "$YUBICO_AUTHENTICATOR_INSTALL_DIR/7.4.2" ]]
+}
+
+@test "current Yubico Authenticator is detected from the redirect without downloading the archive" {
+  ARCH="amd64"
+  TARGET_USER="$(id -un)"
+  TARGET_HOME="$BATS_TEST_TMPDIR/home"
+  YUBICO_AUTHENTICATOR_INSTALL_DIR="$BATS_TEST_TMPDIR/opt/yubico-authenticator"
+  install -d -m 0755 "$YUBICO_AUTHENTICATOR_INSTALL_DIR"
+  install -m 0755 /dev/null "$YUBICO_AUTHENTICATOR_INSTALL_DIR/authenticator"
+  printf '7.4.1\n' >"$YUBICO_AUTHENTICATOR_INSTALL_DIR/.packertron-version"
+  install -d -m 0755 "$TARGET_HOME/.local/share/applications"
+  printf 'Exec="%s/authenticator"\n' "$YUBICO_AUTHENTICATOR_INSTALL_DIR" \
+    >"$TARGET_HOME/.local/share/applications/com.yubico.yubioath.desktop"
+
+  yubico_authenticator_published_version() {
+    printf '7.4.1\n'
+  }
+  fetch_file() {
+    printf 'unexpected Yubico Authenticator download\n' >&2
+    return 99
+  }
+
+  run install_yubico_authenticator
+
+  [[ "$status" -eq 0 ]]
+  [[ "$output" == *"Yubico Authenticator 7.4.1 already installed for ${TARGET_USER}, skipping"* ]]
+  [[ "$output" != *"unexpected Yubico Authenticator download"* ]]
+}
+
+@test "an unreadable Yubico redirect falls back to the archive check" {
+  ARCH="amd64"
+  TARGET_USER="$(id -un)"
+  TARGET_HOME="$BATS_TEST_TMPDIR/home"
+  YUBICO_AUTHENTICATOR_INSTALL_DIR="$BATS_TEST_TMPDIR/opt/yubico-authenticator"
+  install -d -m 0755 "$YUBICO_AUTHENTICATOR_INSTALL_DIR"
+  printf '7.4.1\n' >"$YUBICO_AUTHENTICATOR_INSTALL_DIR/.packertron-version"
+
+  yubico_authenticator_published_version() {
+    return 1
+  }
+  fetch_file() {
+    printf 'fell back to the download\n' >&2
+    return 1
+  }
+
+  run install_yubico_authenticator
+
+  [[ "$status" -ne 0 ]]
+  [[ "$output" == *"fell back to the download"* ]]
 }
 
 @test "failed repository download preserves existing files" {

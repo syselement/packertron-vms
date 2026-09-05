@@ -644,9 +644,12 @@ install_latest_url_debian_package() (
         info "checking latest ${description} version"
         fetch_file_range "$url" "0-65535" "$temporary_dir/package-prefix.deb" ||
             die "failed checking latest ${description} version"
+        # dpkg-deb reads the control member itself, so this works whatever
+        # compression the vendor used (Termius ships control.tar.gz, ChatGPT
+        # control.tar.xz) and needs only the prefix fetched above.
         control_data="$(
-            ar p "$temporary_dir/package-prefix.deb" control.tar.xz 2>/dev/null |
-                tar -xJOf - ./control 2>/dev/null
+            dpkg-deb -f "$temporary_dir/package-prefix.deb" \
+                Package Version Architecture 2>/dev/null
         )" || die "could not read the latest ${description} package metadata"
         package_name="$(awk -F ': ' '$1 == "Package" { print $2; exit }' <<<"$control_data")"
         package_version="$(awk -F ': ' '$1 == "Version" { print $2; exit }' <<<"$control_data")"
@@ -755,7 +758,7 @@ install_termius() {
         return
     fi
 
-    install_downloaded_debian_package \
+    install_latest_url_debian_package \
         "https://download.termius.com/linux/Termius.deb" \
         "termius-app" \
         "Termius"
@@ -1194,11 +1197,36 @@ install_zed() (
 # install any .desktop entry and icon. Keep the install directory in a
 # *_INSTALL_DIR variable at the top of this file.
 
+# Resolve the versioned filename the "latest" URL redirects to, without
+# transferring the archive body. Prints nothing and fails when the redirect
+# does not carry a recognizable version, leaving callers to fall back.
+yubico_authenticator_published_version() {
+    local resolved_url
+
+    resolved_url="$(
+        curl \
+            --fail \
+            --silent \
+            --show-error \
+            --head \
+            --location \
+            --connect-timeout 10 \
+            --max-time 30 \
+            --output /dev/null \
+            --write-out '%{url_effective}' \
+            "$YUBICO_AUTHENTICATOR_URL"
+    )" || return 1
+
+    [[ "$resolved_url" =~ yubico-authenticator-([0-9]+(\.[0-9]+)+)-linux\.tar\.gz$ ]] || return 1
+    printf '%s\n' "${BASH_REMATCH[1]}"
+}
+
 install_yubico_authenticator() (
     set -Eeuo pipefail
 
     local archive_root archive_version
     local backup_directory=""
+    local redirect_version=""
     local desktop_file="${TARGET_HOME}/.local/share/applications/com.yubico.yubioath.desktop"
     local extracted_directory
     local install_directory="$YUBICO_AUTHENTICATOR_INSTALL_DIR"
@@ -1215,9 +1243,13 @@ install_yubico_authenticator() (
             mv -- "$backup_directory" "$install_directory"
             backup_directory=""
             if [[ -f "$install_directory/desktop_integration.sh" ]]; then
+                # Report a failed rollback: the caller dies about the forward
+                # operation, so swallowing this would leave the restored
+                # directory with a broken desktop entry and no diagnostic.
                 run_as_target_user \
                     bash "$install_directory/desktop_integration.sh" --install \
-                    >/dev/null 2>&1 || true
+                    >/dev/null 2>&1 ||
+                    warn "could not restore the previous Yubico Authenticator desktop entry"
             fi
         fi
     }
@@ -1230,7 +1262,25 @@ install_yubico_authenticator() (
     temporary_dir="$(mktemp -d)"
     trap 'rm -rf -- "$temporary_dir"; [[ -z "$staged_directory" ]] || rm -rf -- "$staged_directory"; [[ -z "$backup_directory" ]] || rm -rf -- "$backup_directory"' EXIT
 
-    info "checking latest Yubico Authenticator release"
+    [[ ! -f "$marker_file" ]] || installed_version="$(<"$marker_file")"
+
+    # The "latest" URL redirects to a versioned filename, so the published
+    # version is readable from the redirect target without transferring the
+    # ~60MB archive. Only the converged path benefits; anything unexpected
+    # falls through to the download below rather than failing.
+    if [[ -n "$installed_version" ]]; then
+        info "checking latest Yubico Authenticator release"
+        redirect_version="$(yubico_authenticator_published_version)" || redirect_version=""
+        if [[ -n "$redirect_version" ]] &&
+            dpkg --compare-versions "$installed_version" ge "$redirect_version" &&
+            [[ -x "$install_directory/authenticator" ]] &&
+            grep -Fqx "Exec=\"${install_directory}/authenticator\"" "$desktop_file" 2>/dev/null; then
+            info "Yubico Authenticator ${installed_version} already installed for ${TARGET_USER}, skipping"
+            return
+        fi
+    fi
+
+    info "downloading Yubico Authenticator"
     fetch_file "$YUBICO_AUTHENTICATOR_URL" "$temporary_dir/yubico-authenticator.tar.gz" ||
         die "failed downloading Yubico Authenticator"
     validate_tar_gzip_archive \
@@ -1269,7 +1319,9 @@ install_yubico_authenticator() (
     [[ "$release_version" == "$archive_version" ]] ||
         die "Yubico Authenticator archive version mismatch: ${archive_version} != ${release_version:-missing}"
 
-    [[ ! -f "$marker_file" ]] || installed_version="$(<"$marker_file")"
+    # Re-checked against the archive's own version: the redirect pre-check
+    # above is an optimization, and this stays authoritative for the case where
+    # the redirect carried no version or reported a different one.
     if [[ -n "$installed_version" ]] &&
         dpkg --compare-versions "$installed_version" ge "$release_version" &&
         [[ -x "$install_directory/authenticator" ]] &&
