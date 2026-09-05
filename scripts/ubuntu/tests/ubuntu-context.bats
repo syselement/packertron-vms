@@ -134,3 +134,33 @@ EOF
 
   [[ "$EXECUTION_CONTEXT" == "packer" ]]
 }
+
+@test "captured terminal state survives a later stdout redirection" {
+  # 03-customize-system.sh redirects stdout through tee before the context is
+  # initialized, so the live terminal test would always answer false.
+  UBUNTU_CONTEXT_TTY_CAPTURED=true
+
+  run bash -c 'UBUNTU_CONTEXT_TTY_CAPTURED=true
+    source "$1"
+    ubuntu_context_is_interactive </dev/null >/dev/null
+  ' _ "$CONTEXT_LIBRARY"
+
+  [[ "$status" -eq 0 ]]
+}
+
+@test "captured non-interactive state is honoured on a terminal" {
+  run bash -c 'UBUNTU_CONTEXT_TTY_CAPTURED=false
+    source "$1"
+    ubuntu_context_is_interactive
+  ' _ "$CONTEXT_LIBRARY"
+
+  [[ "$status" -ne 0 ]]
+}
+
+@test "without a captured state the live terminal test is used" {
+  run bash -c 'source "$1"
+    ubuntu_context_is_interactive </dev/null >/dev/null
+  ' _ "$CONTEXT_LIBRARY"
+
+  [[ "$status" -ne 0 ]]
+}

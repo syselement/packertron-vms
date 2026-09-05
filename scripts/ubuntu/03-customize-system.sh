@@ -219,6 +219,10 @@ t_reset=""
 initialize_runtime() {
     require_root
 
+    # Both of these must run before stdout is redirected below: afterwards
+    # stdout is a pipe, so terminal detection can only ever answer false.
+    ubuntu_context_capture_tty
+
     # Console keeps ANSI colors, while the log file stores plain text.
     if [[ -t 1 && "${TERM:-dumb}" != "dumb" && -z "${NO_COLOR+x}" ]]; then
         t_bold=$'\e[1m'
@@ -230,7 +234,11 @@ initialize_runtime() {
         t_reset=$'\e[0m'
     fi
     install -m 0600 /dev/null "$LOG_FILE"
-    exec > >(tee >(sed -u -r 's/\x1B\[[0-9;]*[[:alpha:]]//g' >"$LOG_FILE")) 2>&1
+    # The log file drops ANSI escapes, and keeps only the final state of a
+    # carriage-return redrawn line. dpkg and curl repaint progress with \r, so
+    # without the second expression every intermediate percentage is appended
+    # to the log. The console still shows progress live.
+    exec > >(tee >(sed -u -r -e 's/\x1B\[[0-9;]*[[:alpha:]]//g' -e 's/.*\r//' >"$LOG_FILE")) 2>&1
 
     initialize_ubuntu_context
     USER_NAME="$TARGET_USER"

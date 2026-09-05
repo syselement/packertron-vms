@@ -20,7 +20,28 @@ ubuntu_context_effective_uid() {
     printf '%s\n' "$EUID"
 }
 
+# Preserved when already set, so sourcing this file cannot discard a state the
+# caller captured earlier (or re-sourcing it reset the value mid-run).
+UBUNTU_CONTEXT_TTY_CAPTURED="${UBUNTU_CONTEXT_TTY_CAPTURED:-}"
+
+# Record whether the caller started on a terminal. Scripts that redirect their
+# own output (for example through tee to a log file) must call this before the
+# redirection, because afterwards stdout is a pipe and the terminal test can
+# only ever answer false.
+ubuntu_context_capture_tty() {
+    if [[ -t 0 && -t 1 ]]; then
+        UBUNTU_CONTEXT_TTY_CAPTURED=true
+    else
+        UBUNTU_CONTEXT_TTY_CAPTURED=false
+    fi
+}
+
 ubuntu_context_is_interactive() {
+    if [[ -n "$UBUNTU_CONTEXT_TTY_CAPTURED" ]]; then
+        [[ "$UBUNTU_CONTEXT_TTY_CAPTURED" == true ]]
+        return
+    fi
+
     [[ -t 0 && -t 1 ]]
 }
 
