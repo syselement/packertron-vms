@@ -29,6 +29,8 @@ SCRIPT_DIR="$(
 . "$SCRIPT_DIR/lib/apt-transaction.sh"
 # shellcheck source=lib/apt.sh
 . "$SCRIPT_DIR/lib/apt.sh"
+# shellcheck source=lib/download.sh
+. "$SCRIPT_DIR/lib/download.sh"
 # shellcheck source=lib/custom-tools.sh
 . "$SCRIPT_DIR/lib/custom-tools.sh"
 
@@ -365,47 +367,6 @@ run_quiet_command() (
 # Downloads, packages, and managed files
 # -----------------------------------------------------------------------------
 
-fetch_file() {
-    local destination_file="$2"
-    local url="$1"
-
-    curl \
-        --fail \
-        --show-error \
-        --silent \
-        --location \
-        --connect-timeout 10 \
-        --max-time 180 \
-        --speed-limit 1024 \
-        --speed-time 30 \
-        --retry 2 \
-        --retry-delay 2 \
-        --output "$destination_file" \
-        "$url"
-}
-
-fetch_file_range() {
-    local byte_range="$2"
-    local destination_file="$3"
-    local url="$1"
-
-    curl \
-        --fail \
-        --show-error \
-        --silent \
-        --location \
-        --connect-timeout 10 \
-        --max-time 30 \
-        --speed-limit 1024 \
-        --speed-time 30 \
-        --retry 2 \
-        --retry-delay 2 \
-        --range "$byte_range" \
-        --max-filesize 65536 \
-        --output "$destination_file" \
-        "$url"
-}
-
 validate_zip_archive() {
     local archive_file="$1"
     local description="$2"
@@ -708,7 +669,7 @@ apply_repository_setup() {
         status=$?
     fi
 
-    if ((status == 10)); then
+    if ((status == APT_SOURCES_CHANGED_STATUS)); then
         APT_SOURCES_CHANGED=true
         return 0
     fi
@@ -3264,7 +3225,10 @@ main() {
     fi
 
     info "updating locate database (best effort)"
-    updatedb || true
+    # Suppressed deliberately: the locate index is a convenience, and plocate
+    # exits non-zero on transient conditions such as a pruned mount going away
+    # mid-scan. Nothing later in this run depends on it.
+    updatedb || warn "locate database update failed; continuing"
 
     section "GNOME"
     if [[ "$UBUNTU_VARIANT" == "desktop" ]]; then

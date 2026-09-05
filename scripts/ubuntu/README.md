@@ -18,6 +18,8 @@ Set `TARGET_USER` explicitly when an automated root run has more than one eligib
 
 `03-customize-system.sh` also sources `lib/custom-tools.sh`, which holds every third-party and custom tool installer grouped by how the tool is distributed (APT repository, direct `.deb` URL, GitHub release, Snap, vendor install script, archive, checksum-verified binary, pipx). Add new tools there, following the template comment on the matching section.
 
+`02-provision-system.sh` and `03-customize-system.sh` share `lib/apt.sh` (one hardened `run_apt_get` with dpkg lock timeout, acquire retries and network timeouts) and `lib/download.sh` (`fetch_file` with an outer retry loop and stall detection, plus `fetch_file_range` for reading package metadata without a full download). `00-update-system.sh` keeps its own copy of the APT wrapper because Packer uploads that script without the `lib/` directory; `tests/update-system.bats` asserts the two stay identical.
+
 ---
 
 ## Files

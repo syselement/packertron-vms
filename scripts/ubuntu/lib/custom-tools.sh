@@ -31,6 +31,11 @@
 # files does not matter; every helper is defined before main() runs.
 # Source this file only from 03-customize-system.sh.
 
+# Returned by an ensure_*_repository function when it changed APT sources, so
+# apply_repository_setup in 03-customize-system.sh can tell "sources changed"
+# apart from a genuine failure and schedule a single apt update.
+readonly APT_SOURCES_CHANGED_STATUS=10
+
 STARSHIP_INSTALL_URL="${STARSHIP_INSTALL_URL:-https://starship.rs/install.sh}"
 CLAUDE_CODE_INSTALL_URL="${CLAUDE_CODE_INSTALL_URL:-https://claude.ai/install.sh}"
 LABCTL_INSTALL_URL="${LABCTL_INSTALL_URL:-https://labs.iximiuz.com/cli/install.sh}"
@@ -50,11 +55,12 @@ STRAWBERRY_FILES_URL="${STRAWBERRY_FILES_URL:-https://files.strawberrymusicplaye
 #      fetch the signing key, validate its fingerprint, dearmor it into
 #      "$SYSTEM_KEYRING_DIR", write the .sources file into "$APT_SOURCES_DIR",
 #      record both with apt_transaction_record_file, validate the result with
-#      validate_repository_source, then `return 10` when sources changed.
+#      validate_repository_source, then return "$APT_SOURCES_CHANGED_STATUS"
+#      when sources changed.
 #   2. Call it from main() as: apply_repository_setup ensure_<tool>_repository
 #   3. Add the package name to COMMON_PACKAGES or DESKTOP_PACKAGES in
 #      03-customize-system.sh.
-# Exit code 10 is the "APT sources changed" signal that apply_repository_setup
+# That status is the "APT sources changed" signal apply_repository_setup
 # translates into APT_SOURCES_CHANGED=true.
 
 ensure_fastfetch_ppa() {
@@ -137,7 +143,7 @@ EOF
         info "AZLux repository already configured"
     fi
 
-    [[ "$changed" == false ]] || return 10
+    [[ "$changed" == false ]] || return "$APT_SOURCES_CHANGED_STATUS"
 )
 
 ensure_tailscale_repository() (
@@ -186,7 +192,7 @@ EOF
         info "Tailscale repository already configured"
     fi
 
-    [[ "$changed" == false ]] || return 10
+    [[ "$changed" == false ]] || return "$APT_SOURCES_CHANGED_STATUS"
 )
 
 ensure_syncthing_repository() (
@@ -228,7 +234,7 @@ EOF
         info "Syncthing stable-v2 repository already configured"
     fi
 
-    [[ "$changed" == false ]] || return 10
+    [[ "$changed" == false ]] || return "$APT_SOURCES_CHANGED_STATUS"
 )
 
 ensure_helm_repository() (
@@ -273,7 +279,7 @@ EOF
         info "Helm repository already configured"
     fi
 
-    [[ "$changed" == false ]] || return 10
+    [[ "$changed" == false ]] || return "$APT_SOURCES_CHANGED_STATUS"
 )
 
 ensure_sublime_text_repository() (
@@ -315,7 +321,7 @@ EOF
         info "Sublime Text repository already configured"
     fi
 
-    [[ "$changed" == false ]] || return 10
+    [[ "$changed" == false ]] || return "$APT_SOURCES_CHANGED_STATUS"
 )
 
 ensure_brave_browser_repository() (
@@ -365,7 +371,7 @@ ensure_brave_browser_repository() (
         info "removed legacy Brave repository file: ${legacy_file}"
     done
 
-    [[ "$changed" == false ]] || return 10
+    [[ "$changed" == false ]] || return "$APT_SOURCES_CHANGED_STATUS"
 )
 
 ensure_claude_desktop_repository() (
@@ -408,7 +414,7 @@ EOF
         info "Claude Desktop repository already configured"
     fi
 
-    [[ "$changed" == false ]] || return 10
+    [[ "$changed" == false ]] || return "$APT_SOURCES_CHANGED_STATUS"
 )
 
 ensure_dbeaver_repository() (
@@ -448,7 +454,7 @@ EOF
         info "DBeaver repository already configured"
     fi
 
-    [[ "$changed" == false ]] || return 10
+    [[ "$changed" == false ]] || return "$APT_SOURCES_CHANGED_STATUS"
 )
 
 ensure_mullvad_repository() (
@@ -494,7 +500,7 @@ EOF
         info "Mullvad repository already configured"
     fi
 
-    [[ "$changed" == false ]] || return 10
+    [[ "$changed" == false ]] || return "$APT_SOURCES_CHANGED_STATUS"
 )
 
 ensure_mkvtoolnix_repository() (
@@ -547,7 +553,7 @@ EOF
         info "MKVToolNix repository already configured"
     fi
 
-    [[ "$changed" == false ]] || return 10
+    [[ "$changed" == false ]] || return "$APT_SOURCES_CHANGED_STATUS"
 )
 
 ensure_typora_repository() (
@@ -595,7 +601,7 @@ EOF
         info "removed obsolete Typora repository key: ${legacy_key_file}"
     fi
 
-    [[ "$changed" == false ]] || return 10
+    [[ "$changed" == false ]] || return "$APT_SOURCES_CHANGED_STATUS"
 )
 
 # -----------------------------------------------------------------------------

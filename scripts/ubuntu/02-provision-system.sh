@@ -20,6 +20,8 @@ SCRIPT_DIR="$(
 . "$SCRIPT_DIR/lib/apt-transaction.sh"
 # shellcheck source=lib/apt.sh
 . "$SCRIPT_DIR/lib/apt.sh"
+# shellcheck source=lib/download.sh
+. "$SCRIPT_DIR/lib/download.sh"
 
 SCRIPT_NAME="provision-system"
 LOG_PREFIX="[${SCRIPT_NAME}]"
@@ -89,30 +91,6 @@ warn() { printf '[%s] %s WARN: %s\n' "$(_ts)" "$LOG_PREFIX" "$*"; }
 die() {
     printf '[%s] %s ERROR: %s\n' "$(_ts)" "$LOG_PREFIX" "$*" >&2
     exit 1
-}
-
-fetch_file() {
-    local url="$1"
-    local out="$2"
-    local tries=3
-    local i
-    for ((i = 1; i <= tries; i++)); do
-        if curl \
-            --fail \
-            --show-error \
-            --location \
-            --connect-timeout 10 \
-            --max-time 60 \
-            --retry 2 \
-            --retry-delay 2 \
-            --output "$out" \
-            "$url"; then
-            return 0
-        fi
-        warn "download failed (${i}/${tries}): ${url}"
-        sleep 2
-    done
-    return 1
 }
 
 install_missing_packages() {
