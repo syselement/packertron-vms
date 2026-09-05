@@ -18,6 +18,8 @@ SCRIPT_DIR="$(
 . "$SCRIPT_DIR/lib/ubuntu-context.sh"
 # shellcheck source=lib/apt-transaction.sh
 . "$SCRIPT_DIR/lib/apt-transaction.sh"
+# shellcheck source=lib/apt.sh
+. "$SCRIPT_DIR/lib/apt.sh"
 
 SCRIPT_NAME="provision-system"
 LOG_PREFIX="[${SCRIPT_NAME}]"
@@ -128,9 +130,7 @@ install_missing_packages() {
     fi
 
     log "install missing packages: ${missing[*]}"
-    apt-get \
-        -o DPkg::Lock::Timeout=300 \
-        install -y -qq --no-install-recommends "${missing[@]}"
+    run_apt_get install -y -qq --no-install-recommends "${missing[@]}"
 }
 
 install_file_if_changed() {
@@ -349,8 +349,8 @@ expand_root_lvm_if_present() {
 
 update_and_upgrade_system() {
     log "apt update / dist-upgrade"
-    apt-get -o DPkg::Lock::Timeout=300 update -qq
-    apt-get -o DPkg::Lock::Timeout=300 dist-upgrade -y -qq
+    run_apt_get update -qq
+    run_apt_get dist-upgrade -y -qq
 }
 
 configure_ntp() {
@@ -464,8 +464,8 @@ validate_toolchain() {
 
 cleanup_apt() {
     log "apt cleanup"
-    apt-get -o DPkg::Lock::Timeout=300 autoremove -y --purge
-    apt-get -o DPkg::Lock::Timeout=300 clean
+    run_apt_get autoremove -y --purge
+    run_apt_get clean
     rm -rf /var/lib/apt/lists/*
 }
 
@@ -538,7 +538,7 @@ main() {
     setup_hashicorp_repo
 
     log "apt update after repository configuration"
-    if ! apt-get -o DPkg::Lock::Timeout=300 update -qq; then
+    if ! run_apt_get update -qq; then
         warn "APT update failed after repository changes; restoring previous repository state"
         apt_transaction_rollback
         die "APT repository validation failed; previous repository state restored"

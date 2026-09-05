@@ -20,8 +20,16 @@ die() {
     exit 1
 }
 
+# Kept in step with lib/apt.sh by tests/update-system.bats, but deliberately
+# not sourced from there: Packer's shell provisioner uploads this script on its
+# own, with no lib/ directory beside it, so it must stay self-contained.
 run_apt_get() {
-    apt-get -o DPkg::Lock::Timeout=300 "$@"
+    DEBIAN_FRONTEND=noninteractive apt-get \
+        -o DPkg::Lock::Timeout=300 \
+        -o Acquire::Retries=3 \
+        -o Acquire::http::Timeout=30 \
+        -o Acquire::https::Timeout=30 \
+        "$@"
 }
 
 package_is_available() {

@@ -23,7 +23,34 @@ setup() {
     run_apt_get install -y test-package
 
     grep -Fxq 'DPkg::Lock::Timeout=300' "$apt_record"
+    grep -Fxq 'Acquire::Retries=3' "$apt_record"
+    grep -Fxq 'Acquire::http::Timeout=30' "$apt_record"
+    grep -Fxq 'Acquire::https::Timeout=30' "$apt_record"
     grep -Fxq 'test-package' "$apt_record"
+}
+
+@test "the standalone APT wrapper matches the shared one in lib/apt.sh" {
+    # 00-update-system.sh cannot source lib/apt.sh, because Packer's shell
+    # provisioner uploads it without the lib directory. Catch the two copies
+    # drifting apart instead.
+    local apt_record="$BATS_TEST_TMPDIR/apt-record"
+    local library_record="$BATS_TEST_TMPDIR/library-record"
+
+    apt-get() {
+        printf '%s\n' "$@" >"$apt_record"
+    }
+
+    run_apt_get install -y test-package
+
+    # shellcheck source=../lib/apt.sh
+    source "$BATS_TEST_DIRNAME/../lib/apt.sh"
+    apt-get() {
+        printf '%s\n' "$@" >"$library_record"
+    }
+
+    run_apt_get install -y test-package
+
+    diff "$apt_record" "$library_record"
 }
 
 @test "VMware installs base and available Desktop integration separately" {

@@ -27,6 +27,8 @@ SCRIPT_DIR="$(
 . "$SCRIPT_DIR/lib/ubuntu-context.sh"
 # shellcheck source=lib/apt-transaction.sh
 . "$SCRIPT_DIR/lib/apt-transaction.sh"
+# shellcheck source=lib/apt.sh
+. "$SCRIPT_DIR/lib/apt.sh"
 # shellcheck source=lib/custom-tools.sh
 . "$SCRIPT_DIR/lib/custom-tools.sh"
 
@@ -335,15 +337,6 @@ verify_target_ownership() {
     owner_group="$(stat -Lc '%G' "$path")"
     [[ "$owner" == "$TARGET_USER" && "$owner_group" == "$TARGET_GROUP" ]] ||
         die "unexpected ${description} ownership: ${owner}:${owner_group}; expected ${TARGET_USER}:${TARGET_GROUP}"
-}
-
-run_apt_get() {
-    DEBIAN_FRONTEND=noninteractive apt-get \
-        -o DPkg::Lock::Timeout=300 \
-        -o Acquire::Retries=3 \
-        -o Acquire::http::Timeout=30 \
-        -o Acquire::https::Timeout=30 \
-        "$@"
 }
 
 run_quiet_command() (
