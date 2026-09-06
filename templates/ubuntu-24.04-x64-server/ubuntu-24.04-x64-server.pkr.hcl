@@ -118,7 +118,7 @@ build {
   provisioner "shell" {
     execute_command = "echo '${var.password}' | sudo -S env {{ .Vars }} {{ .Path }}"
     scripts = [
-      "${path.root}/../scripts/ubuntu/00-update-system.sh"
+      "${path.root}/../../scripts/ubuntu/00-update-system.sh"
     ]
   }
 
@@ -132,7 +132,7 @@ build {
   }
 
   provisioner "file" {
-    source      = "${path.root}/../scripts/ubuntu/"
+    source      = "${path.root}/../../scripts/ubuntu/"
     destination = "/var/tmp/packertron-ubuntu/"
   }
 
@@ -154,7 +154,7 @@ build {
   provisioner "shell" {
     execute_command = "echo '${var.password}' | sudo -S env {{ .Vars }} {{ .Path }}"
     scripts = [
-      "${path.root}/../scripts/ubuntu/01-cleanup-system.sh"
+      "${path.root}/../../scripts/ubuntu/01-cleanup-system.sh"
     ]
   }
 }

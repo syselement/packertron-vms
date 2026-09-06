@@ -46,7 +46,7 @@ is_skipped() {
 
 template_directories() {
     local path
-    for path in "$REPO_ROOT"/*/*.pkr.hcl; do
+    for path in "$REPO_ROOT"/templates/*/*.pkr.hcl; do
         [[ -e "$path" ]] || continue
         basename "$(dirname -- "$path")"
     done | sort -u
@@ -68,7 +68,7 @@ check_templates() {
         fi
 
         note "$directory"
-        pushd "$REPO_ROOT/$directory" >/dev/null || {
+        pushd "$REPO_ROOT/templates/$directory" >/dev/null || {
             fail "$directory: cannot enter"
             continue
         }
@@ -118,7 +118,7 @@ check_seeds() {
     fi
 
     note "cloud-init seeds"
-    for file in "$REPO_ROOT"/scripts/ubuntu/autoinstall-*.yaml "$REPO_ROOT"/*/http/user-data; do
+    for file in "$REPO_ROOT"/scripts/ubuntu/autoinstall-*.yaml "$REPO_ROOT"/templates/*/http/user-data; do
         [[ -f "$file" ]] || continue
         local relative="${file#"$REPO_ROOT"/}"
 

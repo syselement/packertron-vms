@@ -188,7 +188,7 @@ build {
   provisioner "shell" {
     execute_command = "echo '${var.ssh_password}' | sudo -S env {{ .Vars }} {{ .Path }}"
     scripts = [
-      "${path.root}/../scripts/ubuntu/00-update-system.sh"
+      "${path.root}/../../scripts/ubuntu/00-update-system.sh"
     ]
   }
 
@@ -198,7 +198,7 @@ build {
   provisioner "shell" {
     execute_command = "echo '${var.ssh_password}' | sudo -S env {{ .Vars }} {{ .Path }}"
     scripts = [
-      "${path.root}/../scripts/ubuntu/01-cleanup-system.sh"
+      "${path.root}/../../scripts/ubuntu/01-cleanup-system.sh"
     ]
   }
 }

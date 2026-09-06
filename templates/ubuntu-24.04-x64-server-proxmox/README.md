@@ -64,5 +64,5 @@ The seed removes both and writes `99-pve.cfg` with
 ## Verify before pushing
 
 ```bash
-../scripts/check-templates.sh          # fmt, validate, cloud-init schema
+../../scripts/check-templates.sh          # fmt, validate, cloud-init schema
 ```

@@ -6,8 +6,8 @@ produces at a network you do not control.
 ## The images ship a known password
 
 Every autoinstall seed - `scripts/ubuntu/autoinstall-*.yaml` and each
-`*/http/user-data` - commits a SHA-512 crypt hash for the initial user, and the
-plaintext is documented in the file next to it.
+`templates/*/http/user-data` - commits a SHA-512 crypt hash for the initial
+user, and the plaintext is documented in the file next to it.
 
 This is not an accident and it cannot be avoided for an unattended install:
 subiquity needs the hash at install time, before the machine exists and before

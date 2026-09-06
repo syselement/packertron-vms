@@ -170,19 +170,40 @@ cd packertron-vms
 
 ```
 packertron-vms/
-├── win-srv-2025/
-│   ├── config/          # Configuration files (autounattend.xml, unattend.xml)
-│   ├── output/          # VM build output
-│   ├── vagrant/         # Vagrant Automation scripts (Powershell, Batch)
-│   ├── README.md        # Readme file
-│   ├── Vagrantfile      # Vagrant configuration
-│   ├── winserver2025.pkr.hcl      # Packer HCL template
-│   ├── winserver2025.pkrvars.hcl  # Packer variables
-├── scripts/             # Automation scripts (Bash, Powershell, Batch)
-├── ...
-└── .gitignore           # Ignore unnecessary files (ISO, temp builds)
-
+├── templates/        # one directory per VM template
+│   ├── kali/                              # Proxmox  (stub, does not build yet)
+│   ├── ubuntu-24.04-x64-desktop/          # VMware
+│   ├── ubuntu-24.04-x64-server/           # VMware
+│   ├── ubuntu-24.04-x64-server-proxmox/   # Proxmox  (unbuilt on real hardware)
+│   ├── ubuntu-26.04-x64-desktop/          # VMware
+│   ├── ubuntu-26.04-x64-server/           # VMware
+│   ├── win-11/                            # Proxmox  (unrepaired, excluded from CI)
+│   └── win-srv-2025/                      # VMware
+├── scripts/          # provisioners, shared by every template
+│   ├── ubuntu/           # Bash provisioning chain, its lib/ and bats tests
+│   ├── windows/          # PowerShell and batch provisioners
+│   └── check-templates.sh  # run the CI template checks locally
+├── .github/workflows/  # CI
+├── SECURITY.md       # credential model - read before pointing this at a network
+└── CHANGELOG.md  LICENSE  README.md  version.yaml
 ```
+
+Every template directory follows the same shape, so the name of a file tells
+you where it belongs:
+
+| Path | Holds |
+| --- | --- |
+| `<name>/<name>.pkr.hcl` | the builder, variables and build block |
+| `<name>/<name>.auto.pkrvars.hcl` | non-secret settings, auto-loaded (ISO URL, sizing) |
+| `<name>/http/` | the cloud-init seed served to the installer (`user-data`, `meta-data`) |
+| `<name>/config/` | Windows answer files (`autounattend.xml`, `unattend.xml`) |
+| `<name>/README.md` | how to build that one template, and whether it currently can be |
+
+Templates reach the shared provisioners through `${path.root}/../../scripts/`.
+Secrets never live in any of these files - see [SECURITY.md](SECURITY.md).
+
+Build output, `packer_cache/`, `.vagrant/` and `tmp/` are generated or scratch
+and are excluded by `.gitignore`.
 
 ---
 
@@ -197,14 +218,14 @@ code .
 
 ### 2️⃣ Packer: Initialize & Build Windows Server 2025
 
-Setup the necessary variables inside the `win-srv-2025\winserver2025.pkrvars.hcl` file, adjusting them accordingly based on your ISO folder, name and checksum.
+Setup the necessary variables inside the `templates\win-srv-2025\win-srv-2025.auto.pkrvars.hcl` file, adjusting them accordingly based on your ISO folder, name and checksum.
 
 Open VMware Workstation Pro (before running Packer build).
 
 Proceed with Packer initialize and build.
 
 ```powershell
-cd win-srv-2025
+cd templates/win-srv-2025
 packer init .
 packer build .
 ```
@@ -212,7 +233,7 @@ packer build .
 ### 3️⃣ Deploy VM with Vagrant
 
 ```powershell
-cd win-srv-2025
+cd templates/win-srv-2025
 vagrant up
 ```
 

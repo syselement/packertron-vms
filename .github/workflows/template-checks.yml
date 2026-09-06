@@ -61,15 +61,15 @@ jobs:
           version: "latest"
 
       - name: Install plugins
-        working-directory: ${{ matrix.template }}
+        working-directory: templates/${{ matrix.template }}
         run: packer init .
 
       - name: Check formatting
-        working-directory: ${{ matrix.template }}
+        working-directory: templates/${{ matrix.template }}
         run: packer fmt -check -diff .
 
       - name: Validate
-        working-directory: ${{ matrix.template }}
+        working-directory: templates/${{ matrix.template }}
         # The Proxmox builder refuses to validate without a username and a
         # token, so the credential-shaped variables get obvious throwaway
         # values here. They are never used to reach a real node: validate does
@@ -105,7 +105,7 @@ jobs:
         run: |
           status=0
           # shellcheck disable=SC2044
-          for file in scripts/ubuntu/autoinstall-*.yaml */http/user-data; do
+          for file in scripts/ubuntu/autoinstall-*.yaml templates/*/http/user-data; do
             [ -f "$file" ] || continue
 
             # cloud-init reads the first document and silently ignores the

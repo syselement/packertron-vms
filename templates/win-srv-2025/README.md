@@ -12,9 +12,9 @@ Repeatable **Windows Server 2025** build for VMware Workstation with optional Va
 ## Quick build
 
 ```powershell
-cd win-srv-2025
+cd templates/win-srv-2025
 packer init .
-packer validate winserver2025.pkr.hcl
+packer validate win-srv-2025.pkr.hcl
 packer build .
 ```
 
@@ -69,8 +69,8 @@ vagrant destroy -f
 
 ## Customize
 
-- `winserver2025.pkr.hcl` - contains the Packer variables with some defaults.
-- `winserver2025.auto.pkrvars.hcl` - auto-loaded Packer Build variables
+- `win-srv-2025.pkr.hcl` - contains the Packer variables with some defaults.
+- `win-srv-2025.auto.pkrvars.hcl` - auto-loaded Packer Build variables
 - Override variables at build time with `-var "key=value"`.
 - Update `iso_url` and `iso_checksum` to match your ISO.
 - `../scripts/` are used
@@ -86,8 +86,8 @@ vagrant destroy -f
 ## Files of note
 
 - `Vagrantfile`
-- `winserver2025.pkr.hcl`
-- `winserver2025.auto.pkrvars.hcl`
+- `win-srv-2025.pkr.hcl`
+- `win-srv-2025.auto.pkrvars.hcl`
 - `output/`
 - `config/`
 - `../scripts/`

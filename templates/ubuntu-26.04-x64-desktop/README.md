@@ -35,7 +35,7 @@ This is how it works:
 ### Build the template box
 
 ```powershell
-cd .\packertron-vms\ubuntu-26.04-x64-desktop
+cd .\packertron-vms\templates\ubuntu-26.04-x64-desktop
 packer init .
 packer validate ubuntu-26.04-x64-desktop.pkr.hcl
 packer build .
