@@ -45,6 +45,7 @@ jobs:
           - ubuntu-26.04-x64-desktop
           - ubuntu-24.04-x64-server
           - ubuntu-26.04-x64-server
+          - ubuntu-24.04-x64-server-proxmox
           - win-srv-2025
 
     steps:

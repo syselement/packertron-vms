@@ -1,0 +1,72 @@
+#cloud-config
+#
+# Do not alter first line of this file.
+#
+# Unattended install of Ubuntu 24.04 Server for the Proxmox template built by
+# ubuntuserver24-proxmox.pkr.hcl in this directory.
+#
+# A cloud-config file holds exactly ONE document: cloud-init reads the first
+# and silently ignores anything appended after it. Keep it that way.
+#
+# This seed stays deliberately thin. It installs the base OS only; 02 and 03
+# run per VM at first boot, so a clone always picks up the current scripts
+# instead of whatever was current when the template was baked.
+
+autoinstall:
+  # version is an Autoinstall required field.
+  version: 1
+
+  locale: en_GB
+  keyboard:
+    layout: it
+  timezone: Europe/Rome
+
+  # IMPORTANT: verify this value from the ISO at: casper/install-sources.yaml
+  source:
+    id: ubuntu-server
+
+  storage:
+    layout:
+      name: lvm
+      sizing-policy: all
+
+  # Password needs to be generated with
+  #   openssl passwd -6 -stdin <<< 'packer'
+  identity:
+    hostname: ubuntu-server-template
+    username: syselement
+    password: "$6$OxXY0.ndy/Q1c4mU$A6QNNCNXD24WVyJXm5gpHd5tq7tjLhJKAf1wAoG0yjsFdO0vFCs02JBtKRUqT0ivHXDdzFtKhs66jvL/x0rKM1"
+
+  ssh:
+    install-server: true
+    authorized-keys:
+      - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPA3hxPOnJAjCFoZMz8mcT+fZTy5j0vjLWPGVM2vaA88
+    allow-pw: false
+
+  # qemu-guest-agent is what lets Proxmox read the guest IP, shut it down
+  # cleanly and freeze the filesystem for snapshots. 00-update-system.sh
+  # installs it too, keyed off systemd-detect-virt; having it here as well
+  # means the template is usable even if that step is ever skipped.
+  packages:
+    - qemu-guest-agent
+
+  late-commands:
+    - curtin in-target -- systemctl enable qemu-guest-agent.service
+    - curtin in-target -- truncate -s 0 /etc/machine-id /var/lib/dbus/machine-id
+    - echo 'syselement ALL=(ALL) NOPASSWD:ALL' > /target/etc/sudoers.d/99-syselement
+    - chmod 0440 /target/etc/sudoers.d/99-syselement
+    # Fail the install rather than ship a template whose sudoers is
+    # unparseable: a bad drop-in breaks sudo for every user on first boot.
+    - curtin in-target -- visudo -c -f /etc/sudoers.d/99-syselement
+    # Subiquity pins cloud-init to the installer's own NoCloud seed and
+    # disables its networking. Left in place, a clone ignores the cloud-init
+    # drive Proxmox attaches, so no per-VM hostname, user, key or network ever
+    # applies and the whole clone-and-configure model silently does nothing.
+    - rm -f /target/etc/cloud/cloud.cfg.d/99-installer.cfg
+    - rm -f /target/etc/cloud/cloud.cfg.d/subiquity-disable-cloudinit-networking.cfg
+    - |
+      printf 'datasource_list: [ NoCloud, ConfigDrive ]\n' \
+        > /target/etc/cloud/cloud.cfg.d/99-pve.cfg
+
+# Validate this file with
+# `sudo cloud-init schema --config-file user-data --annotate`
