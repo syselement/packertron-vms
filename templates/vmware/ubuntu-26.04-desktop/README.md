@@ -103,7 +103,7 @@ vagrant up provisioned
 
 Vagrant/VMware will manage VMX adjustments during `vagrant up`; no manual VMX edits needed when using Vagrant.
 
-- The workstation layer (Docker, OpenTofu, Packer CLI, Ansible, VS Code, hygiene) lives in one idempotent script executed only on the first `vagrant up` - `../scripts/ubuntu/02-provision-system.sh`
+- The workstation layer (Docker, OpenTofu, Packer CLI, Ansible, VS Code, hygiene) lives in one idempotent script executed only on the first `vagrant up` - `../../../scripts/ubuntu/02-provision-system.sh`
 - Re-run with `--provision` to re-provision the VM (Vagrant runs provisioners once by default)
 
 ```powershell
@@ -140,7 +140,7 @@ vagrant destroy -f
 - `ubuntu-26.04-desktop.pkr` - contains the Packer variables with some defaults
 - `ubuntu-26.04-desktop.auto.pkrvars.hcl` - auto-loaded Packer Build variables
 - Override variables at build time with `-var "key=value"`
-- `../scripts/` are used
+- `../../../scripts/` are used
   - during Packer build for preseed/install automation
   - during Vagrant provisioning
 
@@ -160,7 +160,7 @@ vagrant destroy -f
 - `ubuntu-26.04-desktop.pkr.hcl`
 - `ubuntu-26.04-desktop.auto.pkrvars.hcl`
 - `output/`
-- `../scripts/`
+- `../../../scripts/`
 
 ---
 

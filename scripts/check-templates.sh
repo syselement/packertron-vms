@@ -12,6 +12,8 @@
 #   scripts/check-templates.sh            # everything
 #   scripts/check-templates.sh packer     # templates only
 #   scripts/check-templates.sh seeds      # cloud-init seeds only
+#   scripts/check-templates.sh matrix     # CI matrix vs the templates on disk
+#   scripts/check-templates.sh shell      # shellcheck/shfmt outside scripts/ubuntu/
 #   scripts/check-templates.sh proxmox    # one hypervisor only
 
 set -Eeuo pipefail
@@ -19,9 +21,13 @@ set -Eeuo pipefail
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd -- "$SCRIPT_DIR/.." && pwd)"
 
+readonly WORKFLOW="\
+.github/workflows/template-checks.yml"
+
 # Template directories are discovered rather than listed, so a new one is
-# covered the day it is added. Keep this skip list in step with the matrix in
-# .github/workflows/template-checks.yml.
+# covered the day it is added. The CI matrix cannot discover them - GitHub
+# evaluates it before any checkout - so it is the one hand-written list, and
+# check_matrix below is what keeps it honest.
 readonly -a SKIP_TEMPLATES=(
     # Unrepaired build block, and depends on a KeePass database that is not in
     # this repository.
@@ -121,6 +127,93 @@ check_templates() {
     done < <(template_directories)
 }
 
+# The CI matrix and SKIP_TEMPLATES are the only two places that name templates
+# by hand. Left unchecked they drift silently, and both directions are quiet
+# failures: a template missing from the matrix is never validated by CI, and a
+# matrix entry for a directory that no longer exists fails every run with a
+# path error rather than a useful message.
+matrix_templates() {
+    awk '
+        /^ *template: *$/ { inlist = 1; next }
+        inlist && /^ *- / { sub(/^ *- +/, ""); sub(/ *(#.*)?$/, ""); print; next }
+        inlist && !/^ *#/ { inlist = 0 }
+    ' "$REPO_ROOT/$WORKFLOW"
+}
+
+check_matrix() {
+    local expected actual
+
+    note "CI matrix vs templates on disk"
+
+    if [[ ! -f "$REPO_ROOT/$WORKFLOW" ]]; then
+        fail "$WORKFLOW: not found"
+        return
+    fi
+
+    expected="$(
+        while read -r directory; do
+            [[ -n "$directory" ]] || continue
+            is_skipped "$directory" || printf '%s\n' "$directory"
+        done < <(template_directories) | sort
+    )"
+    actual="$(matrix_templates | sort)"
+
+    if [[ "$expected" == "$actual" ]]; then
+        pass "$(printf '%s' "$actual" | grep -c .) template(s) listed, and no others exist"
+        return
+    fi
+
+    # Process substitution, not a pipe: a piped loop runs in a subshell, so
+    # every fail() below would increment a copy of $failures and the script
+    # would exit 0 while reporting failures.
+    while read -r missing; do
+        [[ -n "$missing" ]] || continue
+        fail "$missing exists on disk but is not in the $WORKFLOW matrix, so CI never checks it"
+    done < <(comm -23 <(printf '%s\n' "$expected") <(printf '%s\n' "$actual"))
+
+    while read -r extra; do
+        [[ -n "$extra" ]] || continue
+        fail "the $WORKFLOW matrix lists $extra, which is not a template directory (or is in SKIP_TEMPLATES)"
+    done < <(comm -13 <(printf '%s\n' "$expected") <(printf '%s\n' "$actual"))
+}
+
+# Every shell script in the repository outside scripts/ubuntu/, which
+# ubuntu-static-checks.yml already covers. Discovered rather than listed, so a
+# new one is linted the day it is added - this script and the Proxmox seal are
+# the current two, and both run as root against a real machine.
+repository_shell_scripts() {
+    local path
+    for path in "$REPO_ROOT"/scripts/*.sh "$REPO_ROOT"/templates/*/*.sh "$REPO_ROOT"/templates/*/*/*.sh; do
+        [[ -f "$path" ]] || continue
+        printf '%s\n' "${path#"$REPO_ROOT"/}"
+    done | sort -u
+}
+
+check_shell() {
+    local relative tool missing=0
+
+    note "shell scripts outside scripts/ubuntu/"
+
+    for tool in bash shellcheck shfmt; do
+        command -v "$tool" >/dev/null 2>&1 || {
+            fail "$tool is not installed"
+            missing=1
+        }
+    done
+    ((missing == 0)) || return
+
+    while read -r relative; do
+        [[ -n "$relative" ]] || continue
+        if bash -n "$REPO_ROOT/$relative" &&
+            shellcheck -x "$REPO_ROOT/$relative" &&
+            shfmt -d -i 4 -ci "$REPO_ROOT/$relative"; then
+            pass "$relative"
+        else
+            fail "$relative: syntax, shellcheck or shfmt"
+        fi
+    done < <(repository_shell_scripts)
+}
+
 check_seeds() {
     local file documents
 
@@ -167,11 +260,15 @@ main() {
         all)
             check_templates
             check_seeds
+            check_shell
+            check_matrix
             ;;
         packer) check_templates ;;
         seeds) check_seeds ;;
+        matrix) check_matrix ;;
+        shell) check_shell ;;
         *)
-            printf 'usage: %s [<hypervisor>] [all|packer|seeds]\n' "${BASH_SOURCE[0]##*/}" >&2
+            printf 'usage: %s [<hypervisor>] [all|packer|seeds|shell|matrix]\n' "${BASH_SOURCE[0]##*/}" >&2
             printf 'hypervisors: %s\n' "$(cd "$REPO_ROOT/templates" && echo */)" >&2
             exit 2
             ;;

@@ -63,6 +63,22 @@ Per-build overrides still work: `-var 'vm_id=9100'`.
 `vm_id` must be free on the node, and the ISO is downloaded to
 `iso_storage_pool` on the first run.
 
+## What the build removes before the template is sealed
+
+`scripts/ubuntu/01-cleanup-system.sh` truncates the machine-id and clears
+`/var/lib/cloud`, so a clone is a new cloud-init instance. `../seal-for-clone.sh`
+then runs last and removes what only matters when an image is cloned:
+
+| Removed | Why |
+| --- | --- |
+| `/etc/ssh/ssh_host_*` | otherwise every clone answers with the same fingerprint. A one-shot unit regenerates them before `ssh.service` on the clone |
+| `/etc/netplan/00-installer-config*.yaml` | subiquity wrote it naming the *build* VM's interface; cloud-init writes `50-cloud-init.yaml` on the clone |
+| `/var/lib/systemd/random-seed` | otherwise every clone starts from the same seed |
+
+It lives one directory up because every Proxmox template needs the same seal,
+and it is a script rather than an inline block so `shellcheck` and `shfmt` see
+it - `scripts/check-templates.sh shell` runs both.
+
 ## Why the seed deletes two cloud-init files
 
 Subiquity pins cloud-init to the installer's own NoCloud seed and disables its

@@ -73,13 +73,13 @@ vagrant destroy -f
 - `win-srv-2025.auto.pkrvars.hcl` - auto-loaded Packer Build variables
 - Override variables at build time with `-var "key=value"`.
 - Update `iso_url` and `iso_checksum` to match your ISO.
-- `../scripts/` are used
+- `../../../scripts/` are used
     - during Packer build for preseed/install automation
     - during Vagrant provisioning
 
 ## Troubleshoot fast
 
-- Build hangs on updates: wait for `../scripts/windows/02_win_updates.ps1` to complete and check the Packer log output.
+- Build hangs on updates: wait for `../../../scripts/windows/02_win_updates.ps1` to complete and check the Packer log output.
 - ISO issues: verify the checksum and that the URL is reachable.
 - Run `packer build -debug` for an interactive troubleshooting VM.
 
@@ -90,7 +90,7 @@ vagrant destroy -f
 - `win-srv-2025.auto.pkrvars.hcl`
 - `output/`
 - `config/`
-- `../scripts/`
+- `../../../scripts/`
 
 ---
 

@@ -174,6 +174,7 @@ packertron-vms/
 ├── templates/           one directory per template, grouped by hypervisor
 │   ├── proxmox/                     <- the primary target
 │   │   ├── proxmox.pkrvars.hcl.example   node settings, shared by all of them
+│   │   ├── seal-for-clone.sh             strips per-machine state before cloning
 │   │   ├── ubuntu-24.04-server/
 │   │   ├── kali/                         stub, does not build yet
 │   │   └── win-11/                       unrepaired, excluded from CI

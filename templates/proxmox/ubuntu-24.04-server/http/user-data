@@ -3,7 +3,7 @@
 # Do not alter first line of this file.
 #
 # Unattended install of Ubuntu 24.04 Server for the Proxmox template built by
-# ubuntuserver24-proxmox.pkr.hcl in this directory.
+# ubuntu-24.04-server.pkr.hcl in this directory.
 #
 # A cloud-config file holds exactly ONE document: cloud-init reads the first
 # and silently ignores anything appended after it. Keep it that way.
@@ -51,7 +51,17 @@ autoinstall:
     - qemu-guest-agent
 
   late-commands:
-    - curtin in-target -- systemctl enable qemu-guest-agent.service
+    # qemu-guest-agent.service is static on Ubuntu 24.04: it is started by a
+    # udev rule when the virtio-serial port appears, and carries no [Install]
+    # section. `systemctl enable` on a static unit exits non-zero on systemd
+    # >= 249, and a late-command that exits non-zero fails the whole install -
+    # so this must not be fatal. 00-update-system.sh does the real, version
+    # aware enablement after the install, keyed off `systemctl is-enabled`;
+    # scripts/ubuntu/tests/update-system.bats pins that behaviour.
+    - curtin in-target -- systemctl enable qemu-guest-agent.service || true
+    # Truncated here and again by 01-cleanup-system.sh at the end of the build.
+    # systemd regenerates it on the very next boot, so this pass only covers
+    # the window before Packer connects; 01 is the one that matters.
     - curtin in-target -- truncate -s 0 /etc/machine-id /var/lib/dbus/machine-id
     - echo 'syselement ALL=(ALL) NOPASSWD:ALL' > /target/etc/sudoers.d/99-syselement
     - chmod 0440 /target/etc/sudoers.d/99-syselement

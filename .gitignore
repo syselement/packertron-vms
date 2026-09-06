@@ -1,13 +1,17 @@
-# Cache objects
-*/packer_cache/
-*/.vagrant
+# Build output and caches.
+# No leading path component, so these match at any depth. They used to be
+# written as */packer_cache/ and */output, which anchored them to a template
+# directory sitting directly in the repository root; once templates moved under
+# templates/<hypervisor>/<os>/ those patterns silently stopped matching.
+packer_cache/
+.vagrant/
+output/
 
 # Crash log
 crash.log
 
 # For built boxes
 *.box
-*/output
 
 # FreeFileSync
 *.ffs_lock
@@ -22,6 +26,12 @@ crash.log
 *.temp
 tmp/
 temp/
+
+# Editor and agent local settings
+# settings.local.json is the personal half of the Claude Code config, by its
+# own convention; it also records absolute paths from one machine. The shared
+# half would be .claude/settings.json, which is not ignored.
+.claude/settings.local.json
 
 # Secrets and credentials
 # The tracked *.auto.pkrvars.hcl files hold ISO URLs and checksums only. Keep

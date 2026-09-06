@@ -21,6 +21,8 @@ on:
       - "**/http/user-data"
       - "**/http/meta-data"
       - "scripts/ubuntu/autoinstall-*.yaml"
+      - "scripts/check-templates.sh"
+      - "templates/**/*.sh"
       - ".github/workflows/template-checks.yml"
   workflow_dispatch:
 
@@ -126,6 +128,39 @@ jobs:
           done
           exit "$status"
 
+  checker:
+    # scripts/check-templates.sh is what a person runs before pushing, and
+    # until now nothing linted it: ubuntu-static-checks.yml is scoped to
+    # scripts/ubuntu/, so a syntax error here would only have surfaced by
+    # someone running it and getting a confusing failure.
+    #
+    # It also owns the one invariant CI cannot express itself. The matrix above
+    # is hand-written, because GitHub evaluates it before any checkout and so
+    # it cannot discover directories. check-templates.sh matrix compares that
+    # list against what is actually on disk, in both directions.
+    name: Checker script
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Install shell tooling
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends shellcheck shfmt
+
+      # Covers this script and every other one outside scripts/ubuntu/ -
+      # today that is templates/proxmox/seal-for-clone.sh, which runs as root
+      # against a real machine. The list is discovered, not written here.
+      - name: Lint shell outside scripts/ubuntu/
+        run: ./scripts/check-templates.sh shell
+
+      - name: Verify the CI matrix matches the templates on disk
+        run: ./scripts/check-templates.sh matrix
+
   secrets:
     name: Secret scan
     runs-on: ubuntu-latest
@@ -158,6 +193,7 @@ jobs:
     needs:
       - packer
       - cloud-init
+      - checker
       - secrets
     runs-on: ubuntu-latest
     timeout-minutes: 5

@@ -56,6 +56,35 @@ keys. Only `proxmox.pkrvars.hcl.example` is tracked.
 A token in the environment cannot be committed by a mistake in a `.gitignore`
 rule, which is why the split is drawn there rather than at "sensitive files".
 
+## Per-machine identity in a cloned image
+
+Anything that identifies *a machine* rather than *an image* has to be removed
+before a template is cloned, or every clone shares it.
+
+`scripts/ubuntu/01-cleanup-system.sh` runs in every build and handles the two
+that matter everywhere: it truncates `/etc/machine-id` and clears
+`/var/lib/cloud`, so a clone is treated as a new instance and reads the
+cloud-init drive attached to it.
+
+The Proxmox template's own build block does the rest, as a final step after
+`01`:
+
+- **SSH host keys** are deleted, and a one-shot unit regenerates them before
+  `ssh.service` starts on the clone. Shipped in the image, they let any clone
+  impersonate any other with no warning to a client that has connected before.
+- **`/etc/netplan/00-installer-config*.yaml`**, written by subiquity naming the
+  interface the *build* VM had, is removed so cloud-init's `50-cloud-init.yaml`
+  is the only source of truth on the clone.
+- **`/var/lib/systemd/random-seed`** is removed so clones do not start from a
+  shared seed.
+
+**This applies to the Proxmox template only.** The VMware templates keep their
+host keys, because subiquity leaves cloud-init pinned there and nothing would
+regenerate them: an image with no host keys cannot start `sshd`. Treat a VMware
+image built from this repository as one machine, not a template to clone
+widely - or unpin cloud-init there first, the same way
+`templates/proxmox/ubuntu-24.04-server/http/user-data` does.
+
 ## Supply chain
 
 - GitHub Actions are pinned to commit SHAs, not tags, with the version in a

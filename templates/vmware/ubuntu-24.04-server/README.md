@@ -31,7 +31,7 @@ packer build .
 
 The seed commits a SHA-512 crypt hash whose plaintext is documented next to it,
 so every machine built from it starts with the same console password. Change it
-on anything reachable by anyone else - see [SECURITY.md](../../SECURITY.md).
+on anything reachable by anyone else - see [SECURITY.md](../../../SECURITY.md).
 
 ## Checks
 

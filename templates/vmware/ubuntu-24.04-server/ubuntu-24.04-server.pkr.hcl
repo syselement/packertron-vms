@@ -4,10 +4,6 @@
 
 // Packer : https://www.packer.io/
 
-
-// TO TEST
-
-
 packer {
   required_version = ">= 1.7.0"
   required_plugins {
@@ -27,7 +23,12 @@ variable "iso" {
 variable "checksum" {
   type        = string
   description = "The checksum for the ISO file"
-  default     = "sha256:e240e4b801f7bb68c20d1356b60968ad0c33a41d00d828e74ceb3364a0317be9"
+  // The codename directory carries the SHA256SUMS for whichever point release
+  // is current, so this keeps matching when iso is bumped. It replaces a
+  // literal sha256 that had been left behind by an earlier point release: it
+  // no longer matched the ISO above, so every build aborted at verification.
+  // packer validate never downloads, so nothing in CI could have caught it.
+  default = "file:https://releases.ubuntu.com/noble/SHA256SUMS"
 }
 
 variable "headless" {
@@ -103,7 +104,7 @@ source "vmware-iso" "ubuntuserver24_04" {
   ssh_timeout  = "30m"
 
   // Output configuration
-  output_directory = "template"
+  output_directory = "output"
 
   // Export configuration
   format          = "vmx"
@@ -116,7 +117,7 @@ build {
   // 00 has no library dependencies, so the shell provisioner can upload it on
   // its own.
   provisioner "shell" {
-    execute_command = "echo '${var.password}' | sudo -S env {{ .Vars }} {{ .Path }}"
+    execute_command = "chmod +x {{ .Path }}; echo '${var.password}' | sudo -S env {{ .Vars }} {{ .Path }}"
     scripts = [
       "${path.root}/../../../scripts/ubuntu/00-update-system.sh"
     ]
@@ -137,7 +138,7 @@ build {
   }
 
   provisioner "shell" {
-    execute_command = "echo '${var.password}' | sudo -S env {{ .Vars }} {{ .Path }}"
+    execute_command = "chmod +x {{ .Path }}; echo '${var.password}' | sudo -S env {{ .Vars }} {{ .Path }}"
     environment_vars = [
       "REBOOT_AT_END=false",
       "TARGET_USER=${var.username}"
@@ -152,7 +153,7 @@ build {
   // per-machine state straight back into the image. That /var/tmp sweep is
   // also what removes the staged tree above.
   provisioner "shell" {
-    execute_command = "echo '${var.password}' | sudo -S env {{ .Vars }} {{ .Path }}"
+    execute_command = "chmod +x {{ .Path }}; echo '${var.password}' | sudo -S env {{ .Vars }} {{ .Path }}"
     scripts = [
       "${path.root}/../../../scripts/ubuntu/01-cleanup-system.sh"
     ]

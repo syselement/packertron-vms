@@ -118,7 +118,7 @@ build {
   sources = ["source.vmware-iso.ubuntu2404_desktop"]
   # Provisioning script
   provisioner "shell" {
-    execute_command = "echo '${var.ssh_password}' | sudo -S env {{ .Vars }} {{ .Path }}"
+    execute_command = "chmod +x {{ .Path }}; echo '${var.ssh_password}' | sudo -S env {{ .Vars }} {{ .Path }}"
     scripts = [
       "${path.root}/../../../scripts/ubuntu/00-update-system.sh",
       "${path.root}/../../../scripts/ubuntu/01-cleanup-system.sh"

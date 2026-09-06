@@ -7,14 +7,18 @@
 // from now still picks up the current scripts rather than whatever was current
 // when this template was built.
 //
-// Credentials come from the environment, never from a file in this repository:
+// Node settings - url, node name, storage pools, bridge - come from the
+// shared ../proxmox.pkrvars.hcl, which is gitignored and copied from the
+// .example beside it. Credentials come from the environment, never from any
+// file in this repository:
 //
-//   export PKR_VAR_proxmox_api_url="https://proxmox.example:8006/api2/json"
 //   export PKR_VAR_proxmox_api_token_id="packer@pve!templates"
 //   export PKR_VAR_proxmox_api_token_secret="..."
+//   export PKR_VAR_ssh_password="..."
 //
 // Build with:
-//   packer init . && packer build .
+//   packer init .
+//   packer build -var-file=../proxmox.pkrvars.hcl .
 
 packer {
   required_version = ">= 1.7.0"
@@ -116,7 +120,7 @@ variable "ssh_password" {
   default     = "packer"
 }
 
-source "proxmox-iso" "ubuntuserver24" {
+source "proxmox-iso" "ubuntu-24-04-server" {
   // Documentation : https://developer.hashicorp.com/packer/integrations/hashicorp/proxmox/latest/components/builder/iso
 
   // Connection
@@ -180,25 +184,43 @@ source "proxmox-iso" "ubuntuserver24" {
 }
 
 build {
-  sources = ["source.proxmox-iso.ubuntuserver24"]
+  sources = ["source.proxmox-iso.ubuntu-24-04-server"]
 
+  // Every execute_command here keeps Packer's own `chmod +x {{ .Path }};`
+  // prefix. Packer uploads a provisioner script without the execute bit and
+  // relies on the default execute_command to add it, so overriding that
+  // command - as these do, to pipe a password into sudo - has to put it back
+  // or the script fails with "permission denied" before it runs a line.
+  //
   // 00 installs the guest agent for the detected hypervisor; on Proxmox that
   // is qemu-guest-agent. It has no library dependencies, so the shell
   // provisioner can upload it on its own.
   provisioner "shell" {
-    execute_command = "echo '${var.ssh_password}' | sudo -S env {{ .Vars }} {{ .Path }}"
+    execute_command = "chmod +x {{ .Path }}; echo '${var.ssh_password}' | sudo -S env {{ .Vars }} {{ .Path }}"
     scripts = [
       "${path.root}/../../../scripts/ubuntu/00-update-system.sh"
     ]
   }
 
-  // 01 seals the template and runs last. It truncates the machine-id and
+  // 01 seals what every template needs sealed: it truncates the machine-id and
   // clears cloud-init state, which is what lets every clone be treated as a
   // fresh instance and read the cloud-init drive Proxmox attaches to it.
   provisioner "shell" {
-    execute_command = "echo '${var.ssh_password}' | sudo -S env {{ .Vars }} {{ .Path }}"
+    execute_command = "chmod +x {{ .Path }}; echo '${var.ssh_password}' | sudo -S env {{ .Vars }} {{ .Path }}"
     scripts = [
       "${path.root}/../../../scripts/ubuntu/01-cleanup-system.sh"
+    ]
+  }
+
+  // Sealing that only a clone needs, and the last thing to touch the image.
+  // The reasoning lives in the script; it is a file rather than an inline
+  // block so that shellcheck and shfmt can see it, like every other script
+  // here. It sits one level up because every Proxmox template needs the same
+  // seal.
+  provisioner "shell" {
+    execute_command = "chmod +x {{ .Path }}; echo '${var.ssh_password}' | sudo -S env {{ .Vars }} {{ .Path }}"
+    scripts = [
+      "${path.root}/../seal-for-clone.sh"
     ]
   }
 }

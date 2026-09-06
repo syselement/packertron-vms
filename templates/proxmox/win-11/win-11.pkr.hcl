@@ -21,22 +21,22 @@ packer {
 }
 
 variable "keepass_database" {
-  type = string
+  type    = string
   default = "../../seclab.kdbx"
 }
 
 variable "ca_cert_path" {
-  type = string
+  type    = string
   default = "../../pki/ca.crt"
 }
 
 variable "keepass_password" {
-  type = string
+  type      = string
   sensitive = true
 }
 
 data "keepass-credentials" "kpxc" {
-  keepass_file = "${var.keepass_database}"
+  keepass_file     = "${var.keepass_database}"
   keepass_password = "${var.keepass_password}"
 }
 
@@ -78,11 +78,11 @@ variable "network_adapter" {
 }
 
 source "proxmox-iso" "seclab-win-ws" {
-  proxmox_url  = "https://${var.proxmox_api_host}:8006/api2/json"
-  node         = "${var.proxmox_node}"
-  username     = "${local.proxmox_api_id}"
-  token        = "${local.proxmox_api_token}"
-  bios         = "ovmf"
+  proxmox_url = "https://${var.proxmox_api_host}:8006/api2/json"
+  node        = "${var.proxmox_node}"
+  username    = "${local.proxmox_api_id}"
+  token       = "${local.proxmox_api_token}"
+  bios        = "ovmf"
   boot_iso {
     type         = "sata"
     iso_file     = "${var.iso_storage}:iso/Win-11-Enterprise.iso"
@@ -105,7 +105,7 @@ source "proxmox-iso" "seclab-win-ws" {
   cpu_type                 = "x86-64-v2-AES"
   boot                     = "order=sata0;virtio0"
   boot_wait                = "5s"
-  boot_command             = [
+  boot_command = [
     "<space><space><space><space><space><space>",
     "<space><space><space><space><space><space>",
     "<space><space><space><space><space><space>",
@@ -129,7 +129,7 @@ source "proxmox-iso" "seclab-win-ws" {
     iso_file     = "${var.iso_storage}:iso/Autounattend-win-11-ws.iso"
     iso_checksum = "sha256:2893ca8f6d1f420436b6c213fa618710e7689a67d4bf924263361f07cced3b34"
   }
-  
+
   additional_iso_files {
     index        = 2
     type         = "sata"
@@ -152,9 +152,9 @@ source "proxmox-iso" "seclab-win-ws" {
 }
 
 build {
-  sources = ["sources.proxmox-iso.seclab-win-ws"]
+  sources = ["source.proxmox-iso.seclab-win-ws"]
   provisioner "file" {
-    source = "${var.ca_cert_path}"
+    source      = "${var.ca_cert_path}"
     destination = "C:/Windows/Temp/ca.crt"
   }
   provisioner "windows-shell" {
