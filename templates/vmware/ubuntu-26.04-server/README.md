@@ -6,23 +6,23 @@ The full provisioning chain runs at build time - `00-update-system.sh`, then
 the whole `scripts/ubuntu/` bundle is staged, then `02` and `01`. The result is
 a fat image: everything is baked in, nothing is deferred to first boot. That is
 the opposite of the Proxmox template beside it
-([ubuntu-24.04-x64-server-proxmox](../ubuntu-24.04-x64-server-proxmox/README.md)),
+([proxmox/ubuntu-24.04-server](../../proxmox/ubuntu-24.04-server/README.md)),
 which stays thin and provisions per VM.
 
 Adapted from the 24.04 template in
-[ubuntu-24.04-x64-server](../ubuntu-24.04-x64-server/README.md), which came from
+[ubuntu-24.04-server](../ubuntu-24.04-server/README.md), which came from
 [ynlamy/packer-ubuntuserver24_04](https://github.com/ynlamy/packer-ubuntuserver24_04)
 (GPLv3).
 
 ## Layout
 
-- `ubuntu-26.04-x64-server.pkr.hcl` - builder, variables and build block
+- `ubuntu-26.04-server.pkr.hcl` - builder, variables and build block
 - `http/user-data`, `http/meta-data` - the autoinstall seed served to subiquity
 
 ## Build
 
 ```bash
-cd templates/ubuntu-26.04-x64-server
+cd templates/vmware/ubuntu-26.04-server
 packer init .
 packer validate .
 packer build .
@@ -37,5 +37,5 @@ on anything reachable by anyone else - see [SECURITY.md](../../SECURITY.md).
 ## Checks
 
 ```bash
-../../scripts/check-templates.sh
+../../../scripts/check-templates.sh
 ```

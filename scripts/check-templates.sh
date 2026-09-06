@@ -12,6 +12,7 @@
 #   scripts/check-templates.sh            # everything
 #   scripts/check-templates.sh packer     # templates only
 #   scripts/check-templates.sh seeds      # cloud-init seeds only
+#   scripts/check-templates.sh proxmox    # one hypervisor only
 
 set -Eeuo pipefail
 
@@ -24,10 +25,13 @@ REPO_ROOT="$(cd -- "$SCRIPT_DIR/.." && pwd)"
 readonly -a SKIP_TEMPLATES=(
     # Unrepaired build block, and depends on a KeePass database that is not in
     # this repository.
-    win-11
+    proxmox/win-11
 )
 
 failures=0
+
+# Empty means every hypervisor; set from the command line to narrow the run.
+HYPERVISOR=""
 
 note() { printf '\n== %s\n' "$*"; }
 pass() { printf '   ok   %s\n' "$*"; }
@@ -44,11 +48,15 @@ is_skipped() {
     return 1
 }
 
+# A template is identified by "<hypervisor>/<os>", which is exactly its path
+# under templates/. That is also what the CI matrix lists, so the two stay in
+# step without either side hard-coding a list.
 template_directories() {
-    local path
-    for path in "$REPO_ROOT"/templates/*/*.pkr.hcl; do
+    local path directory
+    for path in "$REPO_ROOT"/templates/*/*/*.pkr.hcl; do
         [[ -e "$path" ]] || continue
-        basename "$(dirname -- "$path")"
+        directory="$(dirname -- "$path")"
+        printf '%s\n' "${directory#"$REPO_ROOT"/templates/}"
     done | sort -u
 }
 
@@ -62,6 +70,10 @@ check_templates() {
 
     while read -r directory; do
         [[ -n "$directory" ]] || continue
+        # An explicit hypervisor narrows the run to templates/<hypervisor>/.
+        if [[ -n "$HYPERVISOR" && "${directory%%/*}" != "$HYPERVISOR" ]]; then
+            continue
+        fi
         if is_skipped "$directory"; then
             printf '   skip %s (in SKIP_TEMPLATES)\n' "$directory"
             continue
@@ -118,7 +130,7 @@ check_seeds() {
     fi
 
     note "cloud-init seeds"
-    for file in "$REPO_ROOT"/scripts/ubuntu/autoinstall-*.yaml "$REPO_ROOT"/templates/*/http/user-data; do
+    for file in "$REPO_ROOT"/scripts/ubuntu/autoinstall-*.yaml "$REPO_ROOT"/templates/*/*/http/user-data; do
         [[ -f "$file" ]] || continue
         local relative="${file#"$REPO_ROOT"/}"
 
@@ -142,6 +154,15 @@ check_seeds() {
 main() {
     local scope="${1:-all}"
 
+    # A hypervisor name is accepted wherever a scope is, because "check just
+    # the Proxmox templates" is the common case while a build is being brought
+    # up on a node. It is validated against the directories that exist rather
+    # than a hard-coded list.
+    if [[ -n "$scope" && -d "$REPO_ROOT/templates/$scope" ]]; then
+        HYPERVISOR="$scope"
+        scope="${2:-all}"
+    fi
+
     case "$scope" in
         all)
             check_templates
@@ -150,7 +171,8 @@ main() {
         packer) check_templates ;;
         seeds) check_seeds ;;
         *)
-            printf 'usage: %s [all|packer|seeds]\n' "${BASH_SOURCE[0]##*/}" >&2
+            printf 'usage: %s [<hypervisor>] [all|packer|seeds]\n' "${BASH_SOURCE[0]##*/}" >&2
+            printf 'hypervisors: %s\n' "$(cd "$REPO_ROOT/templates" && echo */)" >&2
             exit 2
             ;;
     esac

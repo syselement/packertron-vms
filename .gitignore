@@ -25,8 +25,13 @@ temp/
 
 # Secrets and credentials
 # The tracked *.auto.pkrvars.hcl files hold ISO URLs and checksums only. Keep
-# anything sensitive in a *.local.pkrvars.hcl beside them, or in the
-# environment (PROXMOX_VE_*), so it can never be committed by accident.
+# anything sensitive in the environment (PKR_VAR_*), so it can never be
+# committed by accident.
+#
+# templates/proxmox/proxmox.pkrvars.hcl holds one node's settings - hostname,
+# storage pools, bridge. Not secret, but not shareable either, so it is
+# ignored and committed only as .example. Same for any *.local.pkrvars.hcl.
+proxmox.pkrvars.hcl
 *.local.pkrvars.hcl
 *secret*.pkrvars.hcl
 *.tfvars

@@ -18,36 +18,50 @@ up the current scripts rather than whatever was current when the template was
 baked. Only `00-update-system.sh` (guest agent) and `01-cleanup-system.sh`
 (sealing) run during the build.
 
-## Credentials
+## Settings and credentials
 
-Never in a file in this repository. Create a Proxmox API **token** scoped to
-template creation, then:
+Two places, split by whether the value is a secret:
+
+| What | Where | Committed |
+| --- | --- | --- |
+| API token, SSH password | environment, `PKR_VAR_*` | never |
+| Node name, storage pools, bridge | `../proxmox.pkrvars.hcl` | no, only `.example` |
+| ISO URL, checksum, sizing, `vm_id` | this template's `.pkr.hcl` defaults | yes |
+
+The node settings are shared by every template under `templates/proxmox/`, so
+they are written once:
 
 ```bash
-export PKR_VAR_proxmox_api_url="https://proxmox.example:8006/api2/json"
+cd templates/proxmox
+cp proxmox.pkrvars.hcl.example proxmox.pkrvars.hcl   # gitignored
+$EDITOR proxmox.pkrvars.hcl
+```
+
+Create a Proxmox API **token** scoped to template creation - not a root
+password - and export it:
+
+```bash
 export PKR_VAR_proxmox_api_token_id="packer@pve!templates"
 export PKR_VAR_proxmox_api_token_secret="..."
+export PKR_VAR_ssh_password="..."
 ```
 
 Keep `insecure_skip_tls_verify` at its default of `false` unless the node
 presents a self-signed certificate you have deliberately chosen to accept.
 
-Anything else you would rather not type each time belongs in a
-`*.local.pkrvars.hcl` beside this file, which `.gitignore` excludes.
-
 ## Build
 
 ```bash
+cd templates/proxmox/ubuntu-24.04-server
 packer init .
-packer validate .
-packer build .
+packer validate -var-file=../proxmox.pkrvars.hcl .
+packer build    -var-file=../proxmox.pkrvars.hcl .
 ```
 
-Useful overrides: `-var 'proxmox_node=pve01'`, `-var 'storage_pool=local-zfs'`,
-`-var 'network_bridge=vmbr1'`, `-var 'vm_id=9100'`.
+Per-build overrides still work: `-var 'vm_id=9100'`.
 
 `vm_id` must be free on the node, and the ISO is downloaded to
-`iso_storage_pool` (`local` by default) on the first run.
+`iso_storage_pool` on the first run.
 
 ## Why the seed deletes two cloud-init files
 
@@ -64,5 +78,5 @@ The seed removes both and writes `99-pve.cfg` with
 ## Verify before pushing
 
 ```bash
-../../scripts/check-templates.sh          # fmt, validate, cloud-init schema
+../../../scripts/check-templates.sh          # fmt, validate, cloud-init schema
 ```

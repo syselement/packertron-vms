@@ -97,7 +97,7 @@ variable "vm_id" {
 variable "template_name" {
   type        = string
   description = "Name of the resulting template"
-  default     = "ubuntu-24.04-x64-server-template"
+  default     = "ubuntu-24.04-server-template"
 }
 
 // Must match the identity block in http/user-data, which is what the
@@ -188,7 +188,7 @@ build {
   provisioner "shell" {
     execute_command = "echo '${var.ssh_password}' | sudo -S env {{ .Vars }} {{ .Path }}"
     scripts = [
-      "${path.root}/../../scripts/ubuntu/00-update-system.sh"
+      "${path.root}/../../../scripts/ubuntu/00-update-system.sh"
     ]
   }
 
@@ -198,7 +198,7 @@ build {
   provisioner "shell" {
     execute_command = "echo '${var.ssh_password}' | sudo -S env {{ .Vars }} {{ .Path }}"
     scripts = [
-      "${path.root}/../../scripts/ubuntu/01-cleanup-system.sh"
+      "${path.root}/../../../scripts/ubuntu/01-cleanup-system.sh"
     ]
   }
 }

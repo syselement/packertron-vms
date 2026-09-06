@@ -12,8 +12,8 @@ on:
       - main
     paths:
       - "scripts/ubuntu/**"
-      - "templates/ubuntu-24.04-x64-desktop/Vagrantfile"
-      - "templates/ubuntu-26.04-x64-desktop/Vagrantfile"
+      - "templates/vmware/ubuntu-24.04-desktop/Vagrantfile"
+      - "templates/vmware/ubuntu-26.04-desktop/Vagrantfile"
   workflow_dispatch:
 
 permissions:

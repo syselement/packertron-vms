@@ -6,7 +6,7 @@ The full provisioning chain runs at build time - `00-update-system.sh`, then
 the whole `scripts/ubuntu/` bundle is staged, then `02` and `01`. The result is
 a fat image: everything is baked in, nothing is deferred to first boot. That is
 the opposite of the Proxmox template beside it
-([ubuntu-24.04-x64-server-proxmox](../ubuntu-24.04-x64-server-proxmox/README.md)),
+([proxmox/ubuntu-24.04-server](../../proxmox/ubuntu-24.04-server/README.md)),
 which stays thin and provisions per VM.
 
 Adapted from
@@ -15,13 +15,13 @@ Adapted from
 
 ## Layout
 
-- `ubuntu-24.04-x64-server.pkr.hcl` - builder, variables and build block
+- `ubuntu-24.04-server.pkr.hcl` - builder, variables and build block
 - `http/user-data`, `http/meta-data` - the autoinstall seed served to subiquity
 
 ## Build
 
 ```bash
-cd templates/ubuntu-24.04-x64-server
+cd templates/vmware/ubuntu-24.04-server
 packer init .
 packer validate .
 packer build .
@@ -36,5 +36,5 @@ on anything reachable by anyone else - see [SECURITY.md](../../SECURITY.md).
 ## Checks
 
 ```bash
-../../scripts/check-templates.sh
+../../../scripts/check-templates.sh
 ```

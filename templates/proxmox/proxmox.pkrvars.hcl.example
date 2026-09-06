@@ -1,0 +1,41 @@
+# Shared Proxmox settings for every template under templates/proxmox/.
+#
+#   cp proxmox.pkrvars.hcl.example proxmox.pkrvars.hcl
+#
+# proxmox.pkrvars.hcl is gitignored. Fill it in with the values for your node
+# and pass it to every build:
+#
+#   cd templates/proxmox/ubuntu-24.04-server
+#   packer build -var-file=../proxmox.pkrvars.hcl .
+#
+# It is one file per node rather than one per template, so adding a template
+# inherits these settings instead of copying them.
+#
+# CREDENTIALS DO NOT BELONG HERE. The API token and the SSH password come from
+# the environment, so they cannot be committed even by accident:
+#
+#   export PKR_VAR_proxmox_api_token_id="packer@pve!templates"
+#   export PKR_VAR_proxmox_api_token_secret="..."
+#   export PKR_VAR_ssh_password="..."
+#
+# See ../../SECURITY.md.
+
+# Where the API lives. Include the scheme, the port and /api2/json.
+proxmox_api_url = "https://proxmox.example.lan:8006/api2/json"
+
+# The node name as Proxmox shows it, which is not always the hostname.
+proxmox_node = "pve"
+
+# Storage. iso_storage_pool must accept content type "iso"; storage_pool must
+# accept "images". On a default single-node install these are local and
+# local-lvm.
+iso_storage_pool = "local"
+storage_pool     = "local-lvm"
+
+# The bridge the build VM gets its NIC on. It needs DHCP and outbound access,
+# because the installer fetches packages.
+network_bridge = "vmbr0"
+
+# Leave false. Set it to true only for a node presenting a self-signed
+# certificate that you have deliberately chosen to accept.
+insecure_skip_tls_verify = false

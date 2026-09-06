@@ -1,8 +1,6 @@
-# NOT WORKING - https://bugs.launchpad.net/subiquity/+bug/2150197
+# Ubuntu 24.04 Desktop (VMware + Packer)
 
-# Ubuntu 26.04 Desktop (VMware + Packer)
-
-Repeatable **Ubuntu 26.04 Desktop** build for VMware Workstation with optional Vagrant box export.
+Repeatable **Ubuntu 24.04 Desktop** build for VMware Workstation with optional Vagrant box export.
 
 ---
 
@@ -35,14 +33,14 @@ This is how it works:
 ### Build the template box
 
 ```powershell
-cd .\packertron-vms\templates\ubuntu-26.04-x64-desktop
+cd .\packertron-vms\templates\vmware\ubuntu-24.04-desktop\
 packer init .
-packer validate ubuntu-26.04-x64-desktop.pkr.hcl
+packer validate ubuntu-24.04-desktop.pkr.hcl
 packer build .
 ```
 
 - Artifacts land in `output/`
-  - e.g. `ubuntu-26.04-x64-desktop-template-vmware.box` - size ~5GB
+  - e.g. `ubuntu-24.04-x64-desktop-template-vmware.box` - size ~5GB
 
 - Build time: ~15 minutes (hardware dependent)
 
@@ -53,14 +51,14 @@ packer build .
 1. Extract the .box:
 
 ```powershell
-mkdir tmp && tar -xf output/ubuntu-26.04-x64-desktop-template-vmware.box -C tmp
+mkdir tmp && tar -xf output/ubuntu-24.04-x64-desktop-template-vmware.box -C tmp
 ```
 
-2. Open `tmp/ubuntu-26.04-x64-desktop-template.vmx` in Workstation (File -> Open) and power it on
+2. Open `tmp/ubuntu-24.04-x64-desktop-template.vmx` in Workstation (File -> Open) and power it on
     - The `.vmxf`, `.nvram`, `.vmdk`, and `.vmsd` sit alongside it
 
 3. Optional VMX tweaks (before first boot):
-    - `displayname = "Ubuntu-Desktop-26"`
+    - `displayname = "Ubuntu-Desktop-24"`
     - `hgfs.linkrootshare = "FALSE"`
     - `hgfs.maprootshare = "FALSE"`
     - `isolation.tools.hgfs.disable = "TRUE"`
@@ -137,8 +135,8 @@ vagrant destroy -f
 
 ## Customize
 
-- `ubuntu-26.04-x64-desktop.pkr` - contains the Packer variables with some defaults
-- `ubuntu-26.04-x64-desktop.auto.pkrvars.hcl` - auto-loaded Packer Build variables
+- `ubuntu-24.04-desktop.pkr` - contains the Packer variables with some defaults
+- `ubuntu-24.04-desktop.auto.pkrvars.hcl` - auto-loaded Packer Build variables
 - Override variables at build time with `-var "key=value"`
 - `../scripts/` are used
   - during Packer build for preseed/install automation
@@ -157,8 +155,8 @@ vagrant destroy -f
 ## Files of note
 
 - `Vagrantfile`
-- `ubuntu-26.04-x64-desktop.pkr.hcl`
-- `ubuntu-26.04-x64-desktop.auto.pkrvars.hcl`
+- `ubuntu-24.04-desktop.pkr.hcl`
+- `ubuntu-24.04-desktop.auto.pkrvars.hcl`
 - `output/`
 - `../scripts/`
 

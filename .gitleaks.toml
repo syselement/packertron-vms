@@ -17,9 +17,20 @@ password, and the same seeds grant that user NOPASSWD sudo. These images are
 for a lab; do not expose one to an untrusted network without changing the
 password first.
 
-Only the crypt-hash pattern is allowlisted, not the files that carry it, so a
+The Windows answer files carry a KMS client setup key. Those are published by
+Microsoft, one per edition, and exist so that a machine can find a KMS host;
+they activate nothing on their own. The file that holds it cites the Microsoft
+page it came from.
+
+Only these two patterns are allowlisted, never the files that carry them, so a
 real credential added to those same files is still reported.
 """
 regexes = [
+  # SHA-512 crypt hash, as written by mkpasswd -m sha-512.
   '''\$6\$[./A-Za-z0-9]{1,32}\$[./A-Za-z0-9]{20,}''',
+  # The one KMS client setup key this repository carries, matched literally
+  # rather than by shape. A pattern for "five groups of five" would allowlist
+  # every future key without anyone looking at it; this way, adding another
+  # edition's key is a finding that has to be read and re-approved.
+  '''NPPR9-FWDCX-D2C8J-H872K-2YT43''',
 ]

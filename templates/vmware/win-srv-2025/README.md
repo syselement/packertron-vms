@@ -12,7 +12,7 @@ Repeatable **Windows Server 2025** build for VMware Workstation with optional Va
 ## Quick build
 
 ```powershell
-cd templates/win-srv-2025
+cd templates/vmware/win-srv-2025
 packer init .
 packer validate win-srv-2025.pkr.hcl
 packer build .

@@ -33,6 +33,7 @@
         - [4️⃣ Clone packertron-vms Repository](#4️⃣-clone-packertron-vms-repository)
     - [📁 Directory Structure](#-directory-structure)
     - [🚀 Build \& Deploy VMs](#-build--deploy-vms)
+        - [Build a Proxmox template](#build-a-proxmox-template)
         - [1️⃣ Open Visual Studio Code](#1️⃣-open-visual-studio-code)
         - [2️⃣ Packer: Initialize \& Build Windows Server 2025](#2️⃣-packer-initialize--build-windows-server-2025)
         - [3️⃣ Deploy VM with Vagrant](#3️⃣-deploy-vm-with-vagrant)
@@ -170,37 +171,51 @@ cd packertron-vms
 
 ```
 packertron-vms/
-├── templates/        # one directory per VM template
-│   ├── kali/                              # Proxmox  (stub, does not build yet)
-│   ├── ubuntu-24.04-x64-desktop/          # VMware
-│   ├── ubuntu-24.04-x64-server/           # VMware
-│   ├── ubuntu-24.04-x64-server-proxmox/   # Proxmox  (unbuilt on real hardware)
-│   ├── ubuntu-26.04-x64-desktop/          # VMware
-│   ├── ubuntu-26.04-x64-server/           # VMware
-│   ├── win-11/                            # Proxmox  (unrepaired, excluded from CI)
-│   └── win-srv-2025/                      # VMware
-├── scripts/          # provisioners, shared by every template
-│   ├── ubuntu/           # Bash provisioning chain, its lib/ and bats tests
-│   ├── windows/          # PowerShell and batch provisioners
-│   └── check-templates.sh  # run the CI template checks locally
-├── .github/workflows/  # CI
-├── SECURITY.md       # credential model - read before pointing this at a network
+├── templates/           one directory per template, grouped by hypervisor
+│   ├── proxmox/                     <- the primary target
+│   │   ├── proxmox.pkrvars.hcl.example   node settings, shared by all of them
+│   │   ├── ubuntu-24.04-server/
+│   │   ├── kali/                         stub, does not build yet
+│   │   └── win-11/                       unrepaired, excluded from CI
+│   └── vmware/                      <- kept working alongside
+│       ├── ubuntu-24.04-desktop/   ubuntu-26.04-desktop/
+│       ├── ubuntu-24.04-server/    ubuntu-26.04-server/
+│       └── win-srv-2025/
+├── scripts/             provisioners, shared by every template
+│   ├── ubuntu/              Bash chain, lib/, autoinstall seeds, bats tests
+│   ├── windows/             PowerShell and batch provisioners
+│   └── check-templates.sh   run the CI checks locally
+├── .github/workflows/   CI
+├── SECURITY.md          credential model - read before pointing this at a network
 └── CHANGELOG.md  LICENSE  README.md  version.yaml
 ```
 
-Every template directory follows the same shape, so the name of a file tells
-you where it belongs:
+Two levels, `<hypervisor>/<os>`, and that pair is the template's name
+everywhere: in the CI matrix, in `check-templates.sh` output, and on disk.
+
+Inside a template directory:
 
 | Path | Holds |
 | --- | --- |
-| `<name>/<name>.pkr.hcl` | the builder, variables and build block |
-| `<name>/<name>.auto.pkrvars.hcl` | non-secret settings, auto-loaded (ISO URL, sizing) |
-| `<name>/http/` | the cloud-init seed served to the installer (`user-data`, `meta-data`) |
-| `<name>/config/` | Windows answer files (`autounattend.xml`, `unattend.xml`) |
-| `<name>/README.md` | how to build that one template, and whether it currently can be |
+| `<os>/<os>.pkr.hcl` | the builder, variables and build block |
+| `<os>/<os>.auto.pkrvars.hcl` | non-secret defaults, auto-loaded (ISO URL, sizing) |
+| `<os>/http/` | the cloud-init seed served to the installer |
+| `<os>/config/` | Windows answer files |
+| `<os>/README.md` | how to build that one, and whether it currently can be |
 
-Templates reach the shared provisioners through `${path.root}/../../scripts/`.
-Secrets never live in any of these files - see [SECURITY.md](SECURITY.md).
+Templates reach the shared provisioners through
+`${path.root}/../../../scripts/`.
+
+### Where a value goes
+
+| Kind | Where | Committed |
+| --- | --- | --- |
+| API token, SSH password | environment, `PKR_VAR_*` | never |
+| Node name, storage pools, bridge | `templates/proxmox/proxmox.pkrvars.hcl` | no, only the `.example` |
+| ISO URL, checksum, sizing | the template's own `.pkr.hcl` / `.auto.pkrvars.hcl` | yes |
+
+One node file rather than one per template, so adding a template inherits the
+node settings instead of copying them. See [SECURITY.md](SECURITY.md).
 
 Build output, `packer_cache/`, `.vagrant/` and `tmp/` are generated or scratch
 and are excluded by `.gitignore`.
@@ -208,6 +223,48 @@ and are excluded by `.gitignore`.
 ---
 
 ## 🚀 Build & Deploy VMs
+
+### Build a Proxmox template
+
+One-time setup, on the machine that runs Packer:
+
+```bash
+cd templates/proxmox
+cp proxmox.pkrvars.hcl.example proxmox.pkrvars.hcl   # gitignored, never committed
+$EDITOR proxmox.pkrvars.hcl                          # node name, storage pools, bridge
+```
+
+On the Proxmox node, create an API token for a user that may create VMs -
+`Datacenter -> Permissions -> API Tokens`. Give it `PVE.Admin` on `/`, or at
+minimum `VM.Allocate`, `VM.Config.*`, `VM.Monitor`, `VM.PowerMgmt`,
+`Datastore.Allocate` and `Datastore.AllocateSpace` on the storages involved.
+Leave *Privilege Separation* unticked, or the token inherits nothing.
+
+Then, in the shell you build from - these never touch the filesystem:
+
+```bash
+export PKR_VAR_proxmox_api_token_id="packer@pve!templates"
+export PKR_VAR_proxmox_api_token_secret="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+export PKR_VAR_ssh_password="the password in the autoinstall seed"
+```
+
+Build:
+
+```bash
+cd templates/proxmox/ubuntu-24.04-server
+packer init .
+packer build -var-file=../proxmox.pkrvars.hcl .
+```
+
+The result is a Proxmox **template** (`vm_id` 9024 by default) that is thin on
+purpose: base OS, `qemu-guest-agent`, and cloud-init left able to run again.
+Per-VM provisioning happens at first boot on each clone, not in the image.
+
+Before pushing any template change:
+
+```bash
+scripts/check-templates.sh proxmox
+```
 
 ### 1️⃣ Open Visual Studio Code
 
@@ -218,14 +275,14 @@ code .
 
 ### 2️⃣ Packer: Initialize & Build Windows Server 2025
 
-Setup the necessary variables inside the `templates\win-srv-2025\win-srv-2025.auto.pkrvars.hcl` file, adjusting them accordingly based on your ISO folder, name and checksum.
+Setup the necessary variables inside the `templates\vmware\win-srv-2025\win-srv-2025.auto.pkrvars.hcl` file, adjusting them accordingly based on your ISO folder, name and checksum.
 
 Open VMware Workstation Pro (before running Packer build).
 
 Proceed with Packer initialize and build.
 
 ```powershell
-cd templates/win-srv-2025
+cd templates/vmware/win-srv-2025
 packer init .
 packer build .
 ```
@@ -233,7 +290,7 @@ packer build .
 ### 3️⃣ Deploy VM with Vagrant
 
 ```powershell
-cd templates/win-srv-2025
+cd templates/vmware/win-srv-2025
 vagrant up
 ```
 

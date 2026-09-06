@@ -14,7 +14,12 @@ Adapted from [mttaggart/seclab](https://github.com/mttaggart/seclab)
 ## Layout
 
 - `kali.pkr.hcl` - builder, variables and build block
-- `kali.pkrvars.hcl` - non-secret build settings (node, pools, bridge)
+
+Node settings come from the shared `../proxmox.pkrvars.hcl`, the same file
+every Proxmox template here uses. Kali had its own copy of them until the
+hypervisor split; the variable names now match
+[ubuntu-24.04-server](../ubuntu-24.04-server/README.md), so one file feeds
+both.
 
 ## Credentials
 
@@ -28,10 +33,10 @@ export PKR_VAR_ssh_password="..."
 
 The upstream template read these from a KeePass database two directories
 up, which is not part of this repository - that is why it could not even
-be validated before. See [SECURITY.md](../../SECURITY.md).
+be validated before. See [SECURITY.md](../../../SECURITY.md).
 
 ## Checks
 
 ```bash
-../../scripts/check-templates.sh packer
+../../../scripts/check-templates.sh proxmox
 ```

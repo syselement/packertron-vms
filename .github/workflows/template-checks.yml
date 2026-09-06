@@ -35,18 +35,22 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # win-11 is deliberately absent: its build block is still unrepaired
-        # (sources. instead of source.) and it depends on a KeePass database
-        # that is not in this repository. Add it here in the same change that
-        # fixes it.
+        # Each entry is the template's path under templates/, which is also
+        # how scripts/check-templates.sh names it, so the two lists stay
+        # comparable at a glance.
+        #
+        # proxmox/win-11 is deliberately absent: its build block is still
+        # unrepaired (sources. instead of source.) and it depends on a KeePass
+        # database that is not in this repository. Add it here in the same
+        # change that fixes it.
         template:
-          - kali
-          - ubuntu-24.04-x64-desktop
-          - ubuntu-26.04-x64-desktop
-          - ubuntu-24.04-x64-server
-          - ubuntu-26.04-x64-server
-          - ubuntu-24.04-x64-server-proxmox
-          - win-srv-2025
+          - proxmox/kali
+          - proxmox/ubuntu-24.04-server
+          - vmware/ubuntu-24.04-desktop
+          - vmware/ubuntu-26.04-desktop
+          - vmware/ubuntu-24.04-server
+          - vmware/ubuntu-26.04-server
+          - vmware/win-srv-2025
 
     steps:
       # Actions are pinned to commits rather than tags; Dependabot keeps them current.
@@ -105,7 +109,7 @@ jobs:
         run: |
           status=0
           # shellcheck disable=SC2044
-          for file in scripts/ubuntu/autoinstall-*.yaml templates/*/http/user-data; do
+          for file in scripts/ubuntu/autoinstall-*.yaml templates/*/*/http/user-data; do
             [ -f "$file" ] || continue
 
             # cloud-init reads the first document and silently ignores the

@@ -6,7 +6,7 @@ produces at a network you do not control.
 ## The images ship a known password
 
 Every autoinstall seed - `scripts/ubuntu/autoinstall-*.yaml` and each
-`templates/*/http/user-data` - commits a SHA-512 crypt hash for the initial
+`templates/*/*/http/user-data` - commits a SHA-512 crypt hash for the initial
 user, and the plaintext is documented in the file next to it.
 
 This is not an accident and it cannot be avoided for an unattended install:
@@ -29,22 +29,32 @@ real credential committed to those same seeds is still reported.
 
 ## Credentials belong in the environment
 
-Nothing that authenticates to real infrastructure is committed. Proxmox
-credentials are read from the environment:
+Nothing that authenticates to real infrastructure is committed. A value lands
+in one of three places, decided by what it is:
+
+| Kind | Where | Committed |
+| --- | --- | --- |
+| API token, SSH password | environment, `PKR_VAR_*` | **never** |
+| Node name, storage pools, bridge | `templates/proxmox/proxmox.pkrvars.hcl` | no - only the `.example` |
+| ISO URL, checksum, sizing | the template's `.pkr.hcl` / `.auto.pkrvars.hcl` | yes |
 
 ```bash
 export PKR_VAR_proxmox_api_token_id="packer@pve!templates"
 export PKR_VAR_proxmox_api_token_secret="..."
+export PKR_VAR_ssh_password="..."
 ```
 
 Use an API **token** scoped to template creation, not a root password. Keep
 `insecure_skip_tls_verify` at its default of `false` unless the node presents a
 self-signed certificate you have deliberately chosen to accept.
 
-The tracked `*.auto.pkrvars.hcl` and `*.pkrvars.hcl` files carry ISO URLs,
-checksums and sizing only. Anything sensitive that must live in a file belongs
-in a `*.local.pkrvars.hcl`, which `.gitignore` excludes along with `*.tfvars`,
-`.env`, `*.kdbx` and private keys.
+The middle row is not secret, but it describes one person's network, so it is
+not shared either. `.gitignore` excludes `proxmox.pkrvars.hcl` and any
+`*.local.pkrvars.hcl`, along with `*.tfvars`, `.env`, `*.kdbx` and private
+keys. Only `proxmox.pkrvars.hcl.example` is tracked.
+
+A token in the environment cannot be committed by a mistake in a `.gitignore`
+rule, which is why the split is drawn there rather than at "sensitive files".
 
 ## Supply chain
 

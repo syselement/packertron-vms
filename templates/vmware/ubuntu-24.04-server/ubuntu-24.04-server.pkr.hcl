@@ -1,8 +1,12 @@
-// Description : Creating a virtual machine template under Ubuntu Server 26.04 LTS from ISO file with Packer using VMware Workstation
-// Adapted from the 24.04 template in ../ubuntu-24.04-x64-server, which came from
-// Yoann LAMY <https://github.com/ynlamy/packer-ubuntuserver24_04> (GPLv3).
+// Description : Creating a virtual machine template under Ubuntu Server 24.04 LTS from ISO file with Packer using VMware Workstation
+// Author : Yoann LAMY <https://github.com/ynlamy/packer-ubuntuserver24_04>
+// Licence : GPLv3
 
 // Packer : https://www.packer.io/
+
+
+// TO TEST
+
 
 packer {
   required_version = ">= 1.7.0"
@@ -17,15 +21,13 @@ packer {
 variable "iso" {
   type        = string
   description = "A URL to the ISO file"
-  default     = "https://releases.ubuntu.com/26.04.1/ubuntu-26.04.1-live-server-amd64.iso"
+  default     = "https://releases.ubuntu.com/noble/ubuntu-24.04.4-live-server-amd64.iso"
 }
 
 variable "checksum" {
   type        = string
   description = "The checksum for the ISO file"
-  // The codename directory carries the SHA256SUMS for every point release in
-  // the series, so this keeps working when iso is bumped to 26.04.2.
-  default = "file:https://releases.ubuntu.com/resolute/SHA256SUMS"
+  default     = "sha256:e240e4b801f7bb68c20d1356b60968ad0c33a41d00d828e74ceb3364a0317be9"
 }
 
 variable "headless" {
@@ -37,12 +39,13 @@ variable "headless" {
 variable "name" {
   type        = string
   description = "This is the name of the new virtual machine"
-  default     = "vm-ubuntuserver26_04"
+  default     = "vm-ubuntuserver24_04"
 }
 
 // These must match the identity block in http/user-data, which is what the
-// autoinstall actually creates. Mismatched values make every build wait out
-// the 30m SSH timeout.
+// autoinstall actually creates. The upstream template this was adapted from
+// defaulted to ubuntu/MotDePasse; leaving those in place makes every build
+// wait out the 30m SSH timeout.
 variable "username" {
   type        = string
   description = "The username to connect to SSH"
@@ -56,7 +59,7 @@ variable "password" {
   default     = "packer"
 }
 
-source "vmware-iso" "ubuntuserver26_04" {
+source "vmware-iso" "ubuntuserver24_04" {
   // Documentation : https://developer.hashicorp.com/packer/integrations/hashicorp/vmware/latest/components/builder/iso
 
   // ISO configuration
@@ -70,13 +73,12 @@ source "vmware-iso" "ubuntuserver26_04" {
   guest_os_type = "ubuntu-64"
   // Set the CPU count here rather than through vmx_data: Packer generates
   // numvcpus itself, and overriding it there fights the builder.
-  cpus              = 2
-  memory            = 2048
-  disk_size         = 30720
-  disk_adapter_type = "scsi"
-  disk_type_id      = "1"
-  network           = "nat"
-  // Required since packer-plugin-vmware v2.1.6; builds fail validation without it.
+  cpus                 = 2
+  memory               = 2048
+  disk_size            = 30720
+  disk_adapter_type    = "scsi"
+  disk_type_id         = "1"
+  network              = "nat"
   network_adapter_type = "vmxnet3"
   sound                = false
   usb                  = false
@@ -109,14 +111,14 @@ source "vmware-iso" "ubuntuserver26_04" {
 }
 
 build {
-  sources = ["source.vmware-iso.ubuntuserver26_04"]
+  sources = ["source.vmware-iso.ubuntuserver24_04"]
 
   // 00 has no library dependencies, so the shell provisioner can upload it on
   // its own.
   provisioner "shell" {
     execute_command = "echo '${var.password}' | sudo -S env {{ .Vars }} {{ .Path }}"
     scripts = [
-      "${path.root}/../../scripts/ubuntu/00-update-system.sh"
+      "${path.root}/../../../scripts/ubuntu/00-update-system.sh"
     ]
   }
 
@@ -130,7 +132,7 @@ build {
   }
 
   provisioner "file" {
-    source      = "${path.root}/../../scripts/ubuntu/"
+    source      = "${path.root}/../../../scripts/ubuntu/"
     destination = "/var/tmp/packertron-ubuntu/"
   }
 
@@ -152,7 +154,7 @@ build {
   provisioner "shell" {
     execute_command = "echo '${var.password}' | sudo -S env {{ .Vars }} {{ .Path }}"
     scripts = [
-      "${path.root}/../../scripts/ubuntu/01-cleanup-system.sh"
+      "${path.root}/../../../scripts/ubuntu/01-cleanup-system.sh"
     ]
   }
 }

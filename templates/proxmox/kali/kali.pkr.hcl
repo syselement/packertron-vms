@@ -29,9 +29,10 @@ variable "hostname" {
   default = "kali"
 }
 
-variable "proxmox_api_host" {
-  type    = string
-  default = "proxmox"
+variable "proxmox_api_url" {
+  type        = string
+  description = "Proxmox API endpoint, including scheme, port and /api2/json"
+  default     = "https://proxmox:8006/api2/json"
 }
 
 variable "proxmox_api_token_id" {
@@ -58,12 +59,12 @@ variable "storage_pool" {
   default = "local-lvm"
 }
 
-variable "iso_storage" {
+variable "iso_storage_pool" {
   type    = string
   default = "local"
 }
 
-variable "network_adapter" {
+variable "network_bridge" {
   type    = string
   default = "vmbr1"
 }
@@ -86,14 +87,14 @@ variable "insecure_skip_tls_verify" {
 }
 
 source "proxmox-iso" "seclab-kali" {
-  proxmox_url = "https://${var.proxmox_api_host}:8006/api2/json"
+  proxmox_url = var.proxmox_api_url
   node        = var.proxmox_node
   username    = var.proxmox_api_token_id
   token       = var.proxmox_api_token_secret
 
   boot_iso {
     type         = "ide"
-    iso_file     = "${var.iso_storage}:iso/kali.iso"
+    iso_file     = "${var.iso_storage_pool}:iso/kali.iso"
     iso_checksum = "sha256:0b0f5560c21bcc1ee2b1fef2d8e21dca99cc6efa938a47108bbba63bec499779"
     unmount      = true
   }
@@ -114,7 +115,7 @@ source "proxmox-iso" "seclab-kali" {
   cpu_type                 = "x86-64-v2-AES"
 
   network_adapters {
-    bridge = var.network_adapter
+    bridge = var.network_bridge
   }
 
   disks {
