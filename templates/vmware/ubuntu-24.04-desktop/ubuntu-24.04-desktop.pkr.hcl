@@ -1,8 +1,16 @@
-# Description: Packer template to build an Ubuntu 24.04 Desktop VMware VM and package as Vagrant box
-# 
-# https://developer.hashicorp.com/packer/integrations/hashicorp/vmware/latest/components/builder/iso
+# Ubuntu 24.04 Desktop template for VMware Workstation, packaged as a Vagrant box.
+#
+# Docs:
+#   vmware-iso builder  https://developer.hashicorp.com/packer/integrations/hashicorp/vmware/latest/components/builder/iso
+#   Autoinstall         https://canonical-subiquity.readthedocs-hosted.com/en/latest/reference/autoinstall-reference.html
+#   README.md           build steps and Vagrant usage
+#
+# Run:
+#   packer init .
+#   packer validate .
+#   packer build .
+#   vagrant up
 
-# Required plugins to run this template
 packer {
   required_plugins {
     vmware = {
@@ -16,7 +24,6 @@ packer {
   }
 }
 
-# Variables
 variable "iso_checksum" {
   type        = string
   description = "The checksum for the ISO file"
@@ -71,16 +78,13 @@ variable "vm_name" {
   default = "ubuntu-24.04-x64-desktop-template"
 }
 
-# Local values
 locals {
   http_dir          = "${path.root}/http"
   effective_iso_url = can(regex("^[A-Za-z]:/", var.iso_url)) ? (fileexists(var.iso_url) ? var.iso_url : var.iso_fallback_url) : var.iso_url
 }
 
-# Source block
 source "vmware-iso" "ubuntu2404_desktop" {
-  # Ubuntu Desktop autoinstall via NoCloud and local HTTP server
-  # boot_command provides the necessary keystrokes to start the installation with autoinstall parameters
+  # Autoinstall over NoCloud, seeded from the local HTTP server.
   boot_wait = "5s"
   boot_command = [
     "<esc><wait>",
@@ -115,10 +119,8 @@ source "vmware-iso" "ubuntu2404_desktop" {
   vm_name              = var.vm_name
 }
 
-# Build block
 build {
   sources = ["source.vmware-iso.ubuntu2404_desktop"]
-  # Provisioning script
   provisioner "shell" {
     execute_command = "chmod +x {{ .Path }}; echo '${var.ssh_password}' | sudo -S env {{ .Vars }} {{ .Path }}"
     scripts = [
@@ -127,7 +129,6 @@ build {
     ]
   }
 
-  # Package as Vagrant box
   post-processor "vagrant" {
     compression_level = 9
     output            = "${var.output_dir}/${var.vm_name}-vmware.box"

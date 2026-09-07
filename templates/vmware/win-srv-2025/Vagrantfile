@@ -1,4 +1,15 @@
-# Source: https://github.com/automatesql/Automated-Sandbox-Framework/blob/main/vagrantfile
+# Vagrant configuration for the Windows Server 2025 box built in this
+# directory by packer build.
+#
+# Docs:
+#   Vagrant    https://developer.hashicorp.com/vagrant/docs
+#   README.md  build steps and VM lifecycle
+#   Source     https://github.com/automatesql/Automated-Sandbox-Framework/blob/main/vagrantfile
+#
+# Run:
+#   vagrant up
+#   vagrant halt
+#   vagrant destroy -f
 
 Vagrant.configure("2") do |config|
 

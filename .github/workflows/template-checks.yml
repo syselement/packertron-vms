@@ -1,16 +1,12 @@
 name: Template checks
 
-# Everything outside scripts/ubuntu/ had no CI at all, which is how four
-# templates ended up unable to build and a cloud-init seed ended up holding
-# four concatenated documents. This validates the Packer HCL and the
-# cloud-init seeds, and scans the tree for committed secrets.
+# Validates the Packer HCL and the cloud-init seeds, lints the shell outside
+# scripts/ubuntu/, and scans the tree for committed secrets.
 
 on:
-  # No paths filter on pull_request, deliberately. A path-filtered workflow
-  # does not run at all on a PR that touches nothing matching, so it never
-  # reports a status; a branch ruleset that requires one of these checks would
-  # then wait forever on exactly those PRs. Filtering stays on push, where
-  # nothing is gated on the result.
+  # No paths filter on pull_request, deliberately: a path-filtered workflow
+  # never reports a status on a PR that matches nothing, so a ruleset requiring
+  # it would wait forever. Filtering stays on push, which gates nothing.
   pull_request:
   push:
     branches:
@@ -37,14 +33,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # Each entry is the template's path under templates/, which is also
-        # how scripts/check-templates.sh names it, so the two lists stay
-        # comparable at a glance.
+        # Each entry is the template's path under templates/. The checker job
+        # below fails if this list and the directories on disk disagree.
         #
-        # proxmox/win-11 is deliberately absent: its build block is still
-        # unrepaired (sources. instead of source.) and it depends on a KeePass
-        # database that is not in this repository. Add it here in the same
-        # change that fixes it.
+        # proxmox/win-11 is deliberately absent: it depends on a KeePass
+        # database that is not in this repository, so it cannot validate.
         template:
           - proxmox/kali
           - proxmox/ubuntu-24.04-server
@@ -76,11 +69,8 @@ jobs:
 
       - name: Validate
         working-directory: templates/${{ matrix.template }}
-        # The Proxmox builder refuses to validate without a username and a
-        # token, so the credential-shaped variables get obvious throwaway
-        # values here. They are never used to reach a real node: validate does
-        # not contact the API. Templates that declare no such variables ignore
-        # these flags.
+        # The Proxmox builder will not validate without a username and token.
+        # Throwaway values: validate never contacts the API.
         run: |
           if grep -q 'proxmox-iso' ./*.pkr.hcl; then
             packer validate \
@@ -115,7 +105,7 @@ jobs:
             [ -f "$file" ] || continue
 
             # cloud-init reads the first document and silently ignores the
-            # rest, so a second one is dead text that looks live. Catch it.
+            # rest, so a second one is dead text that looks live.
             documents=$(grep -c '^#cloud-config' "$file" || true)
             if [ "$documents" -gt 1 ]; then
               printf '%s: %s #cloud-config documents; only the first is read\n' \
@@ -129,15 +119,10 @@ jobs:
           exit "$status"
 
   checker:
-    # scripts/check-templates.sh is what a person runs before pushing, and
-    # until now nothing linted it: ubuntu-static-checks.yml is scoped to
-    # scripts/ubuntu/, so a syntax error here would only have surfaced by
-    # someone running it and getting a confusing failure.
-    #
-    # It also owns the one invariant CI cannot express itself. The matrix above
-    # is hand-written, because GitHub evaluates it before any checkout and so
-    # it cannot discover directories. check-templates.sh matrix compares that
-    # list against what is actually on disk, in both directions.
+    # Lints the shell that ubuntu-static-checks.yml does not cover, and owns
+    # the one invariant CI cannot express itself: the matrix above is
+    # hand-written, because GitHub evaluates it before any checkout and so
+    # cannot discover directories.
     name: Checker script
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -152,9 +137,6 @@ jobs:
           sudo apt-get update
           sudo apt-get install --yes --no-install-recommends shellcheck shfmt
 
-      # Covers this script and every other one outside scripts/ubuntu/ -
-      # today that is templates/proxmox/seal-for-clone.sh, which runs as root
-      # against a real machine. The list is discovered, not written here.
       - name: Lint shell outside scripts/ubuntu/
         run: ./scripts/check-templates.sh shell
 
@@ -179,13 +161,11 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   template-checks:
-    # This is the single job to mark as a required status check, rather than
-    # the jobs above. The packer job is a matrix, so it produces one context
-    # per template ("packer: kali", ...): requiring those directly means the
-    # ruleset silently breaks every time a template is added or renamed, and a
-    # removed entry leaves a required check that can never report again.
+    # Mark THIS job as the required status check, not the jobs above: packer is
+    # a matrix and emits one context per template, so requiring those breaks the
+    # ruleset whenever a template is added or renamed.
     #
-    # if: always() matters. Without it this job is skipped when anything it
+    # if: always() matters - without it this job is skipped when anything it
     # needs fails, and a skipped required check blocks the PR with no failure
     # to look at.
     name: Template checks complete
@@ -206,8 +186,8 @@ jobs:
           status=0
           for result in $RESULTS; do
             case "$result" in
-              # skipped counts as a pass so a future "if:" on one of the jobs
-              # above does not wedge the gate. None of them is conditional today.
+              # skipped counts as a pass so a future "if:" on a job above does
+              # not wedge the gate.
               success | skipped) ;;
               *)
                 printf 'a required job reported: %s\n' "$result" >&2

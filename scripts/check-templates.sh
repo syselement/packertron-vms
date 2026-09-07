@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 #
-# Run the template checks that CI runs, locally, before pushing.
+# Run the checks that .github/workflows/template-checks.yml runs, locally,
+# before pushing.
 #
-# Mirrors .github/workflows/template-checks.yml: packer fmt -check and packer
-# validate for every template directory, then cloud-init schema for every
-# autoinstall seed. Finding a broken template here costs seconds; finding it in
-# CI costs a round trip, and finding it in neither is how four templates ended
-# up unable to build.
+# Docs:
+#   Packer CLI   https://developer.hashicorp.com/packer/docs/commands
+#   cloud-init   https://cloudinit.readthedocs.io/en/latest/reference/cli.html
+#   README.md    repository layout and where a template belongs
 #
-# Usage:
+# Run:
 #   scripts/check-templates.sh            # everything
 #   scripts/check-templates.sh packer     # templates only
 #   scripts/check-templates.sh seeds      # cloud-init seeds only
@@ -24,10 +24,9 @@ REPO_ROOT="$(cd -- "$SCRIPT_DIR/.." && pwd)"
 readonly WORKFLOW="\
 .github/workflows/template-checks.yml"
 
-# Template directories are discovered rather than listed, so a new one is
-# covered the day it is added. The CI matrix cannot discover them - GitHub
-# evaluates it before any checkout - so it is the one hand-written list, and
-# check_matrix below is what keeps it honest.
+# Discovered rather than listed, so a new template is covered the day it is
+# added. The CI matrix cannot discover them - GitHub evaluates it before any
+# checkout - so check_matrix below keeps that one hand-written list honest.
 readonly -a SKIP_TEMPLATES=(
     # Unrepaired build block, and depends on a KeePass database that is not in
     # this repository.
@@ -54,9 +53,8 @@ is_skipped() {
     return 1
 }
 
-# A template is identified by "<hypervisor>/<os>", which is exactly its path
-# under templates/. That is also what the CI matrix lists, so the two stay in
-# step without either side hard-coding a list.
+# A template is named "<hypervisor>/<os>", its path under templates/ and also
+# what the CI matrix lists.
 template_directories() {
     local path directory
     for path in "$REPO_ROOT"/templates/*/*/*.pkr.hcl; do
@@ -103,10 +101,8 @@ check_templates() {
             fail "$directory: packer fmt (run: packer fmt .)"
         fi
 
-        # The Proxmox builder refuses to validate without a username and a
-        # token. These values are throwaway and never reach a node: validate
-        # does not contact the API. Templates without those variables ignore
-        # the flags.
+        # The Proxmox builder will not validate without a username and token.
+        # Throwaway values: validate never contacts the API.
         if grep -q 'proxmox-iso' ./*.pkr.hcl 2>/dev/null; then
             if packer validate \
                 -var 'proxmox_api_token_id=local@pve!local' \
@@ -127,11 +123,9 @@ check_templates() {
     done < <(template_directories)
 }
 
-# The CI matrix and SKIP_TEMPLATES are the only two places that name templates
-# by hand. Left unchecked they drift silently, and both directions are quiet
-# failures: a template missing from the matrix is never validated by CI, and a
-# matrix entry for a directory that no longer exists fails every run with a
-# path error rather than a useful message.
+# Both drift directions are quiet failures: a template missing from the matrix
+# is never checked by CI, and a matrix entry for a directory that no longer
+# exists fails every run with a path error instead of a useful message.
 matrix_templates() {
     awk '
         /^ *template: *$/ { inlist = 1; next }
@@ -164,8 +158,8 @@ check_matrix() {
     fi
 
     # Process substitution, not a pipe: a piped loop runs in a subshell, so
-    # every fail() below would increment a copy of $failures and the script
-    # would exit 0 while reporting failures.
+    # fail() would increment a copy of $failures and the script would exit 0
+    # while reporting failures.
     while read -r missing; do
         [[ -n "$missing" ]] || continue
         fail "$missing exists on disk but is not in the $WORKFLOW matrix, so CI never checks it"
@@ -177,10 +171,8 @@ check_matrix() {
     done < <(comm -13 <(printf '%s\n' "$expected") <(printf '%s\n' "$actual"))
 }
 
-# Every shell script in the repository outside scripts/ubuntu/, which
-# ubuntu-static-checks.yml already covers. Discovered rather than listed, so a
-# new one is linted the day it is added - this script and the Proxmox seal are
-# the current two, and both run as root against a real machine.
+# Everything outside scripts/ubuntu/, which ubuntu-static-checks.yml covers.
+# Discovered, so a new script is linted the day it is added.
 repository_shell_scripts() {
     local path
     for path in "$REPO_ROOT"/scripts/*.sh "$REPO_ROOT"/templates/*/*.sh "$REPO_ROOT"/templates/*/*/*.sh; do
@@ -227,8 +219,8 @@ check_seeds() {
         [[ -f "$file" ]] || continue
         local relative="${file#"$REPO_ROOT"/}"
 
-        # cloud-init reads the first document and silently ignores the rest, so
-        # a second one is dead text that still looks live.
+        # cloud-init reads the first document and silently ignores the rest,
+        # so a second one is dead text that still looks live.
         documents="$(grep -c '^#cloud-config' "$file" || true)"
         if ((documents > 1)); then
             fail "$relative: $documents #cloud-config documents; only the first is read"
@@ -247,10 +239,8 @@ check_seeds() {
 main() {
     local scope="${1:-all}"
 
-    # A hypervisor name is accepted wherever a scope is, because "check just
-    # the Proxmox templates" is the common case while a build is being brought
-    # up on a node. It is validated against the directories that exist rather
-    # than a hard-coded list.
+    # A hypervisor name is accepted wherever a scope is, validated against the
+    # directories that exist rather than a hard-coded list.
     if [[ -n "$scope" && -d "$REPO_ROOT/templates/$scope" ]]; then
         HYPERVISOR="$scope"
         scope="${2:-all}"

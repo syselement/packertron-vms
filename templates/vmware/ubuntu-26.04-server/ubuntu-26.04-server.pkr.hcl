@@ -1,8 +1,16 @@
-// Description : Creating a virtual machine template under Ubuntu Server 26.04 LTS from ISO file with Packer using VMware Workstation
+// Ubuntu Server 26.04 LTS template for VMware Workstation, built from ISO.
 // Adapted from the 24.04 template in ../ubuntu-24.04-server, which came from
 // Yoann LAMY <https://github.com/ynlamy/packer-ubuntuserver24_04> (GPLv3).
-
-// Packer : https://www.packer.io/
+//
+// Docs:
+//   vmware-iso builder  https://developer.hashicorp.com/packer/integrations/hashicorp/vmware/latest/components/builder/iso
+//   Autoinstall         https://canonical-subiquity.readthedocs-hosted.com/en/latest/reference/autoinstall-reference.html
+//   README.md           build steps and the credential note
+//
+// Run:
+//   packer init .
+//   packer validate .
+//   packer build .
 
 packer {
   required_version = ">= 1.12.0"
@@ -23,8 +31,8 @@ variable "iso" {
 variable "checksum" {
   type        = string
   description = "The checksum for the ISO file"
-  // The codename directory carries the SHA256SUMS for every point release in
-  // the series, so this keeps working when iso is bumped to 26.04.2.
+  // The codename directory carries SHA256SUMS for whichever point release is
+  // current, so this keeps matching when iso is bumped.
   default = "file:https://releases.ubuntu.com/resolute/SHA256SUMS"
 }
 
@@ -40,9 +48,8 @@ variable "name" {
   default     = "vm-ubuntuserver26_04"
 }
 
-// These must match the identity block in http/user-data, which is what the
-// autoinstall actually creates. Mismatched values make every build wait out
-// the 30m SSH timeout.
+// Must match the identity block in http/user-data; a mismatch makes every
+// build wait out the 30m SSH timeout.
 variable "username" {
   type        = string
   description = "The username to connect to SSH"
@@ -57,13 +64,9 @@ variable "password" {
 }
 
 source "vmware-iso" "ubuntuserver26_04" {
-  // Documentation : https://developer.hashicorp.com/packer/integrations/hashicorp/vmware/latest/components/builder/iso
-
-  // ISO configuration
   iso_url      = var.iso
   iso_checksum = var.checksum
 
-  // Hardware configuration
   vm_name       = var.name
   vmdk_name     = var.name
   version       = "21"
@@ -81,16 +84,12 @@ source "vmware-iso" "ubuntuserver26_04" {
   sound                = false
   usb                  = false
 
-  // Run configuration
   headless = var.headless
 
-  // Shutdown configuration
   shutdown_command = "echo '${var.password}' | sudo -S systemctl poweroff"
 
-  // Http directory configuration
   http_directory = "${path.root}/http"
 
-  // Boot configuration
   boot_command = [
     "<esc><wait>",
     "e<wait>",
@@ -100,16 +99,13 @@ source "vmware-iso" "ubuntuserver26_04" {
   ]
   boot_wait = "10s"
 
-  // Communicator configuration
   communicator = "ssh"
   ssh_username = var.username
   ssh_password = var.password
   ssh_timeout  = "30m"
 
-  // Output configuration
   output_directory = "output"
 
-  // Export configuration
   format          = "vmx"
   skip_compaction = false
 }
@@ -126,9 +122,8 @@ build {
     ]
   }
 
-  // 02 sources scripts/ubuntu/lib/*.sh, which a "scripts" list cannot carry:
-  // that uploads each file on its own, with no lib/ directory beside it. Stage
-  // the whole tree first, the same way the Vagrantfiles do, and run it there.
+  // 02 sources scripts/ubuntu/lib/*.sh, which a "scripts" list cannot carry -
+  // it uploads each file alone, with no lib/ beside it. Stage the whole tree.
   provisioner "shell" {
     inline = [
       "mkdir -p /var/tmp/packertron-ubuntu"
@@ -151,10 +146,9 @@ build {
     ]
   }
 
-  // 01 seals the template, so it runs last: it truncates the machine-id and
-  // clears /tmp and /var/tmp, and anything running after it would put
-  // per-machine state straight back into the image. That /var/tmp sweep is
-  // also what removes the staged tree above.
+  // 01 must run last: it truncates the machine-id and clears /tmp and
+  // /var/tmp, so anything after it puts per-machine state back into the image.
+  // That sweep is also what removes the staged tree above.
   provisioner "shell" {
     execute_command = "chmod +x {{ .Path }}; echo '${var.password}' | sudo -S env {{ .Vars }} {{ .Path }}"
     scripts = [

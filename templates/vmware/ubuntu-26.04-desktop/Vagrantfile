@@ -1,4 +1,14 @@
-# Vagrantfile for Ubuntu 26.04 x64 Desktop VMware VM
+# Vagrant configuration for the Ubuntu 26.04 Desktop box built in this
+# directory by packer build.
+#
+# Docs:
+#   Vagrant    https://developer.hashicorp.com/vagrant/docs
+#   README.md  build steps and VM lifecycle
+#
+# Run:
+#   vagrant up
+#   vagrant halt
+#   vagrant destroy -f
 
 description = "Ubuntu-Desktop-26"
 
@@ -11,7 +21,6 @@ Vagrant.configure("2") do |config|
 
   # -------------------------
   # Shared VMware settings
-  # VMX settings can be set here if needed
   # -------------------------
   config.vm.provider "vmware_desktop" do |v|
     v.gui                            = true

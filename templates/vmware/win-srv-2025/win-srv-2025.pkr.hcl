@@ -1,4 +1,16 @@
-# Required plugins to run this template
+# Windows Server 2025 template for VMware Workstation, packaged as a Vagrant box.
+#
+# Docs:
+#   vmware-iso builder  https://developer.hashicorp.com/packer/integrations/hashicorp/vmware/latest/components/builder/iso
+#   Answer files        https://learn.microsoft.com/en-us/windows-hardware/customize/desktop/unattend/
+#   README.md           build steps and ISO/checksum setup
+#
+# Run:
+#   packer init .
+#   packer validate .
+#   packer build .
+#   vagrant up
+
 packer {
   required_plugins {
     vmware = {
@@ -12,9 +24,6 @@ packer {
   }
 }
 
-# -------------------------------------------------
-
-# Variables
 variable "box_output" {
   type        = string
   description = "The output path for the box file"
@@ -73,13 +82,6 @@ variable "vm_name" {
   default     = "Win2025VM"
 }
 
-# -------------------------------------------------
-# Source blocks are generated from your builders; a source can be referenced in build blocks.
-# A build block runs provisioner and post-processors on a source.
-# Read the documentation for source blocks here:
-# https://www.packer.io/docs/templates/hcl_templates/blocks/source
-
-# Source block
 source "vmware-iso" "winsrv2025" {
   boot_command  = ["<spacebar>"]
   boot_wait     = "2s"
@@ -114,10 +116,6 @@ source "vmware-iso" "winsrv2025" {
   ssh_username = var.ssh_username
 }
 
-# -------------------------------------------------
-# A build block invokes sources and runs provisioning steps on them.
-# The documentation for build blocks can be found here:
-# https://www.packer.io/docs/templates/hcl_templates/blocks/build
 
 # Build block
 build {

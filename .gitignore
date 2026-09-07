@@ -1,8 +1,5 @@
-# Build output and caches.
-# No leading path component, so these match at any depth. They used to be
-# written as */packer_cache/ and */output, which anchored them to a template
-# directory sitting directly in the repository root; once templates moved under
-# templates/<hypervisor>/<os>/ those patterns silently stopped matching.
+# Build output and caches. No leading path component, so they match at any
+# depth - templates sit three levels down.
 packer_cache/
 .vagrant/
 output/
@@ -17,30 +14,22 @@ crash.log
 *.ffs_lock
 *.ffs_db
 
-# Temporary files and directories
+# Temporary files and directories.
 # Deliberately NOT *tmp* / *temp*: those substring globs match any path
 # containing "temp", which in a repository full of *template* files silently
-# swallows real content. They already dropped a workflow named
-# template-checks.yml from a commit without reporting anything.
+# swallows real content.
 *.tmp
 *.temp
 tmp/
 temp/
 
-# Editor and agent local settings
-# settings.local.json is the personal half of the Claude Code config, by its
-# own convention; it also records absolute paths from one machine. The shared
-# half would be .claude/settings.json, which is not ignored.
+# Personal editor/agent settings; records absolute paths from one machine.
+# The shared half, .claude/settings.json, is not ignored.
 .claude/settings.local.json
 
-# Secrets and credentials
-# The tracked *.auto.pkrvars.hcl files hold ISO URLs and checksums only. Keep
-# anything sensitive in the environment (PKR_VAR_*), so it can never be
-# committed by accident.
-#
-# templates/proxmox/proxmox.pkrvars.hcl holds one node's settings - hostname,
-# storage pools, bridge. Not secret, but not shareable either, so it is
-# ignored and committed only as .example. Same for any *.local.pkrvars.hcl.
+# Secrets and credentials. Anything sensitive belongs in the environment
+# (PKR_VAR_*), never a file. proxmox.pkrvars.hcl is not secret but describes
+# one node, so it is ignored and committed only as .example.
 proxmox.pkrvars.hcl
 *.local.pkrvars.hcl
 *secret*.pkrvars.hcl

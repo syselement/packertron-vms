@@ -7,20 +7,12 @@ useDefault = true
 
 [allowlist]
 description = """
-The autoinstall seeds commit a SHA-512 crypt hash for the initial user. That
-is deliberate and unavoidable for an unattended install: subiquity needs the
-hash at install time, before anything exists to fetch a secret from.
-
-Treat it as public. The plaintext is documented in the seed files, so every
-machine built from this repository starts with the same known console
-password, and the same seeds grant that user NOPASSWD sudo. These images are
-for a lab; do not expose one to an untrusted network without changing the
-password first.
+The autoinstall seeds commit a SHA-512 crypt hash for the initial user, which
+is unavoidable for an unattended install: subiquity needs the hash before
+anything exists to fetch a secret from. Treat it as public - see SECURITY.md.
 
 The Windows answer files carry a KMS client setup key. Those are published by
-Microsoft, one per edition, and exist so that a machine can find a KMS host;
-they activate nothing on their own. The file that holds it cites the Microsoft
-page it came from.
+Microsoft and activate nothing on their own.
 
 Only these two patterns are allowlisted, never the files that carry them, so a
 real credential added to those same files is still reported.

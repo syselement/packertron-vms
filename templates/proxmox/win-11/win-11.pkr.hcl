@@ -1,11 +1,16 @@
-# Sources:
-# https://github.com/mttaggart/seclab/blob/main/Packer/win-11-ws/config.pkr.hcl
-# https://github.com/ibeerens/packer/blob/main/workstation/windows10/windows.json.pkr.hcl
-# https://github.com/ibeerens/packer/blob/main/hyper-v/windows11/windows.json.pkr.hcl
-
-# Packer configuration file for Windows 11 Workstation
-
-# TO DO
+# Windows 11 workstation template for Proxmox.
+#
+# STATUS: does not build, excluded from CI - it reads credentials from a
+# KeePass database (../../seclab.kdbx) and a CA certificate from ../../pki,
+# neither of which is in this repository, so packer validate cannot run.
+#
+# Docs:
+#   proxmox-iso builder  https://developer.hashicorp.com/packer/integrations/hashicorp/proxmox/latest/components/builder/iso
+#   Sources              https://github.com/mttaggart/seclab/blob/main/Packer/win-11-ws/config.pkr.hcl
+#                        https://github.com/ibeerens/packer/blob/main/workstation/windows10/windows.json.pkr.hcl
+#                        https://github.com/ibeerens/packer/blob/main/hyper-v/windows11/windows.json.pkr.hcl
+#
+# Run: not runnable yet; see STATUS above.
 
 packer {
   required_plugins {

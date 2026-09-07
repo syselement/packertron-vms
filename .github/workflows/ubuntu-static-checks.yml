@@ -1,11 +1,9 @@
 name: Ubuntu static checks
 
 on:
-  # No paths filter on pull_request, deliberately. A path-filtered workflow
-  # does not run at all on a PR that touches nothing matching, so it never
-  # reports a status; a branch ruleset that requires this check would then wait
-  # forever on exactly those PRs. Filtering stays on push, where nothing is
-  # gated on the result.
+  # No paths filter on pull_request, deliberately: a path-filtered workflow
+  # never reports a status on a PR that matches nothing, so a ruleset requiring
+  # it would wait forever. Filtering stays on push, which gates nothing.
   pull_request:
   push:
     branches:
@@ -33,9 +31,8 @@ jobs:
 
     steps:
       - name: Check out repository
-        # Pinned to a commit rather than a tag: a tag can be moved, and this
-        # repository will hold infrastructure credentials. Dependabot keeps the
-        # pin current.
+        # Pinned to a commit, not a tag: a tag can be moved. Dependabot keeps
+        # the pin current.
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0

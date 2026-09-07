@@ -1,19 +1,15 @@
 # Release automation: bumps version.yaml, regenerates CHANGELOG.md, tags.
 #
-# Two things to know before touching branch protection:
+# Before touching branch protection:
 #
-# 1. There is no pull_request trigger here, so this workflow never reports a
-#    status on a PR. Never add it to a ruleset's required status checks: the
-#    check would be permanently "expected" and no PR could ever merge.
-#
-# 2. It pushes the release commit and tag straight to main. A ruleset that
-#    requires a pull request before merging will block that push, which breaks
-#    releases. Give the release actor a bypass entry in the ruleset, or leave
-#    "Require a pull request before merging" off.
+# 1. No pull_request trigger, so this never reports a status on a PR. Never add
+#    it to a ruleset's required checks - it would be permanently "expected" and
+#    no PR could merge.
+# 2. It pushes straight to main. A ruleset requiring a PR before merging blocks
+#    that push and breaks releases; give the release actor a bypass entry.
 
 name: Changelog CI
 
-# Controls when the workflow will run
 on:
   release:
     types: [created, edited]
@@ -23,40 +19,26 @@ on:
     paths-ignore:
       - '.github/workflows/**'  # Ignore changes to workflow files
 
-  # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
 
 # Default to read-only; the one job that needs to write grants itself the token.
 permissions:
   contents: read
 
-# A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
   generate-changelog:
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    # Required: this job commits the version bump, regenerates CHANGELOG.md and
-    # pushes the release tag. It deliberately keeps the checkout credentials
-    # for that reason, so it must stay the only job with write access.
+    # This job commits the bump and pushes the tag, so it keeps its checkout
+    # credentials and must stay the only one with write access.
     permissions:
       contents: write
     steps:
-      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
-      # Actions are pinned to commits rather than tags; Dependabot keeps them current.
-      #
-      # RELEASE_TOKEN, not GITHUB_TOKEN. The branch ruleset on main requires
-      # status checks, and a ruleset enforces that on direct pushes as well as
-      # on pull requests. The release commit is created here on the runner, so
-      # it has no check runs and never can have: the push is rejected with
-      # "2 of 2 required status checks are expected".
-      #
-      # A push authenticated as github-actions[bot] cannot bypass that, because
-      # the bot is not a repository admin. RELEASE_TOKEN is a fine-grained PAT
-      # belonging to the repository owner, so the push is attributed to a user
-      # holding the admin role, which the ruleset bypass list allows.
-      #
-      # The fallback keeps forks and any clone without the secret working: they
-      # simply fail at the push step instead of at checkout.
+      # RELEASE_TOKEN, not GITHUB_TOKEN: rulesets enforce required checks on
+      # direct pushes too, and the release commit is made on the runner so it
+      # has no check runs. github-actions[bot] is not an admin and cannot
+      # bypass; RELEASE_TOKEN is the owner's PAT, which the bypass list allows.
+      # The fallback keeps forks working - they fail at push, not at checkout.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
