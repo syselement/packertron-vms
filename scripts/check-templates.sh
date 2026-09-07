@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 #
-# Run the checks that .github/workflows/template-checks.yml runs, locally,
-# before pushing.
+# Run the checks that .github/workflows/template-checks.yml runs, locally, before pushing.
 #
 # Docs:
 #   Packer CLI   https://developer.hashicorp.com/packer/docs/commands
@@ -24,12 +23,10 @@ REPO_ROOT="$(cd -- "$SCRIPT_DIR/.." && pwd)"
 readonly WORKFLOW="\
 .github/workflows/template-checks.yml"
 
-# Discovered rather than listed, so a new template is covered the day it is
-# added. The CI matrix cannot discover them - GitHub evaluates it before any
-# checkout - so check_matrix below keeps that one hand-written list honest.
+# - Discovered rather than listed, so a new template is covered the day it is added.
+# - The CI matrix cannot discover them - GitHub evaluates it before any checkout - so check_matrix below keeps that one hand-written list honest.
 readonly -a SKIP_TEMPLATES=(
-    # Unrepaired build block, and depends on a KeePass database that is not in
-    # this repository.
+    # Unrepaired build block, and depends on a KeePass database that is not in this repository.
     proxmox/win-11
 )
 
@@ -53,8 +50,7 @@ is_skipped() {
     return 1
 }
 
-# A template is named "<hypervisor>/<os>", its path under templates/ and also
-# what the CI matrix lists.
+# A template is named "<hypervisor>/<os>", its path under templates/ and also what the CI matrix lists.
 template_directories() {
     local path directory
     for path in "$REPO_ROOT"/templates/*/*/*.pkr.hcl; do
@@ -157,9 +153,7 @@ check_matrix() {
         return
     fi
 
-    # Process substitution, not a pipe: a piped loop runs in a subshell, so
-    # fail() would increment a copy of $failures and the script would exit 0
-    # while reporting failures.
+    # Process substitution, not a pipe: a piped loop runs in a subshell, so fail() would increment a copy of $failures and the script would exit 0 while reporting failures.
     while read -r missing; do
         [[ -n "$missing" ]] || continue
         fail "$missing exists on disk but is not in the $WORKFLOW matrix, so CI never checks it"
@@ -219,8 +213,7 @@ check_seeds() {
         [[ -f "$file" ]] || continue
         local relative="${file#"$REPO_ROOT"/}"
 
-        # cloud-init reads the first document and silently ignores the rest,
-        # so a second one is dead text that still looks live.
+        # cloud-init reads the first document and silently ignores the rest, so a second one is dead text that still looks live.
         documents="$(grep -c '^#cloud-config' "$file" || true)"
         if ((documents > 1)); then
             fail "$relative: $documents #cloud-config documents; only the first is read"
@@ -239,8 +232,7 @@ check_seeds() {
 main() {
     local scope="${1:-all}"
 
-    # A hypervisor name is accepted wherever a scope is, validated against the
-    # directories that exist rather than a hard-coded list.
+    # A hypervisor name is accepted wherever a scope is, validated against the directories that exist rather than a hard-coded list.
     if [[ -n "$scope" && -d "$REPO_ROOT/templates/$scope" ]]; then
         HYPERVISOR="$scope"
         scope="${2:-all}"

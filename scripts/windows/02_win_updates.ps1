@@ -1,5 +1,4 @@
-# Install Windows Updates via the PSWindowsUpdate module, driven by a scheduled
-# task so the run survives the reboots it triggers.
+# Install Windows Updates via the PSWindowsUpdate module, driven by a scheduled task so the run survives the reboots it triggers.
 # Run by the win-srv-2025 Packer build as a provisioner, twice.
 #
 # Docs:

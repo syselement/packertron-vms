@@ -1,7 +1,8 @@
 #cloud-config
 #
 # Autoinstall seed for an unattended Ubuntu install with NO provisioning - the
-# intentional negative control for the two seeds beside it. Do not alter the first line.
+# intentional negative control for the two seeds beside it.
+# Do not alter the first line.
 #
 # Docs:
 #   Autoinstall  https://canonical-subiquity.readthedocs-hosted.com/en/latest/reference/autoinstall-reference.html

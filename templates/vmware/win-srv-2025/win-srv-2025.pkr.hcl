@@ -95,10 +95,8 @@ source "vmware-iso" "winsrv2025" {
   iso_checksum  = var.iso_checksum
   iso_url       = var.iso_url
   memory        = var.vm_memory
-  # Required since packer-plugin-vmware v2.1.6; builds fail validation without it.
-  # e1000e rather than the vmxnet3 used by the Ubuntu templates: vmxnet3 needs
-  # drivers that VMware Tools supplies, which Windows setup does not have yet,
-  # so an unattended install would come up with no network adapter.
+  # - Required since packer-plugin-vmware v2.1.6; builds fail validation without it.
+  # - e1000e rather than the vmxnet3 used by the Ubuntu templates: vmxnet3 needs drivers that VMware Tools supplies, which Windows setup does not have yet, so an unattended install would come up with no network adapter.
   network_adapter_type = "e1000e"
   shutdown_command     = "A:/packer_shutdown.bat"
   shutdown_timeout     = "30m"

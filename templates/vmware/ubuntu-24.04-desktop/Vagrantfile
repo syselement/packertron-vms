@@ -1,5 +1,4 @@
-# Vagrant configuration for the Ubuntu 24.04 Desktop box built in this
-# directory by packer build.
+# Vagrant configuration for the Ubuntu 24.04 Desktop box built in this directory by packer build.
 #
 # Docs:
 #   Vagrant    https://developer.hashicorp.com/vagrant/docs

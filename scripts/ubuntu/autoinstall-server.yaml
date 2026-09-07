@@ -1,7 +1,8 @@
 #cloud-config
 #
 # Autoinstall seed for an unattended Ubuntu Server install that enables the
-# packertron-firstboot service, so 02 and 03 run on first boot. Do not alter the first line.
+# packertron-firstboot service, so 02 and 03 run on first boot.
+# Do not alter the first line.
 #
 # Docs:
 #   Autoinstall  https://canonical-subiquity.readthedocs-hosted.com/en/latest/reference/autoinstall-reference.html

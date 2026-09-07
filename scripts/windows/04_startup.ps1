@@ -1,5 +1,4 @@
-# First-boot check: confirm sysprep completed, then remove the startup shortcut
-# so this runs once and never again.
+# First-boot check: confirm sysprep completed, then remove the startup shortcut so this runs once and never again.
 # Staged into the image by the win-srv-2025 Packer build.
 #
 # Docs:

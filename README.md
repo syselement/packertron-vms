@@ -192,8 +192,7 @@ packertron-vms/
 └── CHANGELOG.md  LICENSE  README.md  version.yaml
 ```
 
-Two levels, `<hypervisor>/<os>`, and that pair is the template's name
-everywhere: in the CI matrix, in `check-templates.sh` output, and on disk.
+Two levels, `<hypervisor>/<os>`, and that pair is the template's name everywhere: in the CI matrix, in `check-templates.sh` output, and on disk.
 
 Inside a template directory:
 
@@ -205,8 +204,7 @@ Inside a template directory:
 | `<os>/config/` | Windows answer files |
 | `<os>/README.md` | how to build that one, and whether it currently can be |
 
-Templates reach the shared provisioners through
-`${path.root}/../../../scripts/`.
+Templates reach the shared provisioners through `${path.root}/../../../scripts/`.
 
 ### Where a value goes
 
@@ -216,11 +214,9 @@ Templates reach the shared provisioners through
 | Node name, storage pools, bridge | `templates/proxmox/proxmox.pkrvars.hcl` | no, only the `.example` |
 | ISO URL, checksum, sizing | the template's own `.pkr.hcl` / `.auto.pkrvars.hcl` | yes |
 
-One node file rather than one per template, so adding a template inherits the
-node settings instead of copying them. See [SECURITY.md](SECURITY.md).
+One node file rather than one per template, so adding a template inherits the node settings instead of copying them. See [SECURITY.md](SECURITY.md).
 
-Build output, `packer_cache/`, `.vagrant/` and `tmp/` are generated or scratch
-and are excluded by `.gitignore`.
+Build output, `packer_cache/`, `.vagrant/` and `tmp/` are generated or scratch and are excluded by `.gitignore`.
 
 ---
 
@@ -236,11 +232,9 @@ cp proxmox.pkrvars.hcl.example proxmox.pkrvars.hcl   # gitignored, never committ
 $EDITOR proxmox.pkrvars.hcl                          # node name, storage pools, bridge
 ```
 
-On the Proxmox node, create an API token for a user that may create VMs -
-`Datacenter -> Permissions -> API Tokens`. Give it `PVE.Admin` on `/`, or at
-minimum `VM.Allocate`, `VM.Config.*`, `VM.Monitor`, `VM.PowerMgmt`,
-`Datastore.Allocate` and `Datastore.AllocateSpace` on the storages involved.
-Leave *Privilege Separation* unticked, or the token inherits nothing.
+- On the Proxmox node, create an API token for a user that may create VMs - `Datacenter -> Permissions -> API Tokens`.
+- Give it `PVE.Admin` on `/`, or at minimum `VM.Allocate`, `VM.Config.*`, `VM.Monitor`, `VM.PowerMgmt`, `Datastore.Allocate` and `Datastore.AllocateSpace` on the storages involved.
+- Leave *Privilege Separation* unticked, or the token inherits nothing.
 
 Then, in the shell you build from - these never touch the filesystem:
 
@@ -258,9 +252,8 @@ packer init .
 packer build -var-file=../proxmox.pkrvars.hcl .
 ```
 
-The result is a Proxmox **template** (`vm_id` 80024 by default) that is thin on
-purpose: base OS, `qemu-guest-agent`, and cloud-init left able to run again.
-Per-VM provisioning happens at first boot on each clone, not in the image.
+- The result is a Proxmox **template** (`vm_id` 80024 by default) that is thin on purpose: base OS, `qemu-guest-agent`, and cloud-init left able to run again.
+- Per-VM provisioning happens at first boot on each clone, not in the image.
 
 Before pushing any template change:
 
@@ -342,13 +335,9 @@ Pull requests and improvements are welcome! Ensure your code follows the repo’
 ## 🌍 Future Roadmap
 
 - [ ] Proxmox support
-    - [ ] Templates from the official Ubuntu cloud image, plus an ISO +
-      autoinstall path for parity with the bare-metal install
-    - [ ] Provisioning at first boot per VM, through the existing
-      `packertron-firstboot` service, so templates stay thin and every VM
-      picks up current scripts
-    - [ ] Credentials from the environment (`PROXMOX_VE_*` /
-      `PKR_VAR_proxmox_api_token_*`) - never committed, never KeePass
+    - [ ] Templates from the official Ubuntu cloud image, plus an ISO + autoinstall path for parity with the bare-metal install
+    - [ ] Provisioning at first boot per VM, through the existing `packertron-firstboot` service, so templates stay thin and every VM picks up current scripts
+    - [ ] Credentials from the environment (`PROXMOX_VE_*` / `PKR_VAR_proxmox_api_token_*`) - never committed, never KeePass
 - [ ] OpenTofu layer to create and manage the VMs cloned from those templates
 - [ ] O.S Packer builds:
     - [ ] Win11

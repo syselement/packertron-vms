@@ -1,5 +1,4 @@
-# Build output and caches. No leading path component, so they match at any
-# depth - templates sit three levels down.
+# Build output and caches. No leading path component, so they match at any depth - templates sit three levels down.
 packer_cache/
 .vagrant/
 output/
@@ -14,10 +13,8 @@ crash.log
 *.ffs_lock
 *.ffs_db
 
-# Temporary files and directories.
-# Deliberately NOT *tmp* / *temp*: those substring globs match any path
-# containing "temp", which in a repository full of *template* files silently
-# swallows real content.
+# - Temporary files and directories.
+# - Deliberately NOT *tmp* / *temp*: those substring globs match any path containing "temp", which in a repository full of *template* files silently swallows real content.
 *.tmp
 *.temp
 tmp/
@@ -27,9 +24,9 @@ temp/
 # The shared half, .claude/settings.json, is not ignored.
 .claude/settings.local.json
 
-# Secrets and credentials. Anything sensitive belongs in the environment
-# (PKR_VAR_*), never a file. proxmox.pkrvars.hcl is not secret but describes
-# one node, so it is ignored and committed only as .example.
+# - Secrets and credentials.
+# - Anything sensitive belongs in the environment (PKR_VAR_*), never a file.
+# - proxmox.pkrvars.hcl is not secret but describes one node, so it is ignored and committed only as .example.
 proxmox.pkrvars.hcl
 *.local.pkrvars.hcl
 *secret*.pkrvars.hcl

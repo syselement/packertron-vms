@@ -20,9 +20,7 @@ real credential added to those same files is still reported.
 regexes = [
   # SHA-512 crypt hash, as written by mkpasswd -m sha-512.
   '''\$6\$[./A-Za-z0-9]{1,32}\$[./A-Za-z0-9]{20,}''',
-  # The one KMS client setup key this repository carries, matched literally
-  # rather than by shape. A pattern for "five groups of five" would allowlist
-  # every future key without anyone looking at it; this way, adding another
-  # edition's key is a finding that has to be read and re-approved.
+  # - The one KMS client setup key this repository carries, matched literally rather than by shape.
+  # - A pattern for "five groups of five" would allowlist every future key without anyone looking at it; this way, adding another edition's key is a finding that has to be read and re-approved.
   '''NPPR9-FWDCX-D2C8J-H872K-2YT43''',
 ]

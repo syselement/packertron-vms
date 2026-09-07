@@ -2,12 +2,9 @@
 
 Builds a VMware Workstation VM with the `vmware-iso` builder.
 
-The full provisioning chain runs at build time - `00-update-system.sh`, then
-the whole `scripts/ubuntu/` bundle is staged, then `02` and `01`. The result is
-a fat image: everything is baked in, nothing is deferred to first boot. That is
-the opposite of the Proxmox template beside it
-([proxmox/ubuntu-24.04-server](../../proxmox/ubuntu-24.04-server/README.md)),
-which stays thin and provisions per VM.
+- The full provisioning chain runs at build time - `00-update-system.sh`, then the whole `scripts/ubuntu/` bundle is staged, then `02` and `01`.
+- The result is a fat image: everything is baked in, nothing is deferred to first boot.
+- That is the opposite of the Proxmox template beside it ([proxmox/ubuntu-24.04-server](../../proxmox/ubuntu-24.04-server/README.md)), which stays thin and provisions per VM.
 
 Adapted from the 24.04 template in
 [ubuntu-24.04-server](../ubuntu-24.04-server/README.md), which came from
@@ -30,9 +27,8 @@ packer build .
 
 ## Credentials
 
-The seed commits a SHA-512 crypt hash whose plaintext is documented next to it,
-so every machine built from it starts with the same console password. Change it
-on anything reachable by anyone else - see [SECURITY.md](../../../SECURITY.md).
+- The seed commits a SHA-512 crypt hash whose plaintext is documented next to it, so every machine built from it starts with the same console password.
+- Change it on anything reachable by anyone else - see [SECURITY.md](../../../SECURITY.md).
 
 ## Checks
 

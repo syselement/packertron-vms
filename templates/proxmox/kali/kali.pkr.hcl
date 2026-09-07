@@ -1,8 +1,7 @@
 # Kali Linux template for Proxmox.
 # Adapted from https://github.com/mttaggart/seclab (Packer/kali/config.pkr.hcl).
 #
-# STATUS: stub. Validates, but does not build - http/kali.preseed does not
-# exist, so the boot_command below has nothing to fetch.
+# STATUS: stub. Validates, but does not build - http/kali.preseed does not exist, so the boot_command below has nothing to fetch.
 #
 # Docs:
 #   proxmox-iso builder  https://developer.hashicorp.com/packer/integrations/hashicorp/proxmox/latest/components/builder/iso

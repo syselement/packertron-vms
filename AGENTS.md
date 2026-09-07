@@ -1,8 +1,6 @@
 # packertron-vms
 
-Standards for this repository: Packer templates under `templates/`, the guest
-provisioning scripts under `scripts/`, Vagrantfiles, CI workflows and
-repo-wide files.
+Standards for this repository: Packer templates under `templates/`, the guest provisioning scripts under `scripts/`, Vagrantfiles, CI workflows and repo-wide files.
 
 ## Scope
 
@@ -14,9 +12,7 @@ repo-wide files.
   `.github/workflows/template-checks.yml`. Run `scripts/check-templates.sh`
   before committing, which runs those same checks locally, plus the CI-matrix
   and shell-lint checks CI cannot express itself.
-- Keep the guest-provisioning scripts hypervisor-agnostic. VMware, Proxmox and
-  bare metal all run the same `00`/`01`/`02`/`03`, and that is what makes the
-  Proxmox work cheap.
+- Keep the guest-provisioning scripts hypervisor-agnostic. VMware, Proxmox and bare metal all run the same `00`/`01`/`02`/`03`, and that is what makes the Proxmox work cheap.
 - Preserve compatibility with the existing `packertron-vms` workflows.
 - Prefer small, reviewable changes over complete rewrites.
 - Preserve existing behavior unless the requested task explicitly changes it.
@@ -41,8 +37,7 @@ Preserve the intended execution order of `scripts/ubuntu/`:
 4. `03-customize-system.sh`
 5. `90-bootstrap-baremetal.sh`, where applicable
 
-Do not introduce hidden dependencies between scripts. If one script depends on
-another, document the dependency clearly.
+Do not introduce hidden dependencies between scripts. If one script depends on another, document the dependency clearly.
 
 ## File Headers
 
@@ -66,8 +61,7 @@ Rules:
 - **Use `#`.** It is the default comment marker everywhere, including HCL -
   `#` is idiomatic there and `//` is only the alternative. `.cmd` files use
   `@rem` and `.bat` files use `::`, because those languages have nothing else.
-- **`Purpose` describes this file only.** Not the phase it belongs to, not the
-  plan for the next one, not how the repository is laid out.
+- **`Purpose` describes this file only.** Not the phase it belongs to, not the plan for the next one, not how the repository is laid out.
 - **`Docs` points outward, then inward.** Upstream reference first, then
   `README.md` with a few words on what the README adds. Keep attribution and
   upstream source URLs here - they are load-bearing for adapted files.
@@ -82,26 +76,21 @@ Rules:
   Run: not runnable yet; see STATUS above.
   ```
 
-- **Add a `STATUS:` line** directly under `Purpose` when a file does not work
-  yet, saying concretely why.
+- **Add a `STATUS:` line** directly under `Purpose` when a file does not work yet, saying concretely why.
 - Two constraints override placement: `#cloud-config` must stay the first line
   of a seed, and a file-wide `# shellcheck disable=` directive must stay before
   the first command. Build the header around them.
 
 ## Comments
 
-- Explain **why**, not what the code already says. Delete a comment that
-  restates its line.
-- Keep: non-obvious behavior, ordering constraints, security implications, and
-  the reason an implementation has to be the way it is.
+- Explain **why**, not what the code already says. Delete a comment that restates its line.
+- Keep: non-obvious behavior, ordering constraints, security implications, and the reason an implementation has to be the way it is.
 - Delete: section labels that restate structure (`# Variables`, `# Source
   block`), scaffolding left by a generator, historical narration about what a
   line used to be, plans for future work, and explanations of other components.
-- Cross-file explanations belong in the relevant `README.md`, referenced once
-  from the header, not repeated in each file that touches the subject.
+- Cross-file explanations belong in the relevant `README.md`, referenced once from the header, not repeated in each file that touches the subject.
 - Do not add a comment merely to replace one you removed.
-- Comment-only changes must not touch code. Verify by stripping comments from
-  both revisions and diffing what is left.
+- Comment-only changes must not touch code. Verify by stripping comments from both revisions and diffing what is left.
 
 ## Bash Standards
 
@@ -113,8 +102,7 @@ Rules:
   set -Eeuo pipefail
   ```
 
-- Do not add `set -Eeuo pipefail` blindly to an existing script without first
-  checking whether its current logic is compatible.
+- Do not add `set -Eeuo pipefail` blindly to an existing script without first checking whether its current logic is compatible.
 - Quote variable expansions unless intentional word splitting is required.
 - Use arrays for package lists and command arguments.
 - Use `printf` instead of `echo` where output behavior matters.
@@ -128,8 +116,7 @@ Rules:
 - When temporary files are required, use `mktemp` and clean them with `trap`.
 - Use descriptive function and variable names.
 - Keep functions focused on one responsibility.
-- Preserve the current formatting style unless a formatting refactor is
-  explicitly requested.
+- Preserve the current formatting style unless a formatting refactor is explicitly requested.
 
 ## Error Handling
 
@@ -143,8 +130,7 @@ Rules:
   ```
 
   unless the failure is expected and documented.
-- Check failures at boundaries such as downloads, repository configuration,
-  package installation, file writes, and service changes.
+- Check failures at boundaries such as downloads, repository configuration, package installation, file writes, and service changes.
 - When using traps, preserve the original exit status.
 - Avoid leaving the system in a partially configured state where practical.
 
@@ -162,18 +148,14 @@ die() {
 - Scripts must be safe to run repeatedly.
 - Check the current state before changing it.
 - Do not duplicate configuration entries.
-- Do not repeatedly append aliases, environment variables, repositories, or
-  shell initialization blocks.
-- Check whether packages, Flatpaks, Snaps, repositories, keyrings, groups,
-  services, directories, files, and configuration entries already exist.
-- Prefer declarative file generation when the complete file is owned by this
-  project.
+- Do not repeatedly append aliases, environment variables, repositories, or shell initialization blocks.
+- Check whether packages, Flatpaks, Snaps, repositories, keyrings, groups, services, directories, files, and configuration entries already exist.
+- Prefer declarative file generation when the complete file is owned by this project.
 - Use explicit markers when managing only part of an existing file.
 - Handle partially completed previous runs where practical.
 - Avoid unnecessary package-manager refreshes inside individual functions.
 - Do not reinstall software that is already correctly installed.
-- Avoid enabling or restarting services when their state does not need to
-  change.
+- Avoid enabling or restarting services when their state does not need to change.
 
 ## Privilege Handling
 
@@ -188,10 +170,8 @@ die() {
   sudo sh -c "sudo command"
   ```
 
-- Preserve the invoking user's home directory when user-level configuration is
-  required.
-- Do not assume that `$HOME` belongs to the intended desktop user while running
-  under `sudo`.
+- Preserve the invoking user's home directory when user-level configuration is required.
+- Do not assume that `$HOME` belongs to the intended desktop user while running under `sudo`.
 - Resolve the target non-root user explicitly when necessary.
 - Do not write user-owned files as root without correcting ownership.
 
@@ -237,8 +217,7 @@ Additional requirements:
 - Do not set `DEBIAN_FRONTEND=noninteractive` globally for the user's shell.
 - Account for APT and dpkg lock contention.
 - Avoid running `apt update` repeatedly in multiple functions.
-- Prefer `apt-get` for automation where stable machine-oriented behavior is
-  useful.
+- Prefer `apt-get` for automation where stable machine-oriented behavior is useful.
 - Do not use deprecated `apt-key`.
 - Store repository keys under `/etc/apt/keyrings`.
 - Use repository-specific `signed-by=` configuration.
@@ -303,8 +282,7 @@ curl \
 ## Desktop and Server Detection
 
 - Detect Ubuntu using `/etc/os-release`.
-- Do not identify Ubuntu Desktop solely from `$XDG_CURRENT_DESKTOP`,
-  `$DESKTOP_SESSION`, or the presence of a graphical session.
+- Do not identify Ubuntu Desktop solely from `$XDG_CURRENT_DESKTOP`, `$DESKTOP_SESSION`, or the presence of a graphical session.
 - Prefer installed Ubuntu desktop metapackages as the primary signal.
 - Treat display-server and session variables only as supplemental signals.
 - Keep Desktop-only packages and customization out of Ubuntu Server paths.
@@ -339,8 +317,7 @@ Example managed block:
 
 - Back up important configuration files before replacing them.
 - Do not create backups repeatedly on every run.
-- Validate generated configuration before activating it when a validation
-  command exists.
+- Validate generated configuration before activating it when a validation command exists.
 
 ## Services and systemd
 
@@ -361,17 +338,13 @@ Example managed block:
 - Use the target user's environment when running user-scoped commands.
 - Preserve correct ownership for files under the target user's home directory.
 - Do not overwrite existing user configuration without preserving or merging it.
-- GNOME and desktop-session configuration may require execution in the user's
-  graphical session; do not pretend such changes were validated when no session
-  was available.
+- GNOME and desktop-session configuration may require execution in the user's graphical session; do not pretend such changes were validated when no session was available.
 
 ## Secrets
 
-- Never add passwords, tokens, API keys, private keys, recovery codes, or
-  credentials to the repository.
+- Never add passwords, tokens, API keys, private keys, recovery codes, or credentials to the repository.
 - Do not print secrets to logs.
-- Do not place secrets directly in command-line arguments when a safer mechanism
-  exists.
+- Do not place secrets directly in command-line arguments when a safer mechanism exists.
 - Do not commit `.env` files containing real credentials.
 - Use placeholders in examples.
 - Apply restrictive permissions to sensitive files.
@@ -515,8 +488,7 @@ Report findings with:
 - Ask for approval before expanding the requested scope.
 - Do not execute commands requiring `sudo`.
 - Do not run the real provisioning workflow on the development host.
-- Do not claim integration testing was completed unless it was actually run in
-  a suitable disposable VM.
+- Do not claim integration testing was completed unless it was actually run in a suitable disposable VM.
 - At completion, provide:
 
   1. files changed

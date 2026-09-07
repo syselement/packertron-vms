@@ -1,14 +1,12 @@
 #!/usr/bin/env bash
 #
-# Remove per-machine state that must not survive a clone. Runs as the last
-# provisioner of a Proxmox template build, after 01-cleanup-system.sh.
+# Remove per-machine state that must not survive a clone. Runs as the last provisioner of a Proxmox template build, after 01-cleanup-system.sh.
 #
 # Proxmox-only, not part of 01, because 01 is shared with the VMware templates
 # where cloud-init stays pinned: there nothing would regenerate any of this, so
 # the image would come up with no sshd and no address.
 #
-# All of it is state a running system recreates, so this must run after the
-# last reboot of the build.
+# All of it is state a running system recreates, so this must run after the last reboot of the build.
 #
 # Docs:
 #   cloud-init      https://cloudinit.readthedocs.io/en/latest/
@@ -33,10 +31,9 @@ readonly UNIT_PATH=/etc/systemd/system/regenerate-ssh-host-keys.service
 CLOUD_CFG_DIR="${CLOUD_CFG_DIR:-/etc/cloud/cloud.cfg.d}"
 readonly CLOUD_CFG_DIR
 
-# The seed removes subiquity's pinning with `rm -f`, which exits 0 whether or
-# not it matched. A miss produces a template whose clones never read their
-# cloud-init drive - no hostname, user, key or address, and nothing in any log
-# to say why. This runs over SSH, where a non-zero exit fails the build.
+# - The seed removes subiquity's pinning with `rm -f`, which exits 0 whether or not it matched.
+# - A miss produces a template whose clones never read their cloud-init drive - no hostname, user, key or address, and nothing in any log to say why.
+# - This runs over SSH, where a non-zero exit fails the build.
 verify_cloud_init_unpinned() {
     local leftovers
 
@@ -63,11 +60,9 @@ verify_cloud_init_unpinned() {
         die "99-pve.cfg does not set manage_etc_hosts; clones would keep the template's name in /etc/hosts"
 }
 
-# Host keys identify the machine, not the image: shipped in a template, every
-# clone answers with the same fingerprint and swapping one for another warns
-# nobody. Deleting them alone would leave sshd unable to start, so a one-shot
-# unit regenerates them first. ConditionPathExists makes it a no-op on later
-# boots, so it never has to disable itself.
+# - Host keys identify the machine, not the image: shipped in a template, every clone answers with the same fingerprint and swapping one for another warns nobody.
+# - Deleting them alone would leave sshd unable to start, so a one-shot unit regenerates them first.
+# - ConditionPathExists makes it a no-op on later boots, so it never has to disable itself.
 install_host_key_regeneration() {
     log "install ${UNIT_PATH}"
     cat >"$UNIT_PATH" <<'UNIT'
@@ -86,8 +81,7 @@ WantedBy=multi-user.target
 UNIT
     chmod 0644 "$UNIT_PATH"
 
-    # Fatal on purpose: an unenabled unit means a clone with no host keys and
-    # no sshd, which is far worse to debug than a failed build.
+    # Fatal on purpose: an unenabled unit means a clone with no host keys and no sshd, which is far worse to debug than a failed build.
     systemctl enable regenerate-ssh-host-keys.service ||
         die "failed enabling regenerate-ssh-host-keys.service"
 }
@@ -97,10 +91,9 @@ remove_host_keys() {
     rm -f /etc/ssh/ssh_host_* || die "failed removing SSH host keys"
 }
 
-# Subiquity pins its netplan stanza to the build VM's MAC, not just the
-# interface name, so on a clone it matches nothing and configures nothing. It
-# is then the first file anyone opens when a clone has no address, hiding the
-# fact that cloud-init is doing all the work. Remove it.
+# - Subiquity pins its netplan stanza to the build VM's MAC, not just the interface name, so on a clone it matches nothing and configures nothing.
+# - It is then the first file anyone opens when a clone has no address, hiding the fact that cloud-init is doing all the work.
+# - Remove it.
 remove_installer_netplan() {
     log "remove installer netplan"
     rm -f /etc/netplan/00-installer-config*.yaml ||

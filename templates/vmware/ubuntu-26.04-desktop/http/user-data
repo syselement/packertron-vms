@@ -1,7 +1,7 @@
 #cloud-config
 #
-# Autoinstall seed for Ubuntu 26.04 Desktop, served over HTTP by the vmware-iso
-# build in this directory. Do not alter the first line.
+# Autoinstall seed for Ubuntu 26.04 Desktop, served over HTTP by the vmware-iso build in this directory.
+# Do not alter the first line.
 #
 # Docs:
 #   Autoinstall  https://canonical-subiquity.readthedocs-hosted.com/en/latest/reference/autoinstall-reference.html
@@ -11,8 +11,7 @@
 #   cloud-init schema --config-file user-data --annotate
 #   ../../../../scripts/check-templates.sh seeds
 #
-# Keep this to ONE document: cloud-init reads the first and silently ignores
-# anything appended after it.
+# Keep this to ONE document: cloud-init reads the first and silently ignores anything appended after it.
 
 autoinstall:
   version: 1

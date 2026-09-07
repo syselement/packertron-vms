@@ -1,5 +1,4 @@
-# Stop Windows Update, clear its download cache and defragment, to shrink the
-# image before sysprep.
+# Stop Windows Update, clear its download cache and defragment, to shrink the image before sysprep.
 # Run by the win-srv-2025 Packer build as the last provisioner.
 #
 # Docs:
