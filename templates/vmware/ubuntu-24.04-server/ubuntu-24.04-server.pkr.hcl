@@ -94,7 +94,13 @@ source "vmware-iso" "ubuntuserver24_04" {
   http_directory = "${path.root}/http"
 
   // Boot configuration
-  boot_command = ["e<wait><down><down><down><end> autoinstall 'ds=nocloud;s=http://{{ .HTTPIP }}:{{ .HTTPPort }}/'<F10>"]
+  boot_command = [
+    "<esc><wait>",
+    "e<wait>",
+    "<down><down><down><end>",
+    " autoinstall ds=nocloud\\;s=http://{{ .HTTPIP }}:{{ .HTTPPort }}/ ---",
+    "<f10><wait>"
+  ]
   boot_wait    = "10s"
 
   // Communicator configuration

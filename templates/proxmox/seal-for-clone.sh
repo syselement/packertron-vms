@@ -23,9 +23,48 @@ die() {
     exit 1
 }
 
-[[ "$EUID" -eq 0 ]] || die "run as root"
-
 readonly UNIT_PATH=/etc/systemd/system/regenerate-ssh-host-keys.service
+
+# Overridable only so verify_cloud_init_unpinned can be exercised against a
+# fixture directory. Nothing in the build sets it.
+CLOUD_CFG_DIR="${CLOUD_CFG_DIR:-/etc/cloud/cloud.cfg.d}"
+readonly CLOUD_CFG_DIR
+
+# The seed removes subiquity's cloud-init pinning in late-commands, with rm -f.
+# That is a silent operation: if a file is ever renamed - and it has been, the
+# networking drop-in ships as 00-subiquity-disable-cloudinit-networking.cfg,
+# not the bare name older recipes use - rm matches nothing and still exits 0.
+# The install then succeeds and produces a template whose clones never read
+# their cloud-init drive: no hostname, no user, no key, no address, and no
+# error anywhere to explain it.
+#
+# Checking it here, over SSH, where a non-zero exit fails the build, is the
+# only cheap way to find that out before a clone does.
+verify_cloud_init_unpinned() {
+    local leftovers
+
+    log "verify cloud-init is unpinned"
+
+    leftovers="$(
+        find "$CLOUD_CFG_DIR" -maxdepth 1 -type f \
+            \( -name '*installer*' -o -name '*disable-cloudinit-networking*' \) \
+            -printf '%f\n' 2>/dev/null
+    )"
+    if [[ -n "$leftovers" ]]; then
+        printf '[seal] still present in %s:\n%s\n' "$CLOUD_CFG_DIR" "$leftovers" >&2
+        die "subiquity's cloud-init pinning survived the install; clones would ignore their cloud-init drive"
+    fi
+
+    if grep -rqs -E 'config: *disabled' "$CLOUD_CFG_DIR"; then
+        die "cloud-init networking is still disabled in ${CLOUD_CFG_DIR}; clones would come up with no address"
+    fi
+
+    [[ -f "$CLOUD_CFG_DIR/99-pve.cfg" ]] ||
+        die "missing ${CLOUD_CFG_DIR}/99-pve.cfg; the seed did not set datasource_list"
+
+    grep -qs '^manage_etc_hosts:' "$CLOUD_CFG_DIR/99-pve.cfg" ||
+        die "99-pve.cfg does not set manage_etc_hosts; clones would keep the template's name in /etc/hosts"
+}
 
 # Host keys identify the machine, not the image. Shipped in a template, every
 # clone answers with the same fingerprint: a client cannot tell two of them
@@ -65,10 +104,20 @@ remove_host_keys() {
     rm -f /etc/ssh/ssh_host_* || die "failed removing SSH host keys"
 }
 
-# Subiquity writes its own netplan, naming the interface the build VM happened
-# to have. cloud-init writes 50-cloud-init.yaml on the clone, so leaving this
-# behind gives netplan two sources of truth for one machine, one of them
-# describing a device that may not exist there.
+# Subiquity writes its own netplan, and it pins the stanza to the build VM's
+# MAC address, not just its interface name. Observed on a real Proxmox install:
+#
+#   ethernets:
+#     ens18:
+#       dhcp4: true
+#       match: {macaddress: bc:24:11:b8:a4:5b}
+#       set-name: ens18
+#
+# Proxmox gives a clone a new MAC, so that match can never succeed there. The
+# file is dead config that silently configures nothing - which is worse than it
+# sounds, because it is the first place anyone looks when a clone comes up with
+# no address, and it hides the fact that cloud-init is the only thing actually
+# configuring the NIC. Remove it so 50-cloud-init.yaml is the whole story.
 remove_installer_netplan() {
     log "remove installer netplan"
     rm -f /etc/netplan/00-installer-config*.yaml ||
@@ -83,6 +132,9 @@ remove_random_seed() {
 }
 
 main() {
+    [[ "$EUID" -eq 0 ]] || die "run as root"
+
+    verify_cloud_init_unpinned
     install_host_key_regeneration
     remove_host_keys
     remove_installer_netplan

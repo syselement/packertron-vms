@@ -79,13 +79,14 @@ locals {
 
 # Source block
 source "vmware-iso" "ubuntu2604_desktop" {
-  # Ubuntu Desktop autoinstall via NoCloud-Net and local HTTP server
+  # Ubuntu Desktop autoinstall via NoCloud and local HTTP server
   # boot_command provides the necessary keystrokes to start the installation with autoinstall parameters
   boot_wait = "5s"
   boot_command = [
+    "<esc><wait>",
     "e<wait>",
     "<down><down><down><end>",
-    " autoinstall ds=nocloud-net\\;s=http://{{ .HTTPIP }}:{{ .HTTPPort }}/ ---",
+    " autoinstall ds=nocloud\\;s=http://{{ .HTTPIP }}:{{ .HTTPPort }}/ ---",
     "<f10><wait>"
   ]
   communicator      = "ssh"

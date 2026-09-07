@@ -95,7 +95,18 @@ variable "network_bridge" {
 variable "vm_id" {
   type        = number
   description = "VMID for the build. Proxmox requires it to be free on the node."
-  default     = 9024
+  default     = 80024
+}
+
+// How long to wait after power-on before typing the boot command. OVMF posts
+// more slowly than SeaBIOS, so if the installer never starts, this is the
+// first thing to raise: the keystrokes went into the firmware splash instead
+// of the GRUB menu. Tunable from the command line - `-var 'boot_wait=20s'` -
+// so finding the right value does not mean editing this file.
+variable "boot_wait" {
+  type        = string
+  description = "Delay before the boot command is typed"
+  default     = "10s"
 }
 
 variable "template_name" {
@@ -140,16 +151,44 @@ source "proxmox-iso" "ubuntu-24-04-server" {
   }
 
   // Hardware
-  vm_id                = var.vm_id
-  vm_name              = var.template_name
-  cores                = 2
-  memory               = 2048
-  cpu_type             = "host"
-  os                   = "l26"
-  scsi_controller      = "virtio-scsi-single"
-  qemu_agent           = true
+  vm_id           = var.vm_id
+  vm_name         = var.template_name
+  cores           = 1
+  memory          = 2048
+  cpu_type        = "host"
+  os              = "l26"
+  scsi_controller = "virtio-scsi-single"
+  qemu_agent      = true
+
+  // q35 with OVMF, rather than the i440fx Proxmox defaults to. i440fx models a
+  // 1996 chipset with no native PCIe; pairing it with UEFI works but is the
+  // odd combination. q35 is the modern pairing and what a clone of this
+  // template should look like going forward.
+  //
+  // Proxmox still exposes ide2 on q35, which is where the cloud-init drive
+  // lands, so cloud_init below is unaffected.
+  machine = "q35"
+  bios    = "ovmf"
+
+  // The artifact this build leaves behind on the node.
   template_name        = var.template_name
-  template_description = "Ubuntu Server 24.04 LTS, built by Packer. Thin: 02 and 03 run at first boot."
+  template_description = "Ubuntu Server 24.04 LTS, built by Packer. q35/OVMF. Thin: 02 and 03 run at first boot."
+
+  // OVMF needs somewhere to keep its variable store, and Proxmox will not
+  // start an ovmf VM without one. It goes on the same pool as the disk rather
+  // than getting its own variable: it is 4MB, and a node that can hold the
+  // disk can hold this.
+  //
+  // pre_enrolled_keys stays false, matching the VMs already on this node. With
+  // it true the firmware ships Microsoft's Secure Boot keys enrolled, which
+  // only helps if everything that ever boots here is signed for them - and it
+  // is the usual cause of a template that installs cleanly and then refuses to
+  // boot as a clone.
+  efi_config {
+    efi_storage_pool  = var.storage_pool
+    efi_type          = "4m"
+    pre_enrolled_keys = false
+  }
 
   disks {
     type         = "scsi"
@@ -174,8 +213,14 @@ source "proxmox-iso" "ubuntu-24-04-server" {
 
   // Autoinstall seed, served by Packer's own HTTP server
   http_directory = "${path.root}/http"
-  boot_command   = ["e<wait><down><down><down><end> autoinstall 'ds=nocloud;s=http://{{ .HTTPIP }}:{{ .HTTPPort }}/'<F10>"]
-  boot_wait      = "10s"
+  boot_command = [
+    "<esc><wait>",
+    "e<wait>",
+    "<down><down><down><end>",
+    " autoinstall ds=nocloud\\;s=http://{{ .HTTPIP }}:{{ .HTTPPort }}/ ---",
+    "<f10><wait>"
+  ]
+  boot_wait      = var.boot_wait
 
   // Communicator
   ssh_username = var.ssh_username

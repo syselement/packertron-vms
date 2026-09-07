@@ -27,7 +27,7 @@ This is how it works:
 
 - The build serves the local `http/` directory through Packer’s temporary HTTP server (using `http_directory`). `${path.root}` points to the directory where the Packer template is run from
 
-- During boot, the installer is given `autoinstall ds=nocloud-net\\;s=http://{{ .HTTPIP }}:{{ .HTTPPort }}/`
+- During boot, the installer is given `autoinstall ds=nocloud\\;s=http://{{ .HTTPIP }}:{{ .HTTPPort }}/`
   - Packer serves the local `http/` directory, then Ubuntu autoinstall downloads `user-data` and `meta-data` from Packer’s temporary HTTP server as its NoCloud seed configuration
 
 ### Build the template box

@@ -257,7 +257,7 @@ packer init .
 packer build -var-file=../proxmox.pkrvars.hcl .
 ```
 
-The result is a Proxmox **template** (`vm_id` 9024 by default) that is thin on
+The result is a Proxmox **template** (`vm_id` 80024 by default) that is thin on
 purpose: base OS, `qemu-guest-agent`, and cloud-init left able to run again.
 Per-VM provisioning happens at first boot on each clone, not in the image.
 

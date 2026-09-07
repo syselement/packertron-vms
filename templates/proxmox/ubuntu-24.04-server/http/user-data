@@ -72,10 +72,30 @@ autoinstall:
     # disables its networking. Left in place, a clone ignores the cloud-init
     # drive Proxmox attaches, so no per-VM hostname, user, key or network ever
     # applies and the whole clone-and-configure model silently does nothing.
-    - rm -f /target/etc/cloud/cloud.cfg.d/99-installer.cfg
-    - rm -f /target/etc/cloud/cloud.cfg.d/subiquity-disable-cloudinit-networking.cfg
+    #
+    # 99-installer.cfg captures the install-time user-data verbatim under
+    # `datasource: None`, including `preserve_hostname: true` and a baked
+    # instance-id: a clone that reads it keeps the template's hostname forever.
+    #
+    # Both names are globbed. Observed on a real 24.04 install, the second file
+    # is 00-subiquity-disable-cloudinit-networking.cfg - an exact-name rm would
+    # match nothing, exit 0 because of -f, and leave `network: {config:
+    # disabled}` in place with no sign anything went wrong. seal-for-clone.sh
+    # re-checks this over SSH and fails the build if either survives.
+    - rm -f /target/etc/cloud/cloud.cfg.d/*99-installer.cfg
+    - rm -f /target/etc/cloud/cloud.cfg.d/*subiquity-disable-cloudinit-networking.cfg
+    # manage_etc_hosts is what keeps /etc/hosts in step with the hostname
+    # cloud-init sets on a clone. Ubuntu ships cloud.cfg with
+    # `preserve_hostname: false` and the update_etc_hosts module enabled but
+    # manage_etc_hosts unset, and cc_update_etc_hosts does nothing at all when
+    # it is unset. Ubuntu's nsswitch `hosts:` line has no `myhostname` entry to
+    # cover for it either, so a clone is renamed while /etc/hosts still carries
+    # the template's name and every sudo prints "unable to resolve host".
+    #
+    # `localhost` fixes only the 127.0.1.1 line; `true` would rewrite the whole
+    # file from a template on every boot and discard anything added by hand.
     - |
-      printf 'datasource_list: [ NoCloud, ConfigDrive ]\n' \
+      printf 'datasource_list: [ NoCloud, ConfigDrive ]\nmanage_etc_hosts: localhost\n' \
         > /target/etc/cloud/cloud.cfg.d/99-pve.cfg
 
 # Validate this file with

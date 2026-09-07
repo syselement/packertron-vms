@@ -72,11 +72,17 @@ The Proxmox template's own build block does the rest, as a final step after
 - **SSH host keys** are deleted, and a one-shot unit regenerates them before
   `ssh.service` starts on the clone. Shipped in the image, they let any clone
   impersonate any other with no warning to a client that has connected before.
-- **`/etc/netplan/00-installer-config*.yaml`**, written by subiquity naming the
-  interface the *build* VM had, is removed so cloud-init's `50-cloud-init.yaml`
-  is the only source of truth on the clone.
+- **`/etc/netplan/00-installer-config*.yaml`**, which subiquity pins to the
+  *build* VM's MAC address, is removed. A clone gets a new MAC, so the stanza
+  matches nothing and configures nothing; leaving it behind only hides the fact
+  that cloud-init's `50-cloud-init.yaml` is doing all the work.
 - **`/var/lib/systemd/random-seed`** is removed so clones do not start from a
   shared seed.
+
+It also fails the build if subiquity's cloud-init pinning survived the install,
+or if `manage_etc_hosts` was not set, rather than shipping a template whose
+clones silently ignore their cloud-init drive or answer to a name that resolves
+nowhere.
 
 **This applies to the Proxmox template only.** The VMware templates keep their
 host keys, because subiquity leaves cloud-init pinned there and nothing would
