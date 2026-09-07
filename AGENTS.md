@@ -1,14 +1,19 @@
-# Ubuntu Provisioning Scripts
+# packertron-vms
+
+Standards for this repository: Packer templates under `templates/`, the guest
+provisioning scripts under `scripts/`, Vagrantfiles, CI workflows and
+repo-wide files.
 
 ## Scope
 
-- This file sets the standards for `scripts/ubuntu/`, but the working scope is
-  the whole repository: Packer templates, Vagrantfiles, CI workflows and
-  repo-wide files are all in play.
-- Changes outside `scripts/ubuntu/` still have to clear the same bar. Packer
-  HCL and cloud-init seeds are checked by
-  `.github/workflows/template-checks.yml`; run `scripts/check-templates.sh`
-  before committing, which runs those same checks locally.
+- Everything in the repository is in play, and everything clears the same bar.
+- `scripts/ubuntu/` is the mature part - 187 Bats tests, ShellCheck, shfmt -
+  and is checked by `.github/workflows/ubuntu-static-checks.yml`. Treat it as
+  known-good: do not refactor it as a side effect of another task.
+- Packer HCL and cloud-init seeds are checked by
+  `.github/workflows/template-checks.yml`. Run `scripts/check-templates.sh`
+  before committing, which runs those same checks locally, plus the CI-matrix
+  and shell-lint checks CI cannot express itself.
 - Keep the guest-provisioning scripts hypervisor-agnostic. VMware, Proxmox and
   bare metal all run the same `00`/`01`/`02`/`03`, and that is what makes the
   Proxmox work cheap.
@@ -28,7 +33,7 @@
 
 ## Existing Script Order
 
-Preserve the intended execution order:
+Preserve the intended execution order of `scripts/ubuntu/`:
 
 1. `00-update-system.sh`
 2. `01-cleanup-system.sh`
@@ -38,6 +43,65 @@ Preserve the intended execution order:
 
 Do not introduce hidden dependencies between scripts. If one script depends on
 another, document the dependency clearly.
+
+## File Headers
+
+Every file a person opens as an entry point - Bash scripts, library files,
+Packer templates, cloud-init seeds, Vagrantfiles, PowerShell and batch scripts -
+starts with the same three-part header:
+
+```text
+<Purpose: one or two lines saying what this file is responsible for>
+
+Docs:
+  <tool or builder>  <upstream URL>
+  README.md          what the README covers that this file does not
+
+Run:
+  <the actual commands, in the order they are run>
+```
+
+Rules:
+
+- **Use `#`.** It is the default comment marker everywhere, including HCL -
+  `#` is idiomatic there and `//` is only the alternative. `.cmd` files use
+  `@rem` and `.bat` files use `::`, because those languages have nothing else.
+- **`Purpose` describes this file only.** Not the phase it belongs to, not the
+  plan for the next one, not how the repository is laid out.
+- **`Docs` points outward, then inward.** Upstream reference first, then
+  `README.md` with a few words on what the README adds. Keep attribution and
+  upstream source URLs here - they are load-bearing for adapted files.
+- **`Run` must be real.** Give the commands someone would actually type,
+  including any prerequisite that is expensive to discover (`ssh-add -l` before
+  a Proxmox build, for example). For a file that is invoked by tooling, say so
+  plainly rather than inventing a command:
+
+  ```text
+  Run: Packer invokes this; it is not meant to be run by hand.
+  Run: sourced, not executed.
+  Run: not runnable yet; see STATUS above.
+  ```
+
+- **Add a `STATUS:` line** directly under `Purpose` when a file does not work
+  yet, saying concretely why.
+- Two constraints override placement: `#cloud-config` must stay the first line
+  of a seed, and a file-wide `# shellcheck disable=` directive must stay before
+  the first command. Build the header around them.
+
+## Comments
+
+- Explain **why**, not what the code already says. Delete a comment that
+  restates its line.
+- Keep: non-obvious behavior, ordering constraints, security implications, and
+  the reason an implementation has to be the way it is.
+- Delete: section labels that restate structure (`# Variables`, `# Source
+  block`), scaffolding left by a generator, historical narration about what a
+  line used to be, plans for future work, and explanations of other components.
+- Cross-file explanations belong in the relevant `README.md`, referenced once
+  from the header, not repeated in each file that touches the subject.
+- Do not add a comment merely to replace one you removed.
+- Comment-only changes must not touch code. Verify by stripping comments from
+  both revisions and diffing what is left.
 
 ## Bash Standards
 

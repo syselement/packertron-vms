@@ -187,6 +187,7 @@ packertron-vms/
 │   ├── windows/             PowerShell and batch provisioners
 │   └── check-templates.sh   run the CI checks locally
 ├── .github/workflows/   CI
+├── AGENTS.md            repository standards: file headers, Bash, safety, review
 ├── SECURITY.md          credential model - read before pointing this at a network
 └── CHANGELOG.md  LICENSE  README.md  version.yaml
 ```
