@@ -173,7 +173,7 @@ source "proxmox-iso" "ubuntu-24-04-server" {
   // Hardware
   vm_id           = var.vm_id
   vm_name         = var.template_name
-  cores           = 1
+  cores           = 2
   memory          = 2048
   cpu_type        = "host"
   os              = "l26"
