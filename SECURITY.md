@@ -21,6 +21,9 @@ It follows that:
 - SSH password authentication is disabled (`allow-pw: false`) and a fixed
   ed25519 public key is authorized, so remote access depends on holding the
   matching private key - but console and GDM login do not.
+- Because of that, the Proxmox build authenticates through the **SSH agent**
+  (`ssh_agent_auth`), not a password and not a key file. No passphrase-less
+  copy of a personal key has to exist on disk for a build to run.
 
 **Change the password on any machine that will be reachable by anyone else.**
 

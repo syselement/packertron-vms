@@ -63,8 +63,29 @@ password - and export it:
 ```bash
 export PKR_VAR_proxmox_api_token_id="packer@pve!templates"
 export PKR_VAR_proxmox_api_token_secret="..."
-export PKR_VAR_ssh_password="..."
 ```
+
+### The build logs in over the SSH agent
+
+`http/user-data` sets `allow-pw: false`, so subiquity writes
+`PasswordAuthentication no` and the installed system rejects passwords. The
+build authenticates with the one ed25519 key the seed authorises, through the
+agent - Packer's communicator cannot unlock a passphrase-protected key file,
+and `ssh_private_key_file` fails validation outright on one.
+
+So before building, the key must be loaded:
+
+```bash
+ssh-add -l          # must list the key whose public half is in http/user-data
+ssh-add ~/.ssh/id_ed25519
+```
+
+If it is not, the build reaches the installed system, fails every
+authentication attempt, and sits out the full 30-minute `ssh_timeout` before
+failing with nothing useful in the log.
+
+For an unattended runner, generate a dedicated passphrase-less build key,
+authorise it in the seed, and use `ssh_private_key_file` instead of the agent.
 
 Keep `insecure_skip_tls_verify` at its default of `false` unless the node
 presents a self-signed certificate you have deliberately chosen to accept.
@@ -78,7 +99,13 @@ packer validate -var-file=../proxmox.pkrvars.hcl .
 packer build    -var-file=../proxmox.pkrvars.hcl .
 ```
 
-Per-build overrides still work: `-var 'vm_id=9100'`, `-var 'boot_wait=20s'`.
+Per-build overrides, which are the three knobs a first build usually needs:
+
+| Override | When |
+| --- | --- |
+| `-var 'boot_wait=20s'` | installer never starts; OVMF was still posting when the keys were typed |
+| `-var 'http_bind_address=<your LAN IP>'` | installer starts but cannot fetch the seed; Packer picked a `docker0`/`virbr0` address the VM cannot reach |
+| `-var 'vm_id=80025'` | the VMID is already taken on the node |
 
 `vm_id` must be free on the node, and the ISO is downloaded to
 `iso_storage_pool` on the first run.

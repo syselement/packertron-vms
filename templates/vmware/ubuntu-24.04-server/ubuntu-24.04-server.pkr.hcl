@@ -5,7 +5,7 @@
 // Packer : https://www.packer.io/
 
 packer {
-  required_version = ">= 1.7.0"
+  required_version = ">= 1.12.0"
   required_plugins {
     vmware = {
       version = ">= 1.0.0"
@@ -101,7 +101,7 @@ source "vmware-iso" "ubuntuserver24_04" {
     " autoinstall ds=nocloud\\;s=http://{{ .HTTPIP }}:{{ .HTTPPort }}/ ---",
     "<f10><wait>"
   ]
-  boot_wait    = "10s"
+  boot_wait = "10s"
 
   // Communicator configuration
   communicator = "ssh"

@@ -27,10 +27,11 @@ proxmox_api_url = "https://proxmox.example.lan:8006/api2/json"
 proxmox_node = "pve"
 
 # Storage. iso_storage_pool must accept content type "iso"; storage_pool must
-# accept "images". On a default single-node install these are local and
-# local-lvm.
+# accept "images", and also holds the 4MB EFI variable disk and the cloud-init
+# drive. On a stock single-node install these are local and local-lvm; check
+# Datacenter -> Storage for the real names.
 iso_storage_pool = "local"
-storage_pool     = "local-lvm"
+storage_pool     = "vmstore"
 
 # The bridge the build VM gets its NIC on. It needs DHCP and outbound access,
 # because the installer fetches packages.

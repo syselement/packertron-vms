@@ -21,7 +21,7 @@
 //   packer build -var-file=../proxmox.pkrvars.hcl .
 
 packer {
-  required_version = ">= 1.7.0"
+  required_version = ">= 1.12.0"
   required_plugins {
     proxmox = {
       version = ">= 1.2.1"
@@ -109,6 +109,20 @@ variable "boot_wait" {
   default     = "10s"
 }
 
+// Which local address Packer serves the autoinstall seed from. Empty lets
+// Packer choose, which is right on a machine with one route to the node.
+//
+// It guesses badly on a workstation carrying docker0, virbr0 and VPN
+// interfaces: it can land on 172.17.0.1, the installer cannot reach it, and
+// the build stalls at the installer with no error - Packer is serving happily,
+// on an address the VM has never heard of. Set it to the address on the same
+// network as the node: -var 'http_bind_address=192.168.5.101'.
+variable "http_bind_address" {
+  type        = string
+  description = "Local address to serve http/ from; empty means let Packer choose"
+  default     = ""
+}
+
 variable "template_name" {
   type        = string
   description = "Name of the resulting template"
@@ -124,9 +138,15 @@ variable "ssh_username" {
   default     = "syselement"
 }
 
+// NOT used to log in. http/user-data sets `allow-pw: false`, so subiquity
+// writes PasswordAuthentication no and sshd rejects passwords outright - a
+// build that tried one would sit out the whole ssh_timeout and then fail with
+// nothing useful in the log. This value is only piped into `sudo -S` by the
+// provisioners below, and even there the seed's NOPASSWD sudoers means sudo
+// never reads it.
 variable "ssh_password" {
   type        = string
-  description = "A plaintext password to authenticate with SSH"
+  description = "Password fed to sudo -S by the provisioners; not used for SSH login"
   sensitive   = true
   default     = "packer"
 }
@@ -212,7 +232,8 @@ source "proxmox-iso" "ubuntu-24-04-server" {
   cloud_init_storage_pool = var.storage_pool
 
   // Autoinstall seed, served by Packer's own HTTP server
-  http_directory = "${path.root}/http"
+  http_directory    = "${path.root}/http"
+  http_bind_address = var.http_bind_address
   boot_command = [
     "<esc><wait>",
     "e<wait>",
@@ -220,12 +241,23 @@ source "proxmox-iso" "ubuntu-24-04-server" {
     " autoinstall ds=nocloud\\;s=http://{{ .HTTPIP }}:{{ .HTTPPort }}/ ---",
     "<f10><wait>"
   ]
-  boot_wait      = var.boot_wait
+  boot_wait = var.boot_wait
 
   // Communicator
-  ssh_username = var.ssh_username
-  ssh_password = var.ssh_password
-  ssh_timeout  = "30m"
+  // Authentication goes through the SSH agent, not a password and not a key
+  // file. The seed authorises one ed25519 public key and disables password
+  // auth, and Packer's communicator has no way to unlock a passphrase
+  // protected key - ssh_private_key_file fails validation outright on one.
+  // The agent already holds the unlocked key, so it is the only option that
+  // needs no passphrase-less copy of a personal key lying on disk.
+  //
+  // Before building: `ssh-add -l` must list the key whose public half is in
+  // http/user-data. For an unattended runner, generate a dedicated
+  // passphrase-less build key, authorise it in the seed, and swap this for
+  // ssh_private_key_file instead.
+  ssh_username   = var.ssh_username
+  ssh_agent_auth = true
+  ssh_timeout    = "30m"
 }
 
 build {
