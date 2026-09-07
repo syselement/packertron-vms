@@ -1,7 +1,14 @@
 #!/usr/bin/env bash
-# Shared Ubuntu platform and execution-context detection.
 # Context variables are intentionally assigned for scripts that source this file.
 # shellcheck disable=SC2034
+
+# Shared Ubuntu platform and execution-context detection: flavour, target user,
+# and whether the run is under Packer, Vagrant or bare metal.
+#
+# Docs:
+#   README.md  the detection rules and the test matrix
+#
+# Run: sourced, not executed.
 
 ubuntu_context_error() {
     printf 'ERROR: %s\n' "$*" >&2

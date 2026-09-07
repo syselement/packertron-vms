@@ -1,15 +1,18 @@
 #!/usr/bin/env bash
 
-# Shared download helpers for 02-provision-system.sh and
-# 03-customize-system.sh.
-#
+# Shared download helpers for 02-provision-system.sh and 03-customize-system.sh.
 # Depends on a warn() helper from the sourcing script.
 #
-# Behavior is the union of the two implementations these replaced: curl's own
-# --retry, plus an outer attempt loop that reports each failure, plus stall
-# detection so a connection that goes quiet is abandoned rather than hanging
-# until --max-time. Output stays silent so progress meters do not end up in
-# the log files.
+# curl's own --retry, plus an outer attempt loop that reports each failure,
+# plus stall detection so a connection that goes quiet is abandoned rather than
+# hanging until --max-time. Output stays silent so progress meters do not end
+# up in the log files.
+#
+# Docs:
+#   curl       https://curl.se/docs/manpage.html
+#   README.md  the provisioning chain
+#
+# Run: sourced, not executed.
 
 fetch_file() {
     local url="$1"

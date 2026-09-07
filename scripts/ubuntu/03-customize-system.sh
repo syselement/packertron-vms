@@ -1,18 +1,15 @@
 #!/usr/bin/env bash
 #
-# Customize Ubuntu Desktop or Server
+# Customize Ubuntu Desktop or Server: third-party tooling, GNOME preferences
+# and shell configuration. Runs as root; logs to
+# /var/log/customize-system-<run_id>.log with ANSI escapes stripped.
 #
-# Manual run without reboot from a fresh clone (one line):
-# git clone https://github.com/syselement/packertron-vms.git && cd packertron-vms/scripts/ubuntu && sudo env REBOOT_AT_END=false ./03-customize-system.sh
+# Docs:
+#   README.md  the tool matrix, idempotency notes and the test matrix
 #
-# Manual rerun without reboot from the repository root:
-# cd scripts/ubuntu && sudo env REBOOT_AT_END=false ./03-customize-system.sh
-#
-# Notes:
-# - Run as root.
-# - Console output is colorized when interactive.
-# - Log output is written to /var/log/customize-system-<run_id>.log without ANSI escapes.
-# - GNOME preferences are written immediately for USER_NAME through GSettings.
+# Run:
+#   sudo env REBOOT_AT_END=false ./03-customize-system.sh
+#   git clone https://github.com/syselement/packertron-vms.git && cd packertron-vms/scripts/ubuntu && sudo env REBOOT_AT_END=false ./03-customize-system.sh
 #
 
 set -euo pipefail

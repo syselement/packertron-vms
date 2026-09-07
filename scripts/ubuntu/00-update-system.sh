@@ -1,6 +1,13 @@
 #!/usr/bin/env bash
 #
-# Update an Ubuntu VM template and install the appropriate guest agent.
+# Update an Ubuntu VM template and install the guest agent for the detected
+# hypervisor.
+#
+# Docs:
+#   README.md  the provisioning chain and where this fits
+#
+# Run:
+#   sudo ./00-update-system.sh
 #
 
 set -euo pipefail

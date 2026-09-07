@@ -1,7 +1,12 @@
 #!/usr/bin/env bash
 
-# Persistent rollback support for project-managed APT source and key files.
+# Persistent rollback for project-managed APT source and key files.
 # The caller must set APT_TRANSACTION_DIR to an absolute, script-specific path.
+#
+# Docs:
+#   README.md  the provisioning chain
+#
+# Run: sourced, not executed.
 
 apt_transaction_validate_directory() {
     [[ "${APT_TRANSACTION_DIR:-}" == /* ]] || {

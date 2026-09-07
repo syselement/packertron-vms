@@ -1,3 +1,13 @@
+# First-boot check: confirm sysprep completed, then remove the startup shortcut
+# so this runs once and never again.
+# Staged into the image by the win-srv-2025 Packer build.
+#
+# Docs:
+#   Sysprep state  https://learn.microsoft.com/en-us/windows-hardware/manufacture/desktop/sysprep-process-overview
+#   PowerShell     https://learn.microsoft.com/en-us/powershell/
+#
+# Run: launched by 04_startup.cmd from the Startup folder on first boot.
+
 # Define the registry path
 # Run only when sysprep has completed successfully
 $regPath = "HKLM:\SYSTEM\Setup\Status\SysprepStatus"

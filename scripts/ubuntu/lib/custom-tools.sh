@@ -2,6 +2,11 @@
 
 # Third-party and custom tool installers for 03-customize-system.sh.
 #
+# Docs:
+#   README.md  the tool matrix and how to add a tool
+#
+# Run: sourced, not executed.
+#
 # This file holds every per-tool installer, grouped by how the tool is
 # distributed. To add a tool, find the matching section below and follow the
 # template comment at the top of it:

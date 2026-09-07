@@ -1,16 +1,16 @@
-// Ubuntu Server 24.04 LTS template for VMware Workstation, built from ISO.
-// Author : Yoann LAMY <https://github.com/ynlamy/packer-ubuntuserver24_04>
-// Licence : GPLv3
-//
-// Docs:
-//   vmware-iso builder  https://developer.hashicorp.com/packer/integrations/hashicorp/vmware/latest/components/builder/iso
-//   Autoinstall         https://canonical-subiquity.readthedocs-hosted.com/en/latest/reference/autoinstall-reference.html
-//   README.md           build steps and the credential note
-//
-// Run:
-//   packer init .
-//   packer validate .
-//   packer build .
+# Ubuntu Server 24.04 LTS template for VMware Workstation, built from ISO.
+# Author : Yoann LAMY <https://github.com/ynlamy/packer-ubuntuserver24_04>
+# Licence : GPLv3
+#
+# Docs:
+#   vmware-iso builder  https://developer.hashicorp.com/packer/integrations/hashicorp/vmware/latest/components/builder/iso
+#   Autoinstall         https://canonical-subiquity.readthedocs-hosted.com/en/latest/reference/autoinstall-reference.html
+#   README.md           build steps and the credential note
+#
+# Run:
+#   packer init .
+#   packer validate .
+#   packer build .
 
 packer {
   required_version = ">= 1.12.0"
@@ -31,9 +31,9 @@ variable "iso" {
 variable "checksum" {
   type        = string
   description = "The checksum for the ISO file"
-  // The codename directory carries SHA256SUMS for whichever point release is
-  // current, so this keeps matching when iso is bumped. A literal sha256 does
-  // not, and packer validate never downloads, so CI cannot catch the drift.
+  # The codename directory carries SHA256SUMS for whichever point release is
+  # current, so this keeps matching when iso is bumped. A literal sha256 does
+  # not, and packer validate never downloads, so CI cannot catch the drift.
   default = "file:https://releases.ubuntu.com/noble/SHA256SUMS"
 }
 
@@ -49,8 +49,8 @@ variable "name" {
   default     = "vm-ubuntuserver24_04"
 }
 
-// Must match the identity block in http/user-data; a mismatch makes every
-// build wait out the 30m SSH timeout.
+# Must match the identity block in http/user-data; a mismatch makes every
+# build wait out the 30m SSH timeout.
 variable "username" {
   type        = string
   description = "The username to connect to SSH"
@@ -72,8 +72,8 @@ source "vmware-iso" "ubuntuserver24_04" {
   vmdk_name     = var.name
   version       = "21"
   guest_os_type = "ubuntu-64"
-  // Set the CPU count here rather than through vmx_data: Packer generates
-  // numvcpus itself, and overriding it there fights the builder.
+  # Set the CPU count here rather than through vmx_data: Packer generates
+  # numvcpus itself, and overriding it there fights the builder.
   cpus                 = 2
   memory               = 2048
   disk_size            = 30720
@@ -113,8 +113,8 @@ source "vmware-iso" "ubuntuserver24_04" {
 build {
   sources = ["source.vmware-iso.ubuntuserver24_04"]
 
-  // 00 has no library dependencies, so the shell provisioner can upload it on
-  // its own.
+  # 00 has no library dependencies, so the shell provisioner can upload it on
+  # its own.
   provisioner "shell" {
     execute_command = "chmod +x {{ .Path }}; echo '${var.password}' | sudo -S env {{ .Vars }} {{ .Path }}"
     scripts = [
@@ -122,8 +122,8 @@ build {
     ]
   }
 
-  // 02 sources scripts/ubuntu/lib/*.sh, which a "scripts" list cannot carry -
-  // it uploads each file alone, with no lib/ beside it. Stage the whole tree.
+  # 02 sources scripts/ubuntu/lib/*.sh, which a "scripts" list cannot carry -
+  # it uploads each file alone, with no lib/ beside it. Stage the whole tree.
   provisioner "shell" {
     inline = [
       "mkdir -p /var/tmp/packertron-ubuntu"
@@ -146,9 +146,9 @@ build {
     ]
   }
 
-  // 01 must run last: it truncates the machine-id and clears /tmp and
-  // /var/tmp, so anything after it puts per-machine state back into the image.
-  // That sweep is also what removes the staged tree above.
+  # 01 must run last: it truncates the machine-id and clears /tmp and
+  # /var/tmp, so anything after it puts per-machine state back into the image.
+  # That sweep is also what removes the staged tree above.
   provisioner "shell" {
     execute_command = "chmod +x {{ .Path }}; echo '${var.password}' | sudo -S env {{ .Vars }} {{ .Path }}"
     scripts = [

@@ -1,9 +1,14 @@
 #!/usr/bin/env bash
 #
-# First-boot orchestration for physical Ubuntu workstations.
+# First-boot orchestration for physical Ubuntu workstations. Runs 02 then 03,
+# and deliberately never runs 01 - that would seal a machine someone uses.
 #
-# Manual run this script as root on a freshly installed Ubuntu system:
-# git clone https://github.com/syselement/packertron-vms.git && cd packertron-vms/scripts/ubuntu && sudo env TARGET_USER="$USER" ./90-bootstrap-baremetal.sh
+# Docs:
+#   README.md  the bare-metal path and its logs
+#
+# Run:
+#   sudo env TARGET_USER="$USER" ./90-bootstrap-baremetal.sh
+#   git clone https://github.com/syselement/packertron-vms.git && cd packertron-vms/scripts/ubuntu && sudo env TARGET_USER="$USER" ./90-bootstrap-baremetal.sh
 #
 
 set -Eeuo pipefail

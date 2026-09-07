@@ -1,16 +1,18 @@
 #cloud-config
 #
-# Do not alter first line of this file.
-# https://cloudinit.readthedocs.io/en/latest/
-# https://github.com/canonical/cloud-init/tree/main/doc/examples
+# Autoinstall seed for an unattended Ubuntu install with NO provisioning - the
+# intentional negative control for the two seeds beside it. Do not alter the first line.
 #
-# For autoinstall specific documentation see:
-# https://canonical-subiquity.readthedocs-hosted.com/en/latest/reference/autoinstall-reference.html
+# Docs:
+#   Autoinstall  https://canonical-subiquity.readthedocs-hosted.com/en/latest/reference/autoinstall-reference.html
+#   cloud-init   https://cloudinit.readthedocs.io/en/latest/
+#   README.md    which seed to use, and the first-boot runner
 #
-# This file is used by cloud-init to perform an unattended installation of Ubuntu 26.04 Desktop.
+# Run:
+#   sudo cloud-init schema --config-file autoinstall-noscripts.yaml --annotate
 #
-# Customize username, password, timezone, keyboard layout, ssh authorized keys and other settings as needed.
-#
+# Keep this to ONE document: cloud-init reads the first and silently ignores
+# anything appended after it.
 
 autoinstall:
   # version is an Autoinstall required field.

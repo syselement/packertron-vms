@@ -1,16 +1,16 @@
-// Kali Linux template for Proxmox.
-// Adapted from https://github.com/mttaggart/seclab (Packer/kali/config.pkr.hcl).
-//
-// STATUS: stub. Validates, but does not build - http/kali.preseed does not
-// exist, so the boot_command below has nothing to fetch.
-//
-// Docs:
-//   proxmox-iso builder  https://developer.hashicorp.com/packer/integrations/hashicorp/proxmox/latest/components/builder/iso
-//   README.md            status and credentials
-//
-// Run:
-//   packer init .
-//   packer validate -var-file=../proxmox.pkrvars.hcl .
+# Kali Linux template for Proxmox.
+# Adapted from https://github.com/mttaggart/seclab (Packer/kali/config.pkr.hcl).
+#
+# STATUS: stub. Validates, but does not build - http/kali.preseed does not
+# exist, so the boot_command below has nothing to fetch.
+#
+# Docs:
+#   proxmox-iso builder  https://developer.hashicorp.com/packer/integrations/hashicorp/proxmox/latest/components/builder/iso
+#   README.md            status and credentials
+#
+# Run:
+#   packer init .
+#   packer validate -var-file=../proxmox.pkrvars.hcl .
 
 packer {
   required_plugins {
@@ -135,7 +135,7 @@ source "proxmox-iso" "seclab-kali" {
   ]
 }
 
-// Deliberately no provisioners: this template stays script-free.
+# Deliberately no provisioners: this template stays script-free.
 build {
   sources = ["source.proxmox-iso.seclab-kali"]
 }

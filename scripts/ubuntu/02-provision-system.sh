@@ -1,9 +1,13 @@
 #!/usr/bin/env bash
 #
-# Install baseline + developer tools on Ubuntu Desktop or Server
+# Install the baseline and developer tooling on Ubuntu Desktop or Server.
+#
+# Docs:
+#   README.md  package sets, idempotency, and the test matrix
 #
 # Run:
-# git clone https://github.com/syselement/packertron-vms.git && cd packertron-vms/scripts/ubuntu && sudo ./02-provision-system.sh
+#   sudo ./02-provision-system.sh
+#   git clone https://github.com/syselement/packertron-vms.git && cd packertron-vms/scripts/ubuntu && sudo ./02-provision-system.sh
 #
 
 set -euo pipefail

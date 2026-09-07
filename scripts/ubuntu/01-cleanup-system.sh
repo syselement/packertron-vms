@@ -3,11 +3,16 @@
 # Seal an Ubuntu VM template: strip caches, logs and per-machine identity so
 # clones start clean.
 #
-# This is a template-build step. It is destructive on a running system: it
-# truncates the machine-id and deletes every file under /tmp and /var/tmp.
-# 90-bootstrap-baremetal.sh deliberately never calls it. Set
-# PACKERTRON_ALLOW_CLEANUP=true to run it somewhere the guard does not
-# recognise as a template build.
+# DESTRUCTIVE on a running system: it truncates the machine-id and deletes
+# every file under /tmp and /var/tmp. 90-bootstrap-baremetal.sh deliberately
+# never calls it. Set PACKERTRON_ALLOW_CLEANUP=true to run it somewhere the
+# guard does not recognise as a template build.
+#
+# Docs:
+#   README.md  the provisioning chain and where this fits
+#
+# Run:
+#   sudo ./01-cleanup-system.sh
 #
 
 set -Eeuo pipefail

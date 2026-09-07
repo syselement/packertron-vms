@@ -4,17 +4,18 @@
 
 # Shared logging for 02-provision-system.sh and 03-customize-system.sh.
 #
-# One format for both scripts:
-#
 #   [2026-09-05 15:27:02] [provision-system] INFO  install baseline packages
 #   [2026-09-05 15:27:02] [provision-system] OK    Docker service enabled
 #
-# The sourcing script sets SCRIPT_NAME, LOG_PREFIX and LOG_FILE before calling
-# anything here.
+# The sourcing script sets SCRIPT_NAME, LOG_PREFIX and LOG_FILE first.
 #
-# 00-update-system.sh and 01-cleanup-system.sh deliberately do not use this:
-# Packer's shell provisioner uploads those two on their own, with no lib/
-# directory beside them, and neither writes its own log file.
+# 00 and 01 deliberately do not use this: Packer uploads those two alone, with
+# no lib/ beside them, and neither writes its own log file.
+#
+# Docs:
+#   README.md  log locations and the carriage-return filter
+#
+# Run: sourced, not executed.
 
 t_bold=""
 t_dim=""

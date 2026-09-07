@@ -2,15 +2,15 @@
 
 # Shared APT invocation.
 #
-# Used by the scripts that are staged as a complete directory:
-# 02-provision-system.sh and 03-customize-system.sh (Vagrant copies
-# scripts/ubuntu wholesale, and the autoinstall first-boot runner checks the
-# repository out).
+# Used by the scripts staged as a complete directory: 02-provision-system.sh
+# and 03-customize-system.sh. 00-update-system.sh deliberately keeps its own
+# copy - Packer uploads that script alone, with no lib/ beside it, so it has to
+# stay self-contained. tests/update-system.bats asserts the two stay in step.
 #
-# 00-update-system.sh deliberately keeps its own copy of this wrapper rather
-# than sourcing this file: Packer's shell provisioner uploads that script on
-# its own, with no lib/ directory beside it, so it has to stay self-contained.
-# tests/update-system.bats asserts the two stay in step.
+# Docs:
+#   README.md  the provisioning chain
+#
+# Run: sourced, not executed.
 
 # The Dpkg::Options are not redundant with DEBIAN_FRONTEND: that governs
 # debconf, while dpkg's own "Configuration file '...' - what would you like to

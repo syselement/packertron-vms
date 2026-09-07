@@ -1,9 +1,13 @@
-# Install Windows Updates using PSWindowsUpdate module and a scheduled task.
-# Adapted from various sources listed below.
+# Install Windows Updates via the PSWindowsUpdate module, driven by a scheduled
+# task so the run survives the reboots it triggers.
+# Run by the win-srv-2025 Packer build as a provisioner, twice.
 #
-# Source: https://github.com/hashicorp/best-practices/blob/master/packer/scripts/windows/install_windows_updates.ps1 - deprecated repo
-# Source: https://github.com/eaksel/packer-Win2022/blob/main/scripts/win-update.ps1
+# Docs:
+#   PSWindowsUpdate  https://www.powershellgallery.com/packages/PSWindowsUpdate
+#   Source           https://github.com/eaksel/packer-Win2022/blob/main/scripts/win-update.ps1
+#                    https://github.com/hashicorp/best-practices/blob/master/packer/scripts/windows/install_windows_updates.ps1 (deprecated)
 #
+# Run: Packer invokes this; it is not meant to be run by hand.
 
 # Silence progress bars in PowerShell, which can sometimes feed back strange XML data to the Packer output.
 $ProgressPreference = "SilentlyContinue"

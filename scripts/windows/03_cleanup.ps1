@@ -1,4 +1,11 @@
-# Source: https://github.com/eaksel/packer-Win2022/blob/main/scripts/cleanup.ps1
+# Stop Windows Update, clear its download cache and defragment, to shrink the
+# image before sysprep.
+# Run by the win-srv-2025 Packer build as the last provisioner.
+#
+# Docs:
+#   Source  https://github.com/eaksel/packer-Win2022/blob/main/scripts/cleanup.ps1
+#
+# Run: Packer invokes this; it is not meant to be run by hand.
 
 # Clear the terminal screen
 Clear-Host
