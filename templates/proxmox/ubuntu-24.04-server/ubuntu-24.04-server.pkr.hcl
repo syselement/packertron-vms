@@ -139,12 +139,23 @@ source "proxmox-iso" "ubuntu-24-04-server" {
   token                    = var.proxmox_api_token_secret
   insecure_skip_tls_verify = var.insecure_skip_tls_verify
 
+  # Two ways to get the ISO onto the node; keep exactly one of them live.
+  #
+  # iso_download_pve has the node fetch it directly, which needs outbound
+  # internet there but skips pulling 3 GiB down to the workstation and pushing
+  # it straight back up. PVE still verifies iso_checksum.
+  #
+  # iso_target_path is the fallback for a node with no internet: Packer
+  # downloads and uploads it, and naming the local file keeps the name it is
+  # stored under readable.
   boot_iso {
     type             = "scsi"
     iso_url          = var.iso
     iso_checksum     = var.checksum
     iso_storage_pool = var.iso_storage_pool
-    unmount          = true
+    iso_download_pve = true
+    # iso_target_path  = "${path.root}/packer_cache/${basename(var.iso)}"
+    unmount = true
   }
 
   vm_id           = var.vm_id
@@ -162,7 +173,7 @@ source "proxmox-iso" "ubuntu-24-04-server" {
   bios    = "ovmf"
 
   template_name        = var.template_name
-  template_description = "Ubuntu Server 24.04 LTS, built by Packer. q35/OVMF. Thin: 02 and 03 run at first boot."
+  template_description = "Ubuntu Server 24.04 LTS, built by Packer on ${timestamp()}. q35/OVMF. Thin: 02 and 03 run at first boot."
 
   # OVMF will not start without a variable store. pre_enrolled_keys false: with
   # Microsoft's Secure Boot keys enrolled, anything unsigned fails to boot once cloned.
