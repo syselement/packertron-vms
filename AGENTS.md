@@ -12,6 +12,10 @@ Standards for this repository: Packer templates under `templates/`, the guest pr
   `.github/workflows/template-checks.yml`. Run `scripts/check-templates.sh`
   before committing, which runs those same checks locally, plus the CI-matrix
   and shell-lint checks CI cannot express itself.
+- `scripts/install-requirements.sh` reports the host tooling those checks need,
+  and installs it when asked. It reports by default and changes nothing, so it
+  is safe to run during an audit. `scripts/install-requirements.ps1` is the
+  Windows equivalent for the VMware path.
 - Keep the guest-provisioning scripts hypervisor-agnostic. VMware, Proxmox and bare metal all run the same `00`/`01`/`02`/`03`, and that is what makes the Proxmox work cheap.
 - Preserve compatibility with the existing `packertron-vms` workflows.
 - Prefer small, reviewable changes over complete rewrites.

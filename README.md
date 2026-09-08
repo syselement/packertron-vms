@@ -57,12 +57,33 @@
 
 ## 🛠 Requirements
 
-Ensure you have the following installed before proceeding:
+Check what is missing, and install it, with the scripts in `scripts/`. Both
+report by default and change nothing until you ask them to install:
+
+```bash
+# Linux (apt): the Proxmox path, and every check CI runs
+scripts/install-requirements.sh                    # report
+scripts/install-requirements.sh install            # install
+scripts/install-requirements.sh install --with-vmware
+```
+
+```powershell
+# Windows (winget, or Chocolatey as a fallback): the VMware path
+powershell -ExecutionPolicy Bypass -File scripts\install-requirements.ps1
+powershell -ExecutionPolicy Bypass -File scripts\install-requirements.ps1 -Install
+```
+
+The repository's own checks are Bash and need `cloud-init`, which has no
+Windows build - so on Windows run them under WSL with the Linux script. VMware
+Workstation and the Vagrant VMware plugin stay manual: the download needs a
+Broadcom account, and the plugin has to be installed as the user who runs
+Vagrant.
 
 ### System Requirements
 
 - **Windows 10/11** or **Linux**
-- **VMware Workstation Pro** (or Proxmox in future support)
+- **VMware Workstation Pro** for the VMware templates, or a **Proxmox VE** node
+  for the Proxmox ones
 
 ### Software Dependencies
 
@@ -185,7 +206,8 @@ packertron-vms/
 ├── scripts/             provisioners, shared by every template
 │   ├── ubuntu/              Bash chain, lib/, autoinstall seeds, bats tests
 │   ├── windows/             PowerShell and batch provisioners
-│   └── check-templates.sh   run the CI checks locally
+│   ├── check-templates.sh   run the CI checks locally
+│   └── install-requirements.{sh,ps1}   host tooling, Linux and Windows
 ├── .github/workflows/   CI
 ├── AGENTS.md            repository standards: file headers, Bash, safety, review
 ├── SECURITY.md          credential model - read before pointing this at a network
