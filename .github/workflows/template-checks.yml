@@ -1,9 +1,12 @@
 name: Template checks
 
-# Validates the Packer HCL and the cloud-init seeds, lints the shell outside scripts/ubuntu/, and scans the tree for committed secrets.
+# Validates the Packer HCL and the cloud-init seeds, lints the shell outside
+# scripts/ubuntu/, and scans the tree for committed secrets.
 
 on:
-  # - No paths filter on pull_request, deliberately: a path-filtered workflow never reports a status on a PR that matches nothing, so a ruleset requiring it would wait forever.
+  # - No paths filter on pull_request, deliberately: a path-filtered workflow
+  #   never reports a status on a PR that matches nothing, so a ruleset
+  #   requiring it would wait forever.
   # - Filtering stays on push, which gates nothing.
   pull_request:
   push:
@@ -31,9 +34,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # Each entry is the template's path under templates/. The checker job below fails if this list and the directories on disk disagree.
+        # Each entry is the template's path under templates/. The checker job
+        # below fails if this list and the directories on disk disagree.
         #
-        # proxmox/win-11 is deliberately absent: it depends on a KeePass database that is not in this repository, so it cannot validate.
+        # proxmox/win-11 is deliberately absent: it depends on a KeePass
+        # database that is not in this repository, so it cannot validate.
         template:
           - proxmox/kali
           - proxmox/ubuntu-24.04-server
@@ -100,7 +105,8 @@ jobs:
           for file in scripts/ubuntu/autoinstall-*.yaml templates/*/*/http/user-data; do
             [ -f "$file" ] || continue
 
-            # cloud-init reads the first document and silently ignores the rest, so a second one is dead text that looks live.
+            # cloud-init reads the first document and silently ignores the
+            # rest, so a second one is dead text that looks live.
             documents=$(grep -c '^#cloud-config' "$file" || true)
             if [ "$documents" -gt 1 ]; then
               printf '%s: %s #cloud-config documents; only the first is read\n' \
@@ -157,10 +163,12 @@ jobs:
 
   template-checks:
     # Mark THIS job as the required status check, not the jobs above: packer is
-    # a matrix and emits one context per template, so requiring those breaks the
-    # ruleset whenever a template is added or renamed.
+    # a matrix and emits one context per template, so requiring those breaks
+    # the ruleset whenever a template is added or renamed.
     #
-    # if: always() matters - without it this job is skipped when anything it needs fails, and a skipped required check blocks the PR with no failure to look at.
+    # if: always() matters - without it this job is skipped when anything it
+    # needs fails, and a skipped required check blocks the PR with no failure
+    # to look at.
     name: Template checks complete
     if: always()
     needs:
@@ -179,7 +187,8 @@ jobs:
           status=0
           for result in $RESULTS; do
             case "$result" in
-              # skipped counts as a pass so a future "if:" on a job above does not wedge the gate.
+              # skipped counts as a pass so a future "if:" on a job above does
+              # not wedge the gate.
               success | skipped) ;;
               *)
                 printf 'a required job reported: %s\n' "$result" >&2

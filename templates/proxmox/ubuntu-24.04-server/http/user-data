@@ -1,7 +1,7 @@
 #cloud-config
 #
-# Autoinstall seed for ubuntu-24.04-server.pkr.hcl, served over HTTP by the proxmox-iso build in this directory.
-# Do not alter the first line.
+# Autoinstall seed for ubuntu-24.04-server.pkr.hcl, served over HTTP by the
+# proxmox-iso build in this directory. Do not alter the first line.
 #
 # Docs:
 #   Autoinstall  https://canonical-subiquity.readthedocs-hosted.com/en/latest/reference/autoinstall-reference.html
@@ -11,7 +11,8 @@
 #   cloud-init schema --config-file user-data --annotate
 #   ../../../../scripts/check-templates.sh seeds
 #
-# Keep this to ONE document: cloud-init reads the first and silently ignores anything appended after it.
+# Keep this to ONE document: cloud-init reads the first and silently ignores
+# anything appended after it.
 
 autoinstall:
   version: 1
@@ -42,30 +43,38 @@ autoinstall:
       - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPA3hxPOnJAjCFoZMz8mcT+fZTy5j0vjLWPGVM2vaA88
     allow-pw: false
 
-  # Also installed by 00-update-system.sh; listed here so the template stays usable if that step is skipped.
+  # Also installed by 00-update-system.sh; listed here so the template stays
+  # usable if that step is skipped.
   packages:
     - qemu-guest-agent
 
   late-commands:
     # Must not be fatal: the unit is static on 24.04, and `systemctl enable` on
-    # a static unit exits non-zero on systemd >= 249, which would fail the whole
-    # install. 00-update-system.sh does the real enablement afterwards.
+    # a static unit exits non-zero on systemd >= 249, which would fail the
+    # whole install. 00-update-system.sh does the real enablement afterwards.
     - curtin in-target -- systemctl enable qemu-guest-agent.service || true
-    # Only covers the window before Packer connects; systemd regenerates it on the next boot and 01-cleanup-system.sh is the pass that sticks.
+    # Only covers the window before Packer connects; systemd regenerates it on
+    # the next boot and 01-cleanup-system.sh is the pass that sticks.
     - curtin in-target -- truncate -s 0 /etc/machine-id /var/lib/dbus/machine-id
     - echo 'syselement ALL=(ALL) NOPASSWD:ALL' > /target/etc/sudoers.d/99-syselement
     - chmod 0440 /target/etc/sudoers.d/99-syselement
     # An unparseable drop-in breaks sudo for every user; fail the install here.
     - curtin in-target -- visudo -c -f /etc/sudoers.d/99-syselement
-    # Subiquity pins cloud-init to the installer's own seed and disables its networking. Left in place, a clone ignores its cloud-init drive entirely.
+    # Subiquity pins cloud-init to the installer's own seed and disables its
+    # networking. Left in place, a clone ignores its cloud-init drive entirely.
     #
-    # - Globbed, not named exactly: the networking drop-in ships as 00-subiquity-disable-cloudinit-networking.cfg, and `rm -f` on a name that matches nothing still exits 0.
+    # - Globbed, not named exactly: the networking drop-in ships as
+    #   00-subiquity-disable-cloudinit-networking.cfg, and `rm -f` on a name
+    #   that matches nothing still exits 0.
     # - seal-for-clone.sh re-checks and fails the build if either survives.
     - rm -f /target/etc/cloud/cloud.cfg.d/*99-installer.cfg
     - rm -f /target/etc/cloud/cloud.cfg.d/*subiquity-disable-cloudinit-networking.cfg
-    # - Without manage_etc_hosts, cloud-init renames a clone but leaves /etc/hosts naming the template, and every sudo prints "unable to resolve host" - Ubuntu
+    # - Without manage_etc_hosts, cloud-init renames a clone but leaves
+    #   /etc/hosts naming the template, and every sudo prints "unable to
+    #   resolve host" - Ubuntu
     #   leaves it unset and has no `myhostname` in nsswitch to cover for it.
-    # - `localhost` fixes only the 127.0.1.1 line; `true` would rewrite the whole file on every boot.
+    # - `localhost` fixes only the 127.0.1.1 line; `true` would rewrite the
+    #   whole file on every boot.
     - |
       printf 'datasource_list: [ NoCloud, ConfigDrive ]\nmanage_etc_hosts: localhost\n' \
         > /target/etc/cloud/cloud.cfg.d/99-pve.cfg

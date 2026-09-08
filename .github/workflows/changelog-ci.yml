@@ -29,12 +29,16 @@ jobs:
   generate-changelog:
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    # This job commits the bump and pushes the tag, so it keeps its checkout credentials and must stay the only one with write access.
+    # This job commits the bump and pushes the tag, so it keeps its checkout
+    # credentials and must stay the only one with write access.
     permissions:
       contents: write
     steps:
-      # - RELEASE_TOKEN, not GITHUB_TOKEN: rulesets enforce required checks on direct pushes too, and the release commit is made on the runner so it has no check runs.
-      # - github-actions[bot] is not an admin and cannot bypass; RELEASE_TOKEN is the owner's PAT, which the bypass list allows.
+      # - RELEASE_TOKEN, not GITHUB_TOKEN: rulesets enforce required checks on
+      #   direct pushes too, and the release commit is made on the runner so it
+      #   has no check runs.
+      # - github-actions[bot] is not an admin and cannot bypass; RELEASE_TOKEN
+      #   is the owner's PAT, which the bypass list allows.
       # - The fallback keeps forks working - they fail at push, not at checkout.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:

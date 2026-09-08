@@ -63,8 +63,7 @@ STRAWBERRY_FILES_URL="${STRAWBERRY_FILES_URL:-https://files.strawberrymusicplaye
 #      validate_repository_source, then return "$APT_SOURCES_CHANGED_STATUS"
 #      when sources changed.
 #   2. Call it from main() as: apply_repository_setup ensure_<tool>_repository
-#   3. Add the package name to COMMON_PACKAGES or DESKTOP_PACKAGES in
-#      03-customize-system.sh.
+#   3. Add the package name to COMMON_PACKAGES or DESKTOP_PACKAGES in 03-customize-system.sh.
 # That status is the "APT sources changed" signal apply_repository_setup
 # translates into APT_SOURCES_CHANGED=true.
 
@@ -850,8 +849,7 @@ install_strawberry() (
 #           "<owner>/<repo>" "<asset-suffix>" "<dpkg-package-name>" "<Display Name>"
 #   }
 # The asset suffix selects the release asset (e.g. "_amd64.deb"); map it per
-# architecture with a case on "$ARCH" when the project ships several (see
-# install_rustdesk).
+# architecture with a case on "$ARCH" when the project ships several (see install_rustdesk).
 
 install_latest_github_debian_package() (
     set -Eeuo pipefail
@@ -1211,12 +1209,12 @@ install_zed() (
 # -----------------------------------------------------------------------------
 # Type 7: archive extracted to /opt
 # -----------------------------------------------------------------------------
-# For tarball/zip releases with no package. Follow install_yubico_authenticator:
-# download the archive, validate it (validate_tar_gzip_archive or
-# validate_zip_archive reject path traversal), extract into a versioned
-# directory under /opt, symlink the entry point into "$LOCAL_BIN_DIR", and
-# install any .desktop entry and icon. Keep the install directory in a
-# *_INSTALL_DIR variable at the top of this file.
+# For tarball/zip releases with no package. Follow
+# install_yubico_authenticator: download the archive, validate it
+# (validate_tar_gzip_archive or validate_zip_archive reject path traversal),
+# extract into a versioned directory under /opt, symlink the entry point into
+# "$LOCAL_BIN_DIR", and install any .desktop entry and icon. Keep the install
+# directory in a *_INSTALL_DIR variable at the top of this file.
 
 # Resolve the versioned filename the "latest" URL redirects to, without
 # transferring the archive body. Prints nothing and fails when the redirect
@@ -1820,9 +1818,9 @@ install_kubectl() (
 
     # Stage beside the target and rename, like write_file_if_changed and
     # install_target_config_file do. "install" unlinks the destination and
-    # writes a fresh file, so an interrupt mid-write leaves either no kubectl at
-    # all or a truncated but still executable one. A rename is atomic: the path
-    # always holds a complete binary.
+    # writes a fresh file, so an interrupt mid-write leaves either no kubectl
+    # at all or a truncated but still executable one. A rename is atomic: the
+    # path always holds a complete binary.
     staged_binary="$(mktemp "${kubectl_bin}.tmp.XXXXXX")"
     if ! install -m 0755 "$temporary_dir/kubectl" "$staged_binary"; then
         rm -f -- "$staged_binary"

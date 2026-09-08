@@ -36,9 +36,9 @@ variable "vm_disk_size" {
   default     = "61440"
 }
 
-# Windows Server 2025 ISO details
-# Use Get-FileHash to generate the ISO checksum
-# Example: Get-FileHash .\26100.1742.240906-0331.ge_release_svc_refresh_SERVER_EVAL_x64FRE_en-us.iso
+# Windows Server 2025 ISO details Use Get-FileHash to generate the ISO checksum
+# Example: Get-FileHash
+# .\26100.1742.240906-0331.ge_release_svc_refresh_SERVER_EVAL_x64FRE_en-us.iso
 variable "iso_checksum" {
   type        = string
   description = "The checksum for the ISO file"
@@ -95,8 +95,11 @@ source "vmware-iso" "winsrv2025" {
   iso_checksum  = var.iso_checksum
   iso_url       = var.iso_url
   memory        = var.vm_memory
-  # - Required since packer-plugin-vmware v2.1.6; builds fail validation without it.
-  # - e1000e rather than the vmxnet3 used by the Ubuntu templates: vmxnet3 needs drivers that VMware Tools supplies, which Windows setup does not have yet, so an unattended install would come up with no network adapter.
+  # - Required since packer-plugin-vmware v2.1.6; builds fail validation
+  #   without it.
+  # - e1000e rather than the vmxnet3 used by the Ubuntu templates: vmxnet3
+  #   needs drivers that VMware Tools supplies, which Windows setup does not
+  #   have yet, so an unattended install would come up with no network adapter.
   network_adapter_type = "e1000e"
   shutdown_command     = "A:/packer_shutdown.bat"
   shutdown_timeout     = "30m"
@@ -125,13 +128,15 @@ build {
     scripts      = ["${path.root}/../../../scripts/windows/01_vmware_tools.ps1"]
   }
 
-  # Copy unattend.xml to the VM for the final sysprep shutdown step in the packer_shutdown.bat script
+  # Copy unattend.xml to the VM for the final sysprep shutdown step in the
+  # packer_shutdown.bat script
   provisioner "file" {
     source      = "config/unattend.xml"
     destination = "C:/Windows/Panther/unattend.xml"
   }
 
-  # Startup scripts used in the unattend.xml to run during first boot after complete deployment/sysprep
+  # Startup scripts used in the unattend.xml to run during first boot after
+  # complete deployment/sysprep
   provisioner "powershell" {
     inline = ["New-Item -Path 'c:/' -Name 'tmp' -ItemType 'directory'"]
   }

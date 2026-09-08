@@ -1,4 +1,5 @@
-# Ubuntu Server 24.04 LTS template for Proxmox VE: ISO + autoinstall, sealed for cloning.
+# Ubuntu Server 24.04 LTS template for Proxmox VE: ISO + autoinstall, sealed
+# for cloning.
 #
 # Docs:
 #   proxmox-iso builder  https://developer.hashicorp.com/packer/integrations/hashicorp/proxmox/latest/components/builder/iso
@@ -91,7 +92,8 @@ variable "vm_id" {
   default     = 80024
 }
 
-# Raise this first if the installer never starts: OVMF posts more slowly than SeaBIOS, and the keystrokes then land in the firmware splash, not GRUB.
+# Raise this first if the installer never starts: OVMF posts more slowly than
+# SeaBIOS, and the keystrokes then land in the firmware splash, not GRUB.
 variable "boot_wait" {
   type        = string
   description = "Delay before the boot command is typed"
@@ -99,7 +101,9 @@ variable "boot_wait" {
 }
 
 # - Empty lets Packer choose.
-# - Pin it on a host with docker0/virbr0/VPN interfaces: Packer can serve the seed on an address the VM cannot reach, and the build then stalls at the installer with nothing reported wrong.
+# - Pin it on a host with docker0/virbr0/VPN interfaces: Packer can serve the
+#   seed on an address the VM cannot reach, and the build then stalls at the
+#   installer with nothing reported wrong.
 variable "http_bind_address" {
   type        = string
   description = "Local address to serve http/ from; empty means let Packer choose"
@@ -119,7 +123,8 @@ variable "ssh_username" {
   default     = "syselement"
 }
 
-# Not used to log in: the seed sets `allow-pw: false`. Only piped into `sudo -S`, which the seed's NOPASSWD sudoers means sudo never reads.
+# Not used to log in: the seed sets `allow-pw: false`. Only piped into `sudo
+# -S`, which the seed's NOPASSWD sudoers means sudo never reads.
 variable "ssh_password" {
   type        = string
   description = "Password fed to sudo -S by the provisioners; not used for SSH login"
@@ -151,14 +156,16 @@ source "proxmox-iso" "ubuntu-24-04-server" {
   scsi_controller = "virtio-scsi-single"
   qemu_agent      = true
 
-  # q35 rather than the i440fx default. Proxmox still exposes ide2 on q35, so the cloud-init drive below is unaffected.
+  # q35 rather than the i440fx default. Proxmox still exposes ide2 on q35, so
+  # the cloud-init drive below is unaffected.
   machine = "q35"
   bios    = "ovmf"
 
   template_name        = var.template_name
   template_description = "Ubuntu Server 24.04 LTS, built by Packer. q35/OVMF. Thin: 02 and 03 run at first boot."
 
-  # OVMF will not start without a variable store. pre_enrolled_keys false: with Microsoft's Secure Boot keys enrolled, anything unsigned fails to boot once cloned.
+  # OVMF will not start without a variable store. pre_enrolled_keys false: with
+  # Microsoft's Secure Boot keys enrolled, anything unsigned fails to boot once cloned.
   efi_config {
     efi_storage_pool  = var.storage_pool
     efi_type          = "4m"
@@ -180,7 +187,8 @@ source "proxmox-iso" "ubuntu-24-04-server" {
     firewall = false
   }
 
-  # The clone-time configuration channel: hostname, user, keys and network are set here per VM.
+  # The clone-time configuration channel: hostname, user, keys and network are
+  # set here per VM.
   cloud_init              = true
   cloud_init_storage_pool = var.storage_pool
 
@@ -195,7 +203,9 @@ source "proxmox-iso" "ubuntu-24-04-server" {
   ]
   boot_wait = var.boot_wait
 
-  # - The seed disables password auth and authorises one ed25519 key, and Packer cannot unlock a passphrase-protected key file - so authentication goes through the agent.
+  # - The seed disables password auth and authorises one ed25519 key, and
+  #   Packer cannot unlock a passphrase-protected key file - so authentication
+  #   goes through the agent.
   # - `ssh-add -l` must list that key before building.
   ssh_username   = var.ssh_username
   ssh_agent_auth = true
@@ -205,7 +215,9 @@ source "proxmox-iso" "ubuntu-24-04-server" {
 build {
   sources = ["source.proxmox-iso.ubuntu-24-04-server"]
 
-  # The `chmod +x` prefix is Packer's own default, which overriding execute_command drops; without it every script fails with "permission denied" before running a line.
+  # The `chmod +x` prefix is Packer's own default, which overriding
+  # execute_command drops; without it every script fails with "permission
+  # denied" before running a line.
   #
   # 00 installs the guest agent. No library dependencies, so it uploads alone.
   provisioner "shell" {
@@ -215,7 +227,8 @@ build {
     ]
   }
 
-  # 01 truncates the machine-id and clears cloud-init state, so a clone is treated as a fresh instance.
+  # 01 truncates the machine-id and clears cloud-init state, so a clone is
+  # treated as a fresh instance.
   provisioner "shell" {
     execute_command = "chmod +x {{ .Path }}; echo '${var.ssh_password}' | sudo -S env {{ .Vars }} {{ .Path }}"
     scripts = [

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
-# Shared download helpers for 02-provision-system.sh and 03-customize-system.sh.
-# Depends on a warn() helper from the sourcing script.
+# Shared download helpers for 02-provision-system.sh and
+# 03-customize-system.sh. Depends on a warn() helper from the sourcing script.
 #
 # curl's own --retry, plus an outer attempt loop that reports each failure,
 # plus stall detection so a connection that goes quiet is abandoned rather than

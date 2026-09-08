@@ -746,8 +746,8 @@ ListenStream=
 ListenStream=9443
 EOF
 
-    # write_file_if_changed keeps a converged run from rewriting the drop-in and
-    # bouncing Cockpit for no reason, and registers the file with the APT
+    # write_file_if_changed keeps a converged run from rewriting the drop-in
+    # and bouncing Cockpit for no reason, and registers the file with the APT
     # transaction so a later failure rolls it back.
     if write_file_if_changed "$temporary_file" "$override_file"; then
         override_changed=true
@@ -759,9 +759,9 @@ EOF
             was_active=true
         fi
 
-        # Reload before configure_system_socket, not after: that function starts
-        # a stopped socket, and without the drop-in already loaded it would come
-        # up on the stock port 9090 until the restart below moved it.
+        # Reload before configure_system_socket, not after: that function
+        # starts a stopped socket, and without the drop-in already loaded it
+        # would come up on the stock port 9090 until the restart below moved it.
         if [[ "$override_changed" == true ]]; then
             systemctl daemon-reload ||
                 die "failed reloading systemd after configuring Cockpit port"
@@ -2396,8 +2396,7 @@ dotfiles_hook = r'''# >>> future dotfiles hook (disabled) >>>
 #   git -C "$DOTFILES_DIR" pull --ff-only
 # else
 #   git clone "$DOTFILES_REPO_URL" "$DOTFILES_DIR"
-# fi
-# "$DOTFILES_DIR/install.sh"
+# fi "$DOTFILES_DIR/install.sh"
 # <<< future dotfiles hook (disabled) <<<'''
 
 def backup(path: Path) -> None:
@@ -2817,7 +2816,8 @@ install_homebrew_for_user() (
         chmod 0644 "$installer_file"
         bash -n "$installer_file" || die "downloaded Homebrew installer is not valid Bash"
 
-        # Pre-create the supported Linux prefix so the non-interactive installer does not require password-based sudo access.
+        # Pre-create the supported Linux prefix so the non-interactive
+        # installer does not require password-based sudo access.
         if [[ ! -d "$(dirname -- "$prefix")" ]]; then
             install -d -m 0755 -o "$TARGET_USER" -g "$TARGET_GROUP" "$(dirname -- "$prefix")"
         fi
@@ -3254,9 +3254,9 @@ main() {
 
     section "GNOME"
     if [[ "$UBUNTU_VARIANT" == "desktop" ]]; then
-        # Apply now, inside this provisioning run. When GNOME is already running,
-        # target its real per-user bus; during headless SSH/Vagrant provisioning,
-        # use the temporary-bus fallback from run_as_gnome_user().
+        # Apply now, inside this provisioning run. When GNOME is already
+        # running, target its real per-user bus; during headless SSH/Vagrant
+        # provisioning, use the temporary-bus fallback from run_as_gnome_user().
         install_dim_background_windows_extension "$USER_NAME"
         install_hide_universal_access_extension "$USER_NAME"
         install_smile_complementary_extension "$USER_NAME"

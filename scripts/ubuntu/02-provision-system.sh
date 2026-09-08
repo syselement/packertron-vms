@@ -381,8 +381,7 @@ configure_docker() {
 
     # Bring the daemon up before granting membership. The privilege grant is
     # persistent and the enable/start can die; doing it in this order never
-    # leaves an account in the docker group on a host where Docker never
-    # started.
+    # leaves an account in the docker group on a host where Docker never started.
     if [[ -d "$SYSTEMD_RUNTIME_DIR" ]]; then
         systemctl cat docker.service >/dev/null 2>&1 ||
             die "Docker systemd unit is unavailable after package installation"

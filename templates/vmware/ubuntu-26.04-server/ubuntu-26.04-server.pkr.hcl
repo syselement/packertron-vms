@@ -30,7 +30,8 @@ variable "iso" {
 variable "checksum" {
   type        = string
   description = "The checksum for the ISO file"
-  # The codename directory carries SHA256SUMS for whichever point release is current, so this keeps matching when iso is bumped.
+  # The codename directory carries SHA256SUMS for whichever point release is
+  # current, so this keeps matching when iso is bumped.
   default = "file:https://releases.ubuntu.com/resolute/SHA256SUMS"
 }
 
@@ -68,7 +69,8 @@ source "vmware-iso" "ubuntuserver26_04" {
   vmdk_name     = var.name
   version       = "21"
   guest_os_type = "ubuntu-64"
-  # Set the CPU count here rather than through vmx_data: Packer generates numvcpus itself, and overriding it there fights the builder.
+  # Set the CPU count here rather than through vmx_data: Packer generates
+  # numvcpus itself, and overriding it there fights the builder.
   cpus              = 2
   memory            = 2048
   disk_size         = 30720
@@ -109,7 +111,8 @@ source "vmware-iso" "ubuntuserver26_04" {
 build {
   sources = ["source.vmware-iso.ubuntuserver26_04"]
 
-  # 00 has no library dependencies, so the shell provisioner can upload it on its own.
+  # 00 has no library dependencies, so the shell provisioner can upload it on
+  # its own.
   provisioner "shell" {
     execute_command = "chmod +x {{ .Path }}; echo '${var.password}' | sudo -S env {{ .Vars }} {{ .Path }}"
     scripts = [
@@ -117,7 +120,8 @@ build {
     ]
   }
 
-  # 02 sources scripts/ubuntu/lib/*.sh, which a "scripts" list cannot carry - it uploads each file alone, with no lib/ beside it. Stage the whole tree.
+  # 02 sources scripts/ubuntu/lib/*.sh, which a "scripts" list cannot carry -
+  # it uploads each file alone, with no lib/ beside it. Stage the whole tree.
   provisioner "shell" {
     inline = [
       "mkdir -p /var/tmp/packertron-ubuntu"
@@ -140,7 +144,8 @@ build {
     ]
   }
 
-  # - 01 must run last: it truncates the machine-id and clears /tmp and /var/tmp, so anything after it puts per-machine state back into the image.
+  # - 01 must run last: it truncates the machine-id and clears /tmp and
+  #   /var/tmp, so anything after it puts per-machine state back into the image.
   # - That sweep is also what removes the staged tree above.
   provisioner "shell" {
     execute_command = "chmod +x {{ .Path }}; echo '${var.password}' | sudo -S env {{ .Vars }} {{ .Path }}"

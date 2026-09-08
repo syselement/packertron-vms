@@ -1,7 +1,9 @@
 name: Ubuntu static checks
 
 on:
-  # - No paths filter on pull_request, deliberately: a path-filtered workflow never reports a status on a PR that matches nothing, so a ruleset requiring it would wait forever.
+  # - No paths filter on pull_request, deliberately: a path-filtered workflow
+  #   never reports a status on a PR that matches nothing, so a ruleset
+  #   requiring it would wait forever.
   # - Filtering stays on push, which gates nothing.
   pull_request:
   push:
@@ -18,7 +20,8 @@ permissions:
 
 jobs:
   static-checks:
-    # This name is the status check context. Keep it stable: the branch ruleset refers to it by this exact string.
+    # This name is the status check context. Keep it stable: the branch ruleset
+    # refers to it by this exact string.
     name: Ubuntu static checks
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -29,7 +32,8 @@ jobs:
 
     steps:
       - name: Check out repository
-        # Pinned to a commit, not a tag: a tag can be moved. Dependabot keeps the pin current.
+        # Pinned to a commit, not a tag: a tag can be moved. Dependabot keeps
+        # the pin current.
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0

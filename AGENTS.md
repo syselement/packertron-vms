@@ -92,6 +92,7 @@ The two contexts want opposite things, so keep them apart.
 - Keep wrapping them, at roughly 79 columns. A comment shares the pane with the code it describes, and is read at whatever width that pane happens to be, so a long line is worse there than a wrapped one.
 - Wrap on the width, not mid-thought: fill the line before starting a new one.
 - Do not carry the Markdown rule into a comment, and do not carry this one into Markdown.
+- Never leave a single word alone on the last line. Pull it up onto the line before, even if that runs a few columns past 79 - one orphaned word reads worse than one slightly long line.
 
 ## Bash Standards
 

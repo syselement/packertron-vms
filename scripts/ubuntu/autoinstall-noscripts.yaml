@@ -47,7 +47,8 @@ autoinstall:
     username: syselement
     password: "$6$OxXY0.ndy/Q1c4mU$A6QNNCNXD24WVyJXm5gpHd5tq7tjLhJKAf1wAoG0yjsFdO0vFCs02JBtKRUqT0ivHXDdzFtKhs66jvL/x0rKM1" # password: packer
 
-  # Configure OpenSSH server - install (Internet access is required) and configure authorized keys
+  # Configure OpenSSH server - install (Internet access is required) and
+  # configure authorized keys
   ssh:
     install-server: true
     authorized-keys:
@@ -58,19 +59,21 @@ autoinstall:
   # packages:
   #   - open-vm-tools
 
-  # Update the APT package database and upgrade installed packages automatically on first boot
+  # Update the APT package database and upgrade installed packages
+  # automatically on first boot
   # package_update: true
   # package_upgrade: true
 
-  # Shell commands to run after the installation has completed successfully and any updates and packages installed, just before the system reboots
-  # The commands are run in the installer environment with the installed system mounted at /target
+  # Shell commands to run after the installation has completed successfully and
+  # any updates and packages installed, just before the system reboots The
+  # commands are run in the installer environment with the installed system
+  # mounted at /target
   late-commands:
     - curtin in-target -- truncate -s 0 /etc/machine-id /var/lib/dbus/machine-id
     - echo 'syselement ALL=(ALL) NOPASSWD:ALL' > /target/etc/sudoers.d/99-syselement
     - chmod 0440 /target/etc/sudoers.d/99-syselement
 
 
-# Validate this file with
-# `sudo cloud-init schema --config-file user-data --annotate`
-# or
-# `sudo cloud-init schema --config-file autoinstall-noscripts.yaml --annotate`
+# Validate this file with `sudo cloud-init schema --config-file user-data
+# --annotate` or `sudo cloud-init schema --config-file
+# autoinstall-noscripts.yaml --annotate`

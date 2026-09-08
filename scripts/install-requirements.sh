@@ -28,8 +28,8 @@ readonly KEYRING_DIR=/etc/apt/keyrings
 readonly HASHICORP_KEYRING="$KEYRING_DIR/hashicorp-archive-keyring.gpg"
 readonly HASHICORP_LIST=/etc/apt/sources.list.d/hashicorp.list
 
-# The HashiCorp APT repository publishes per-codename suites and lags new Ubuntu
-# releases. Override when your codename has no suite yet:
+# The HashiCorp APT repository publishes per-codename suites and lags new
+# Ubuntu releases. Override when your codename has no suite yet:
 #   PACKERTRON_HASHICORP_SUITE=noble scripts/install-requirements.sh install
 HASHICORP_SUITE="${PACKERTRON_HASHICORP_SUITE:-}"
 
@@ -160,8 +160,8 @@ apt_install() {
     sudo DEBIAN_FRONTEND=noninteractive apt-get install --yes --no-install-recommends "$@"
 }
 
-# Keyring under /etc/apt/keyrings with signed-by, never apt-key. Downloaded to a
-# temporary file and dearmored before it is trusted.
+# Keyring under /etc/apt/keyrings with signed-by, never apt-key. Downloaded to
+# a temporary file and dearmored before it is trusted.
 ensure_hashicorp_repository() {
     local tmp_key suite
 
