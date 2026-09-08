@@ -57,8 +57,7 @@
 
 ## 🛠 Requirements
 
-Check what is missing, and install it, with the scripts in `scripts/`. Both
-report by default and change nothing until you ask them to install:
+Check what is missing, and install it, with the scripts in `scripts/`. Both report by default and change nothing until you ask them to install:
 
 ```bash
 # Linux (apt): the Proxmox path, and every check CI runs
@@ -73,17 +72,12 @@ powershell -ExecutionPolicy Bypass -File scripts\install-requirements.ps1
 powershell -ExecutionPolicy Bypass -File scripts\install-requirements.ps1 -Install
 ```
 
-The repository's own checks are Bash and need `cloud-init`, which has no
-Windows build - so on Windows run them under WSL with the Linux script. VMware
-Workstation and the Vagrant VMware plugin stay manual: the download needs a
-Broadcom account, and the plugin has to be installed as the user who runs
-Vagrant.
+The repository's own checks are Bash and need `cloud-init`, which has no Windows build - so on Windows run them under WSL with the Linux script. VMware Workstation and the Vagrant VMware plugin stay manual: the download needs a Broadcom account, and the plugin has to be installed as the user who runs Vagrant.
 
 ### System Requirements
 
 - **Windows 10/11** or **Linux**
-- **VMware Workstation Pro** for the VMware templates, or a **Proxmox VE** node
-  for the Proxmox ones
+- **VMware Workstation Pro** for the VMware templates, or a **Proxmox VE** node for the Proxmox ones
 
 ### Software Dependencies
 

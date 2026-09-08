@@ -5,17 +5,9 @@ Standards for this repository: Packer templates under `templates/`, the guest pr
 ## Scope
 
 - Everything in the repository is in play, and everything clears the same bar.
-- `scripts/ubuntu/` is the mature part - 187 Bats tests, ShellCheck, shfmt -
-  and is checked by `.github/workflows/ubuntu-static-checks.yml`. Treat it as
-  known-good: do not refactor it as a side effect of another task.
-- Packer HCL and cloud-init seeds are checked by
-  `.github/workflows/template-checks.yml`. Run `scripts/check-templates.sh`
-  before committing, which runs those same checks locally, plus the CI-matrix
-  and shell-lint checks CI cannot express itself.
-- `scripts/install-requirements.sh` reports the host tooling those checks need,
-  and installs it when asked. It reports by default and changes nothing, so it
-  is safe to run during an audit. `scripts/install-requirements.ps1` is the
-  Windows equivalent for the VMware path.
+- `scripts/ubuntu/` is the mature part - 187 Bats tests, ShellCheck, shfmt - and is checked by `.github/workflows/ubuntu-static-checks.yml`. Treat it as known-good: do not refactor it as a side effect of another task.
+- Packer HCL and cloud-init seeds are checked by `.github/workflows/template-checks.yml`. Run `scripts/check-templates.sh` before committing, which runs those same checks locally, plus the CI-matrix and shell-lint checks CI cannot express itself.
+- `scripts/install-requirements.sh` reports the host tooling those checks need, and installs it when asked. It reports by default and changes nothing, so it is safe to run during an audit. `scripts/install-requirements.ps1` is the Windows equivalent for the VMware path.
 - Keep the guest-provisioning scripts hypervisor-agnostic. VMware, Proxmox and bare metal all run the same `00`/`01`/`02`/`03`, and that is what makes the Proxmox work cheap.
 - Preserve compatibility with the existing `packertron-vms` workflows.
 - Prefer small, reviewable changes over complete rewrites.
@@ -45,12 +37,10 @@ Do not introduce hidden dependencies between scripts. If one script depends on a
 
 ## File Headers
 
-Every file a person opens as an entry point - Bash scripts, library files,
-Packer templates, cloud-init seeds, Vagrantfiles, PowerShell and batch scripts -
-starts with the same three-part header:
+Every file a person opens as an entry point - Bash scripts, library files, Packer templates, cloud-init seeds, Vagrantfiles, PowerShell and batch scripts - starts with the same three-part header:
 
 ```text
-<Purpose: one or two lines saying what this file is responsible for>
+<Purpose: what this file is responsible for, one sentence per line>
 
 Docs:
   <tool or builder>  <upstream URL>
@@ -62,17 +52,10 @@ Run:
 
 Rules:
 
-- **Use `#`.** It is the default comment marker everywhere, including HCL -
-  `#` is idiomatic there and `//` is only the alternative. `.cmd` files use
-  `@rem` and `.bat` files use `::`, because those languages have nothing else.
+- **Use `#`.** It is the default comment marker everywhere, including HCL - `#` is idiomatic there and `//` is only the alternative. `.cmd` files use `@rem` and `.bat` files use `::`, because those languages have nothing else.
 - **`Purpose` describes this file only.** Not the phase it belongs to, not the plan for the next one, not how the repository is laid out.
-- **`Docs` points outward, then inward.** Upstream reference first, then
-  `README.md` with a few words on what the README adds. Keep attribution and
-  upstream source URLs here - they are load-bearing for adapted files.
-- **`Run` must be real.** Give the commands someone would actually type,
-  including any prerequisite that is expensive to discover (`ssh-add -l` before
-  a Proxmox build, for example). For a file that is invoked by tooling, say so
-  plainly rather than inventing a command:
+- **`Docs` points outward, then inward.** Upstream reference first, then `README.md` with a few words on what the README adds. Keep attribution and upstream source URLs here - they are load-bearing for adapted files.
+- **`Run` must be real.** Give the commands someone would actually type, including any prerequisite that is expensive to discover (`ssh-add -l` before a Proxmox build, for example). For a file that is invoked by tooling, say so plainly rather than inventing a command:
 
   ```text
   Run: Packer invokes this; it is not meant to be run by hand.
@@ -81,20 +64,34 @@ Rules:
   ```
 
 - **Add a `STATUS:` line** directly under `Purpose` when a file does not work yet, saying concretely why.
-- Two constraints override placement: `#cloud-config` must stay the first line
-  of a seed, and a file-wide `# shellcheck disable=` directive must stay before
-  the first command. Build the header around them.
+- Two constraints override placement: `#cloud-config` must stay the first line of a seed, and a file-wide `# shellcheck disable=` directive must stay before the first command. Build the header around them.
 
 ## Comments
 
 - Explain **why**, not what the code already says. Delete a comment that restates its line.
 - Keep: non-obvious behavior, ordering constraints, security implications, and the reason an implementation has to be the way it is.
-- Delete: section labels that restate structure (`# Variables`, `# Source
-  block`), scaffolding left by a generator, historical narration about what a
-  line used to be, plans for future work, and explanations of other components.
+- Delete: section labels that restate structure (`# Variables`, `# Source block`), scaffolding left by a generator, historical narration about what a line used to be, plans for future work, and explanations of other components.
 - Cross-file explanations belong in the relevant `README.md`, referenced once from the header, not repeated in each file that touches the subject.
 - Do not add a comment merely to replace one you removed.
 - Comment-only changes must not touch code. Verify by stripping comments from both revisions and diffing what is left.
+
+## Line Breaks
+
+The two contexts want opposite things, so keep them apart.
+
+### Markdown
+
+- **Never break a sentence across two lines.** A sentence stays on one line however long it runs; the editor soft-wraps it.
+- One paragraph, or one list item, is one line. Do not hard-wrap prose to a column limit.
+- A line break is structure, not formatting. Keep breaks only between list items, between table rows, inside code blocks, for long commands, and for aligned blocks such as the `Docs:` entries in a file header.
+- Never reflow anything inside a code block, a table, or a blockquote.
+- When you edit a sentence, rejoin it. Do not leave it split across lines because it was already split.
+
+### Comments in code
+
+- Keep wrapping them, at roughly 79 columns. A comment shares the pane with the code it describes, and is read at whatever width that pane happens to be, so a long line is worse there than a wrapped one.
+- Wrap on the width, not mid-thought: fill the line before starting a new one.
+- Do not carry the Markdown rule into a comment, and do not carry this one into Markdown.
 
 ## Bash Standards
 
