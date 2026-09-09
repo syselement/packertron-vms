@@ -1,3 +1,22 @@
+# [0.70.0](https://github.com/syselement/packertron-vms/compare/v0.69.0...v0.70.0) (2026-09-09)
+
+
+### Bug Fixes
+
+* **proxmox:** authenticate over the SSH agent, and make the two first-build knobs tunable ([1321201](https://github.com/syselement/packertron-vms/commit/132120128e47ae137d5a462ba56dd3d4ea9eb463))
+* **proxmox:** increase VM cores from 1 to 2 for improved performance ([28b4a3d](https://github.com/syselement/packertron-vms/commit/28b4a3d2b2f1d44d19594a53ddeff56a3fe8bd1e))
+* update Proxmox template VM ID and enhance cloud-init handling ([7f4871b](https://github.com/syselement/packertron-vms/commit/7f4871b36a377dc2b2c1f0c3592259c2e44385d3))
+
+
+### Features
+
+* enhance template checks, add Markdown verification, and update README and user-data for clarity ([78d2af8](https://github.com/syselement/packertron-vms/commit/78d2af80a6370669c6f4695e8329ff6bc07e29b3))
+* **packer:** add an Ubuntu Server 24.04 template for Proxmox ([38a556b](https://github.com/syselement/packertron-vms/commit/38a556bb567af5b0890be3b348b2ea18e1a48c85))
+* **proxmox:** enhance ISO handling and update template description for clarity ([bf29ea0](https://github.com/syselement/packertron-vms/commit/bf29ea0c5343f5344956870a1ed156b29eb13792))
+* **scripts:** add host requirement scripts for Linux and Windows ([e5a2106](https://github.com/syselement/packertron-vms/commit/e5a21060a118185e42f6d4ca476efae173d4a557))
+
+
+
 # [0.69.0](https://github.com/syselement/packertron-vms/compare/v0.68.1...v0.69.0) (2026-09-05)
 
 
@@ -45,21 +64,6 @@
 
 * **ubuntu:** increase reboot delay to 10 seconds after provisioning ([0c80538](https://github.com/syselement/packertron-vms/commit/0c805380c19d66a7d5b0885383d3bffd2c864c59))
 * **ubuntu:** retry a Homebrew formula install before failing the run ([5e7c550](https://github.com/syselement/packertron-vms/commit/5e7c550f916bec31eafd5a62b87508851c17814f))
-
-
-
-## [0.67.2](https://github.com/syselement/packertron-vms/compare/v0.67.1...v0.67.2) (2026-09-05)
-
-
-### Bug Fixes
-
-* **autoinstall:** let a pushed fix supersede a failing pinned revision ([affbdd2](https://github.com/syselement/packertron-vms/commit/affbdd23c168da8bde25ab2f1da264e751932171))
-* detect a pending reboot and repair the 24.04 Server Packer template ([0f2ca43](https://github.com/syselement/packertron-vms/commit/0f2ca437b35147ac3fc9843155e021f4686c032d))
-* **ubuntu:** keep VS Code on Desktop and tolerate absent Desktop packages ([d18a20a](https://github.com/syselement/packertron-vms/commit/d18a20aa364fbfe429eb9d5b74e35ef45e332fdd))
-* **ubuntu:** make service configuration converge and bound snap operations ([29c4ff7](https://github.com/syselement/packertron-vms/commit/29c4ff77839d6f421842e9afe2b6512b8cb6b5ae))
-* **ubuntu:** repair bare-metal bootstrap safety defects ([c07ef45](https://github.com/syselement/packertron-vms/commit/c07ef45526fd3d72f8faf6ee89a24d9094c2ae98))
-* **ubuntu:** stop dpkg conffile prompts and harden 01-cleanup-system ([f786cd5](https://github.com/syselement/packertron-vms/commit/f786cd5e9acd8b977d539284538c282edb7dc696))
-* **ubuntu:** stop dpkg progress meters filling the logs with blank lines ([14bf071](https://github.com/syselement/packertron-vms/commit/14bf071850b4202d7ee0f44cbedbaa8a056d1a3e))
 
 
 
