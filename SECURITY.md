@@ -53,7 +53,7 @@ Anything that identifies *a machine* rather than *an image* has to be removed be
 
 The Proxmox template's own build block does the rest, as a final step after `01`:
 
-- **SSH host keys** are deleted, and a one-shot unit regenerates them before `ssh.service` starts on the clone. Shipped in the image, they let any clone impersonate any other with no warning to a client that has connected before.
+- **SSH host keys** are deleted, and a one-shot unit regenerates them before `ssh.service` starts on the clone. Shipped in the image, they let any clone impersonate any other with no warning to a client that has connected before. Verified on two clones of the same template: their ed25519 fingerprints differ. In practice cloud-init's `cc_ssh` regenerates them first, so the unit's `ConditionPathExists` skips it; the unit still matters for a clone booted with no cloud-init drive, where nothing else would create host keys and `sshd` would fail to start.
 - **`/etc/netplan/00-installer-config*.yaml`**, which subiquity pins to the *build* VM's MAC address, is removed. A clone gets a new MAC, so the stanza matches nothing and configures nothing; leaving it behind only hides the fact that cloud-init's `50-cloud-init.yaml` is doing all the work.
 - **`/var/lib/systemd/random-seed`** is removed so clones do not start from a shared seed.
 

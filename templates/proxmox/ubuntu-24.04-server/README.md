@@ -2,9 +2,7 @@
 
 Builds an Ubuntu Server 24.04 LTS template on Proxmox VE from the official ISO, driven by the autoinstall seed in `http/`.
 
-> **Status: validates, not yet built.** `packer validate` passes in CI, but this
-> template has not been run against a real node. Expect to adjust
-> `proxmox_node`, `storage_pool` and `network_bridge` for your host.
+> **Status: built and verified on a real node** (Proxmox VE, q35/OVMF, 24.04.4, build time ~5 minutes). Two full clones were checked: SSH host keys, machine-id and the systemd random seed all differ between them; hostname, `/etc/hosts`, netplan and DHCP are correct on each; cloud-init reports `done` from `DataSourceNoCloud [seed=cmdline,/dev/sr0]`. Adjust `proxmox_node`, `storage_pool` and `network_bridge` for your host.
 
 ## Where the install media comes from
 
