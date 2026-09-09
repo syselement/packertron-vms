@@ -4,9 +4,7 @@ This repository builds lab VM templates. Read this before pointing anything it p
 
 ## The images ship a known password
 
-Every autoinstall seed - `scripts/ubuntu/autoinstall-*.yaml` and each
-`templates/*/*/http/user-data` - commits a SHA-512 crypt hash for the initial
-user, and the plaintext is documented in the file next to it.
+Every autoinstall seed - `scripts/ubuntu/autoinstall-*.yaml` and each `templates/*/*/http/user-data` - commits a SHA-512 crypt hash for the initial user, and the plaintext is documented in the file next to it.
 
 - This is not an accident and it cannot be avoided for an unattended install: subiquity needs the hash at install time, before the machine exists and before anything is available to fetch a secret from.
 - Treat that credential as public.
@@ -15,12 +13,8 @@ It follows that:
 
 - Every machine built from this repository starts with the **same** console password.
 - The same seeds grant that user `NOPASSWD: ALL` sudo, permanently.
-- SSH password authentication is disabled (`allow-pw: false`) and a fixed
-  ed25519 public key is authorized, so remote access depends on holding the
-  matching private key - but console and GDM login do not.
-- Because of that, the Proxmox build authenticates through the **SSH agent**
-  (`ssh_agent_auth`), not a password and not a key file. No passphrase-less
-  copy of a personal key has to exist on disk for a build to run.
+- SSH password authentication is disabled (`allow-pw: false`) and a fixed ed25519 public key is authorized, so remote access depends on holding the matching private key - but console and GDM login do not.
+- Because of that, the Proxmox build authenticates through the **SSH agent** (`ssh_agent_auth`), not a password and not a key file. No passphrase-less copy of a personal key has to exist on disk for a build to run.
 
 **Change the password on any machine that will be reachable by anyone else.**
 
@@ -55,26 +49,15 @@ A token in the environment cannot be committed by a mistake in a `.gitignore` ru
 
 Anything that identifies *a machine* rather than *an image* has to be removed before a template is cloned, or every clone shares it.
 
-`scripts/ubuntu/01-cleanup-system.sh` runs in every build and handles the two
-that matter everywhere: it truncates `/etc/machine-id` and clears
-`/var/lib/cloud`, so a clone is treated as a new instance and reads the
-cloud-init drive attached to it.
+`scripts/ubuntu/01-cleanup-system.sh` runs in every build and handles the two that matter everywhere: it truncates `/etc/machine-id` and clears `/var/lib/cloud`, so a clone is treated as a new instance and reads the cloud-init drive attached to it.
 
 The Proxmox template's own build block does the rest, as a final step after `01`:
 
-- **SSH host keys** are deleted, and a one-shot unit regenerates them before
-  `ssh.service` starts on the clone. Shipped in the image, they let any clone
-  impersonate any other with no warning to a client that has connected before.
-- **`/etc/netplan/00-installer-config*.yaml`**, which subiquity pins to the
-  *build* VM's MAC address, is removed. A clone gets a new MAC, so the stanza
-  matches nothing and configures nothing; leaving it behind only hides the fact
-  that cloud-init's `50-cloud-init.yaml` is doing all the work.
+- **SSH host keys** are deleted, and a one-shot unit regenerates them before `ssh.service` starts on the clone. Shipped in the image, they let any clone impersonate any other with no warning to a client that has connected before.
+- **`/etc/netplan/00-installer-config*.yaml`**, which subiquity pins to the *build* VM's MAC address, is removed. A clone gets a new MAC, so the stanza matches nothing and configures nothing; leaving it behind only hides the fact that cloud-init's `50-cloud-init.yaml` is doing all the work.
 - **`/var/lib/systemd/random-seed`** is removed so clones do not start from a shared seed.
 
-It also fails the build if subiquity's cloud-init pinning survived the install,
-or if `manage_etc_hosts` was not set, rather than shipping a template whose
-clones silently ignore their cloud-init drive or answer to a name that resolves
-nowhere.
+It also fails the build if subiquity's cloud-init pinning survived the install, or if `manage_etc_hosts` was not set, rather than shipping a template whose clones silently ignore their cloud-init drive or answer to a name that resolves nowhere.
 
 **This applies to the Proxmox template only.**
 
@@ -103,8 +86,7 @@ Required status checks match the *job* context, not the workflow name, so the tw
 
 `Template checks complete` is an aggregate job that depends on the others.
 
-- Require it rather than the individual jobs: `packer` is a matrix and emits one context per template, so requiring those directly breaks the ruleset whenever a
-  template is added or renamed, and a removed entry leaves a required check that can never report again.
+- Require it rather than the individual jobs: `packer` is a matrix and emits one context per template, so requiring those directly breaks the ruleset whenever a template is added or renamed, and a removed entry leaves a required check that can never report again.
 
 Do **not** require `Changelog CI`. It has no `pull_request` trigger, so it would never report and no PR could merge.
 

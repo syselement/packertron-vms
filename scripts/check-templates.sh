@@ -14,6 +14,7 @@
 #   scripts/check-templates.sh seeds      # cloud-init seeds only
 #   scripts/check-templates.sh matrix     # CI matrix vs the templates on disk
 #   scripts/check-templates.sh shell      # shellcheck/shfmt outside scripts/ubuntu/
+#   scripts/check-templates.sh docs       # Markdown sentences kept on one line
 #   scripts/check-templates.sh proxmox    # one hypervisor only
 
 set -Eeuo pipefail
@@ -206,6 +207,51 @@ check_shell() {
     done < <(repository_shell_scripts)
 }
 
+# AGENTS.md keeps Markdown unwrapped: one paragraph or list item per line,
+# however long. Wrapping it is easy to do by reflex and invisible in review, so
+# it is checked rather than trusted. Code blocks, tables, blockquotes, headings
+# and list boundaries are all real structure and left alone.
+check_docs() {
+    local relative found
+
+    note "Markdown sentences on one line"
+
+    found="$(
+        while read -r relative; do
+            [[ -n "$relative" ]] || continue
+            awk -v file="$relative" '
+                /^[[:space:]]*(```|~~~)/ { fence = !fence; next }
+                fence { next }
+                {
+                    line[NR] = $0
+                }
+                END {
+                    for (i = 1; i <= NR; i++) {
+                        cur = line[i]; nxt = line[i + 1]
+                        if (cur ~ /^[[:space:]]*$/ || nxt ~ /^[[:space:]]*$/) continue
+                        if (cur ~ /^[[:space:]]*(#|\||>)/ || nxt ~ /^[[:space:]]*(#|\||>|```|~~~)/) continue
+                        if (cur ~ /^[[:space:]]*[-=*_ ]{3,}$/ || nxt ~ /^[[:space:]]*[-=*_ ]{3,}$/) continue
+                        if (nxt ~ /^[[:space:]]*([-*+]|[0-9]+[.)]) /) continue
+                        if (cur ~ /  $/) continue
+                        printf "%s:%d\n", file, i
+                    }
+                }
+            ' "$REPO_ROOT/$relative"
+        done < <(cd "$REPO_ROOT" && git ls-files '*.md' | grep -v '^CHANGELOG.md$')
+    )"
+
+    if [[ -z "$found" ]]; then
+        pass "no sentence is split across two lines"
+        return
+    fi
+    # Process substitution, not a pipe: a piped loop runs in a subshell, so
+    # fail() would increment a copy of $failures and this would exit 0.
+    while read -r location; do
+        [[ -n "$location" ]] || continue
+        fail "$location: sentence continues on the next line; keep it on one"
+    done < <(printf '%s\n' "$found")
+}
+
 check_seeds() {
     local file documents
 
@@ -251,14 +297,16 @@ main() {
             check_templates
             check_seeds
             check_shell
+            check_docs
             check_matrix
             ;;
         packer) check_templates ;;
         seeds) check_seeds ;;
         matrix) check_matrix ;;
         shell) check_shell ;;
+        docs) check_docs ;;
         *)
-            printf 'usage: %s [<hypervisor>] [all|packer|seeds|shell|matrix]\n' "${BASH_SOURCE[0]##*/}" >&2
+            printf 'usage: %s [<hypervisor>] [all|packer|seeds|shell|docs|matrix]\n' "${BASH_SOURCE[0]##*/}" >&2
             printf 'hypervisors: %s\n' "$(cd "$REPO_ROOT/templates" && echo */)" >&2
             exit 2
             ;;

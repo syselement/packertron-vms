@@ -20,6 +20,7 @@ on:
       - "scripts/ubuntu/autoinstall-*.yaml"
       - "scripts/check-templates.sh"
       - "templates/**/*.sh"
+      - "**/*.md"
       - ".github/workflows/template-checks.yml"
   workflow_dispatch:
 
@@ -140,6 +141,9 @@ jobs:
 
       - name: Lint shell outside scripts/ubuntu/
         run: ./scripts/check-templates.sh shell
+
+      - name: Verify Markdown keeps each sentence on one line
+        run: ./scripts/check-templates.sh docs
 
       - name: Verify the CI matrix matches the templates on disk
         run: ./scripts/check-templates.sh matrix

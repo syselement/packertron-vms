@@ -68,6 +68,19 @@ variable "checksum" {
   default     = "file:https://releases.ubuntu.com/noble/SHA256SUMS"
 }
 
+# Setting this uses an ISO already on the node: nothing is downloaded or
+# uploaded, and it keeps whatever name you gave it. Leaving it empty downloads
+# var.iso instead.
+#
+# The download path stores the file under a SHA1 of the URL. That is the
+# plugin's own behaviour - it ignores iso_target_path - and the only other way
+# out, iso_download_pve, needs the API token's role to carry Sys.AccessNetwork.
+variable "iso_file" {
+  type        = string
+  description = "ISO already on the node, as storage:iso/name.iso; empty downloads var.iso"
+  default     = ""
+}
+
 variable "iso_storage_pool" {
   type        = string
   description = "Proxmox storage that holds ISO images"
@@ -117,6 +130,18 @@ variable "template_name" {
 }
 
 # Must match the identity block in http/user-data; a mismatch makes every build wait out the SSH timeout.
+# Normally empty: the builder asks the qemu guest agent for the VM's address.
+# That query goes through the Proxmox API and needs VM.GuestAgent.Audit on the
+# token's role - on PVE 8 it replaced the older VM.Monitor, which no longer
+# exists. Without it the lookup returns nothing and the build sits on "Waiting
+# for SSH" forever, with no connection attempt ever reaching the VM. Setting
+# this skips the lookup.
+variable "ssh_host" {
+  type        = string
+  description = "Address to reach the build VM on; empty asks the guest agent"
+  default     = ""
+}
+
 variable "ssh_username" {
   type        = string
   description = "The username to connect to SSH"
@@ -139,23 +164,15 @@ source "proxmox-iso" "ubuntu-24-04-server" {
   token                    = var.proxmox_api_token_secret
   insecure_skip_tls_verify = var.insecure_skip_tls_verify
 
-  # Two ways to get the ISO onto the node; keep exactly one of them live.
-  #
-  # iso_download_pve has the node fetch it directly, which needs outbound
-  # internet there but skips pulling 3 GiB down to the workstation and pushing
-  # it straight back up. PVE still verifies iso_checksum.
-  #
-  # iso_target_path is the fallback for a node with no internet: Packer
-  # downloads and uploads it, and naming the local file keeps the name it is
-  # stored under readable.
+  # Exactly one of iso_file and iso_url may be set, and an empty string counts
+  # as unset, so var.iso_file is the switch between them.
   boot_iso {
     type             = "scsi"
-    iso_url          = var.iso
+    iso_file         = var.iso_file
+    iso_url          = var.iso_file == "" ? var.iso : ""
     iso_checksum     = var.checksum
     iso_storage_pool = var.iso_storage_pool
-    iso_download_pve = true
-    # iso_target_path  = "${path.root}/packer_cache/${basename(var.iso)}"
-    unmount = true
+    unmount          = true
   }
 
   vm_id           = var.vm_id
@@ -218,6 +235,7 @@ source "proxmox-iso" "ubuntu-24-04-server" {
   #   Packer cannot unlock a passphrase-protected key file - so authentication
   #   goes through the agent.
   # - `ssh-add -l` must list that key before building.
+  ssh_host       = var.ssh_host
   ssh_username   = var.ssh_username
   ssh_agent_auth = true
   ssh_timeout    = "30m"

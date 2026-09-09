@@ -34,6 +34,9 @@
     - [📁 Directory Structure](#-directory-structure)
     - [🚀 Build \& Deploy VMs](#-build--deploy-vms)
         - [Build a Proxmox template](#build-a-proxmox-template)
+        - [Dedicated Role](#dedicated-role)
+            - [CLI](#cli)
+            - [UI](#ui)
         - [1️⃣ Open Visual Studio Code](#1️⃣-open-visual-studio-code)
         - [2️⃣ Packer: Initialize \& Build Windows Server 2025](#2️⃣-packer-initialize--build-windows-server-2025)
         - [3️⃣ Deploy VM with Vagrant](#3️⃣-deploy-vm-with-vagrant)
@@ -248,16 +251,11 @@ cp proxmox.pkrvars.hcl.example proxmox.pkrvars.hcl   # gitignored, never committ
 $EDITOR proxmox.pkrvars.hcl                          # node name, storage pools, bridge
 ```
 
-- On the Proxmox node, create an API token for a user that may create VMs - `Datacenter -> Permissions -> API Tokens`.
-- Give it `PVE.Admin` on `/`, or at minimum `VM.Allocate`, `VM.Config.*`, `VM.Monitor`, `VM.PowerMgmt`, `Datastore.Allocate` and `Datastore.AllocateSpace` on the storages involved.
-- Leave *Privilege Separation* unticked, or the token inherits nothing.
-
-Then, in the shell you build from - these never touch the filesystem:
+On the Proxmox node, create the token described in [Dedicated Role](#dedicated-role) below. Then, in the shell you build from - these never touch the filesystem:
 
 ```bash
-export PKR_VAR_proxmox_api_token_id="packer@pve!templates"
+export PKR_VAR_proxmox_api_token_id="automation@pve!deploy"
 export PKR_VAR_proxmox_api_token_secret="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-export PKR_VAR_ssh_password="the password in the autoinstall seed"
 ```
 
 Build:
@@ -276,6 +274,84 @@ Before pushing any template change:
 ```bash
 scripts/check-templates.sh proxmox
 ```
+
+### Dedicated Role
+
+Create a dedicated `automation@pve` user, give it a restricted role, and create a token with Privilege Separation unticked. Do not use a root token.
+
+- [Roles](https://pve.proxmox.com/pve-docs/chapter-pveum.html#pveum_roles)
+- [Privileges](https://pve.proxmox.com/pve-docs/chapter-pveum.html#_privileges)
+
+For the restricted role use these privileges for template builds:
+
+| Category | Privileges to select |
+| --- | --- |
+| Datastore | `Datastore.AllocateSpace`, `Datastore.AllocateTemplate`, `Datastore.Audit` |
+| VM | `SDN.Use`, `VM.Allocate`, `VM.Audit`, `VM.Clone`, `VM.Config.CDROM`, `VM.Config.CPU`, `VM.Config.Cloudinit`, `VM.Config.Disk`, `VM.Config.HWType`, `VM.Config.Memory`, `VM.Config.Network`, `VM.Config.Options`, `VM.Console`, `VM.PowerMgmt`, `VM.GuestAgent.Audit` |
+
+This is a practical starting role, not a guaranteed exact minimum. It covers the normal Packer ISO-build operations and the planned OpenTofu workflow of cloning a template, configuring its hardware and cloud-init, and starting or stopping it.
+
+`VM.GuestAgent.Audit` is the one that is easy to miss. Packer asks the guest agent for the VM's address, and without it the lookup returns nothing: the build sits on "Waiting for SSH" for the full timeout without a single connection ever reaching the VM. On PVE 8 it replaced the older `VM.Monitor`, which no longer exists.
+
+`iso_download_pve` would additionally need `Sys.AccessNetwork`, which is why the templates leave it off and let Packer do the download - see [templates/proxmox/ubuntu-24.04-server/README.md](templates/proxmox/ubuntu-24.04-server/README.md).
+
+The same role covers the intended workflow:
+
+```
+Packer
+  → create Ubuntu VM
+  → configure hardware
+  → attach ISO
+  → install and provision
+  → convert to template
+
+OpenTofu
+  → clone template
+  → configure CPU/RAM/disk/network
+  → configure cloud-init
+  → start/stop VM
+```
+
+If you later add snapshots, backups, migration, replication, PCI passthrough, or other advanced operations, you may need additional privileges. Do not add those now just because they exist.
+
+If a build returns `403`, find the missing privilege rather than switching the role to `Administrator`.
+
+#### CLI
+
+Run on the Proxmox node as root:
+
+```bash
+pveum user add automation@pve --comment "IAC deployment automation"
+# no password is ok
+
+pveum role add IACDeploy --privs "Datastore.AllocateSpace Datastore.AllocateTemplate Datastore.Audit SDN.Use VM.Allocate VM.Audit VM.Clone VM.Config.CDROM VM.Config.CPU VM.Config.Cloudinit VM.Config.Disk VM.Config.HWType VM.Config.Memory VM.Config.Network VM.Config.Options VM.Console VM.PowerMgmt VM.GuestAgent.Audit"
+
+pveum acl modify / -user automation@pve -role IACDeploy
+
+pveum user token add automation@pve deploy -privsep 0
+
+pveum user permissions automation@pve
+```
+
+Save the secret printed by `pveum user token add` - it is shown once and never again. The token ID is:
+
+```
+automation@pve!deploy
+```
+
+A password is only needed for interactive login, which this user does not do:
+
+```bash
+# pveum passwd automation@pve
+```
+
+#### UI
+
+1. `Datacenter → Permissions → Users → Add` - create `automation` in the `pve` realm.
+2. `Datacenter → Permissions → Roles → Create` - create `IACDeploy` with the privileges in the table above.
+3. `Datacenter → Permissions → Add → User Permission` - assign `IACDeploy` to `automation@pve` at `/` for a single-node setup.
+4. `Datacenter → Permissions → API Tokens → Add` - User `automation@pve`, Token ID `deploy`, **Privilege Separation unticked**. Ticked, the token inherits nothing and every call is denied.
+5. Copy the token secret immediately.
 
 ### 1️⃣ Open Visual Studio Code
 

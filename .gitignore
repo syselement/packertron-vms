@@ -2,6 +2,9 @@
 packer_cache/
 .vagrant/
 output/
+# packer-plugin-proxmox writes the ISO it downloads into a directory of this
+# name beside the template, whatever iso_target_path says.
+downloaded_iso_path/
 
 # Crash log
 crash.log
