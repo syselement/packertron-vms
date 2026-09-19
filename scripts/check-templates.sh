@@ -15,6 +15,8 @@
 #   scripts/check-templates.sh matrix     # CI matrix vs the templates on disk
 #   scripts/check-templates.sh shell      # shellcheck/shfmt outside scripts/ubuntu/
 #   scripts/check-templates.sh docs       # Markdown sentences kept on one line
+#   scripts/check-templates.sh firstboot  # embedded first-boot copies are current
+#   scripts/check-templates.sh tofu       # the deploy/ OpenTofu module
 #   scripts/check-templates.sh proxmox    # one hypervisor only
 
 set -Eeuo pipefail
@@ -252,6 +254,56 @@ check_docs() {
     done < <(printf '%s\n' "$found")
 }
 
+# The deploy/ module reads the first-boot files with file(), so a rename there
+# breaks it in a way nothing else here would catch.
+check_tofu() {
+    local module="$REPO_ROOT/deploy"
+
+    note "deploy/ OpenTofu module"
+
+    if [[ ! -d "$module" ]]; then
+        pass "no deploy/ module"
+        return
+    fi
+    if ! command -v tofu >/dev/null 2>&1; then
+        fail "tofu is not installed; see https://opentofu.org/docs/intro/install/"
+        return
+    fi
+
+    if tofu -chdir="$module" fmt -check -recursive >/dev/null; then
+        pass "tofu fmt"
+    else
+        fail "deploy/: tofu fmt (run: tofu -chdir=deploy fmt)"
+    fi
+
+    # -backend=false so this never touches remote state.
+    if tofu -chdir="$module" init -backend=false -input=false >/dev/null; then
+        pass "tofu init"
+    else
+        fail "deploy/: tofu init"
+        return
+    fi
+
+    if tofu -chdir="$module" validate >/dev/null; then
+        pass "tofu validate"
+    else
+        fail "deploy/: tofu validate"
+    fi
+}
+
+# cloud-init cannot include a file, so every seed carries its own copy of the
+# first-boot stub and unit. This is what stops an edit to
+# scripts/ubuntu/firstboot/ from reaching only the seeds someone remembered.
+check_firstboot() {
+    note "embedded first-boot copies"
+
+    if "$REPO_ROOT/scripts/sync-firstboot.sh" --check; then
+        pass "every seed embeds the current scripts/ubuntu/firstboot/ files"
+    else
+        fail "a seed is out of date; run scripts/sync-firstboot.sh"
+    fi
+}
+
 check_seeds() {
     local file documents
 
@@ -296,17 +348,21 @@ main() {
         all)
             check_templates
             check_seeds
+            check_firstboot
+            check_tofu
             check_shell
             check_docs
             check_matrix
             ;;
         packer) check_templates ;;
         seeds) check_seeds ;;
+        firstboot) check_firstboot ;;
+        tofu) check_tofu ;;
         matrix) check_matrix ;;
         shell) check_shell ;;
         docs) check_docs ;;
         *)
-            printf 'usage: %s [<hypervisor>] [all|packer|seeds|shell|docs|matrix]\n' "${BASH_SOURCE[0]##*/}" >&2
+            printf 'usage: %s [<hypervisor>] [all|packer|seeds|firstboot|tofu|shell|docs|matrix]\n' "${BASH_SOURCE[0]##*/}" >&2
             printf 'hypervisors: %s\n' "$(cd "$REPO_ROOT/templates" && echo */)" >&2
             exit 2
             ;;

@@ -90,7 +90,7 @@ source "proxmox-iso" "seclab-kali" {
 
   boot_iso {
     type         = "ide"
-    iso_file     = "${var.iso_storage_pool}:iso/kali.iso"
+    iso_file     = "${var.iso_storage_pool}:iso/kali-linux-2026.2-installer-amd64.iso"
     iso_checksum = "sha256:0b0f5560c21bcc1ee2b1fef2d8e21dca99cc6efa938a47108bbba63bec499779"
     unmount      = true
   }

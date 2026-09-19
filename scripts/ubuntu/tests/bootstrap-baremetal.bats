@@ -109,7 +109,67 @@ EOF
     [[ "$(<"$STATE_DIR/complete")" == "$TEST_REVISION" ]]
 }
 
-@test "autoinstall enables a retrying revision-bound service that removes itself on success" {
+@test "the default step list is what a workstation has always run" {
+    STEPS="02,03"
+
+    run selected_steps
+
+    [[ "$status" -eq 0 ]]
+    [[ "$output" == "02
+03" ]]
+}
+
+@test "a single step can be selected on its own" {
+    STEPS="02"
+
+    run selected_steps
+
+    [[ "$status" -eq 0 ]]
+    [[ "$output" == "02" ]]
+}
+
+@test "an empty step list selects nothing" {
+    STEPS=""
+
+    run selected_steps
+
+    [[ "$status" -eq 0 ]]
+    [[ -z "$output" ]]
+}
+
+@test "whitespace around a step name is tolerated" {
+    STEPS=" 02 , 03 "
+
+    run selected_steps
+
+    [[ "$status" -eq 0 ]]
+    [[ "$output" == "02
+03" ]]
+}
+
+@test "an unrecognised step is fatal, not skipped" {
+    # Provisioning less than was asked for is the failure that gets noticed
+    # last, so a typo in firstboot.conf must stop the run.
+    STEPS="02,99"
+
+    run selected_steps
+
+    [[ "$status" -ne 0 ]]
+    [[ "$output" == *"unknown provisioning step '99'"* ]]
+    [[ "$output" == *"available: 02 03"* ]]
+}
+
+@test "the sealing and template-only steps cannot be selected" {
+    local step
+
+    for step in 00 01; do
+        STEPS="$step"
+        run selected_steps
+        [[ "$status" -ne 0 ]]
+    done
+}
+
+@test "autoinstall enables a retrying service that removes itself on success" {
     local autoinstall_file
 
     for autoinstall_file in autoinstall-desktop.yaml autoinstall-server.yaml; do
@@ -122,15 +182,38 @@ EOF
         grep -Fq 'ExecStartPost=/usr/bin/systemctl disable packertron-firstboot.service' "$autoinstall_file"
         grep -Fq 'ExecStartPost=/usr/bin/rm -f /etc/systemd/system/packertron-firstboot.service' "$autoinstall_file"
         grep -Fq 'ExecStartPost=/usr/bin/systemctl daemon-reload' "$autoinstall_file"
-        # shellcheck disable=SC2016
-        grep -Fq 'PACKERTRON_BOOTSTRAP_REVISION="$REPO_COMMIT" \' "$autoinstall_file"
+        grep -Fq -- '- [systemctl, start, --no-block, packertron-firstboot.service]' "$autoinstall_file"
+
         # The target user must be passed explicitly: there is no SUDO_USER
         # under systemd, and discovery fails once a second account exists.
-        # shellcheck disable=SC2016
-        grep -Fq 'TARGET_USER="$INSTALL_USER" exec \' "$autoinstall_file"
-        # shellcheck disable=SC2016
-        grep -Fq 'git -C "$REPO_DIR" checkout --detach "$REPO_COMMIT"' "$autoinstall_file"
-        grep -Fq -- '- [systemctl, start, --no-block, packertron-firstboot.service]' "$autoinstall_file"
-        ! grep -Fq -- '- ["/usr/local/sbin/packertron-firstboot"]' "$autoinstall_file"
+        grep -Fq 'TARGET_USER=syselement' "$autoinstall_file"
+        grep -Fq 'STEPS=02,03' "$autoinstall_file"
     done
+}
+
+@test "the seeds embed the first-boot files rather than restating them" {
+    local autoinstall_file
+
+    for autoinstall_file in autoinstall-desktop.yaml autoinstall-server.yaml; do
+        autoinstall_file="$BATS_TEST_DIRNAME/../$autoinstall_file"
+
+        grep -Fq '>>> packertron-firstboot' "$autoinstall_file"
+        # The runner must come from the fetched ref, never the working tree: a
+        # retry only fetches, so a tree-relative path stays stale forever.
+        # shellcheck disable=SC2016
+        grep -Fq 'git -C "$PACKERTRON_REPO_DIR" show "origin/${PACKERTRON_REPO_BRANCH}:${RUNNER_PATH}"' "$autoinstall_file"
+
+        # The pinning and retry logic lives in firstboot/run.sh now. A copy
+        # back inside a seed is a copy no linter and no test can reach.
+        run grep -Fq 'MAX_PINNED_ATTEMPTS' "$autoinstall_file"
+        [[ "$status" -ne 0 ]]
+    done
+}
+
+@test "every embedded copy of the first-boot files is current" {
+    # The seeds carry generated copies; this is what catches an edit to
+    # scripts/ubuntu/firstboot/ that was never synced into them.
+    run "$BATS_TEST_DIRNAME/../../sync-firstboot.sh" --check
+
+    [[ "$status" -eq 0 ]]
 }
