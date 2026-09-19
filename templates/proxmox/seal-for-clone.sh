@@ -29,8 +29,6 @@ die() {
     exit 1
 }
 
-readonly UNIT_PATH=/etc/systemd/system/regenerate-ssh-host-keys.service
-
 # Overridable only so the check below can be run against a fixture.
 CLOUD_CFG_DIR="${CLOUD_CFG_DIR:-/etc/cloud/cloud.cfg.d}"
 readonly CLOUD_CFG_DIR
@@ -82,33 +80,15 @@ verify_cloud_init_unpinned() {
 
 # Host keys identify the machine, not the image: shipped in a template, every
 # clone answers with the same fingerprint and swapping one for another warns
-# nobody. Deleting them alone would leave sshd unable to start, so a one-shot
-# unit regenerates them first. ConditionPathExists makes it a no-op on later
-# boots, so it never has to disable itself.
-install_host_key_regeneration() {
-    log "install ${UNIT_PATH}"
-    cat >"$UNIT_PATH" <<'UNIT'
-[Unit]
-Description=Regenerate SSH host keys on the first boot of a clone
-Before=ssh.service ssh.socket
-ConditionPathExists=!/etc/ssh/ssh_host_ed25519_key
-
-[Service]
-Type=oneshot
-RemainAfterExit=yes
-ExecStart=/usr/bin/ssh-keygen -A
-
-[Install]
-WantedBy=multi-user.target
-UNIT
-    chmod 0644 "$UNIT_PATH"
-
-    # Fatal on purpose: an unenabled unit means a clone with no host keys and
-    # no sshd, which is far worse to debug than a failed build.
-    systemctl enable regenerate-ssh-host-keys.service ||
-        die "failed enabling regenerate-ssh-host-keys.service"
-}
-
+# nobody. cloud-init's cc_ssh regenerates them on the clone's first boot, before
+# sshd starts, which is verified: clones of one template answer with different
+# keys.
+#
+# There is deliberately no unit here to regenerate them as a fallback. One was
+# tried, ordered Before=ssh.socket; as an ordinary service it also ran after
+# basic.target, which is after sockets.target, which wants ssh.socket - a cycle
+# that systemd broke by dropping ssh.socket, so no clone had sshd at all. It
+# had also never run: cloud-init always got there first.
 remove_host_keys() {
     log "remove SSH host keys"
     rm -f /etc/ssh/ssh_host_* || die "failed removing SSH host keys"
@@ -126,7 +106,6 @@ main() {
 
     write_pve_cloud_init_config
     verify_cloud_init_unpinned
-    install_host_key_regeneration
     remove_host_keys
     remove_random_seed
     log "done"
