@@ -1,3 +1,12 @@
+# [0.71.0](https://github.com/syselement/packertron-vms/compare/v0.70.0...v0.71.0) (2026-09-19)
+
+
+### Features
+
+* update runner handling to fetch from repository ref instead of working tree ([19655af](https://github.com/syselement/packertron-vms/commit/19655af9210eb1c36705492732762a9deb21217a))
+
+
+
 # [0.70.0](https://github.com/syselement/packertron-vms/compare/v0.69.0...v0.70.0) (2026-09-09)
 
 
@@ -54,16 +63,6 @@
 ### Features
 
 * **packer:** add an Ubuntu Server 26.04 template ([975d403](https://github.com/syselement/packertron-vms/commit/975d403a06941ba10730104ab4f7df664eb151a0))
-
-
-
-## [0.67.3](https://github.com/syselement/packertron-vms/compare/v0.67.2...v0.67.3) (2026-09-05)
-
-
-### Bug Fixes
-
-* **ubuntu:** increase reboot delay to 10 seconds after provisioning ([0c80538](https://github.com/syselement/packertron-vms/commit/0c805380c19d66a7d5b0885383d3bffd2c864c59))
-* **ubuntu:** retry a Homebrew formula install before failing the run ([5e7c550](https://github.com/syselement/packertron-vms/commit/5e7c550f916bec31eafd5a62b87508851c17814f))
 
 
 
