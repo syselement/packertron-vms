@@ -179,9 +179,19 @@ autoinstall:
               git clone --branch "$PACKERTRON_REPO_BRANCH" "$PACKERTRON_REPO_URL" "$PACKERTRON_REPO_DIR"
           fi
 
-          # Run from a copy on tmpfs, never from the checkout: the runner moves the
+          # Read the runner from the fetched ref, not the working tree. A fetch does not
+          # move the checkout, so on a retry the tree still holds whatever the first
+          # clone got - and a runner that was missing then stays missing forever.
+          #
+          # It goes to tmpfs rather than being run in place: the runner moves the
           # checkout between revisions, and Bash re-reads a script file as it executes.
-          install -m 0700 "$PACKERTRON_REPO_DIR/$RUNNER_PATH" /run/packertron-firstboot-run
+          git -C "$PACKERTRON_REPO_DIR" show "origin/${PACKERTRON_REPO_BRANCH}:${RUNNER_PATH}" \
+              >/run/packertron-firstboot-run ||
+              {
+                  echo "ERROR: ${RUNNER_PATH} is not on origin/${PACKERTRON_REPO_BRANCH}" >&2
+                  exit 1
+              }
+          chmod 0700 /run/packertron-firstboot-run
           exec /run/packertron-firstboot-run
       - path: /etc/systemd/system/packertron-firstboot.service
         owner: root:root

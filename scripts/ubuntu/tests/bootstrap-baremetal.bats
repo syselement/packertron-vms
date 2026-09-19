@@ -198,7 +198,10 @@ EOF
         autoinstall_file="$BATS_TEST_DIRNAME/../$autoinstall_file"
 
         grep -Fq '>>> packertron-firstboot' "$autoinstall_file"
-        grep -Fq 'install -m 0700 "$PACKERTRON_REPO_DIR/$RUNNER_PATH"' "$autoinstall_file"
+        # The runner must come from the fetched ref, never the working tree: a
+        # retry only fetches, so a tree-relative path stays stale forever.
+        # shellcheck disable=SC2016
+        grep -Fq 'git -C "$PACKERTRON_REPO_DIR" show "origin/${PACKERTRON_REPO_BRANCH}:${RUNNER_PATH}"' "$autoinstall_file"
 
         # The pinning and retry logic lives in firstboot/run.sh now. A copy
         # back inside a seed is a copy no linter and no test can reach.
