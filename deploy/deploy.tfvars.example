@@ -1,0 +1,49 @@
+# Copy to deploy.tfvars, which is gitignored, and edit.
+#
+#   cp deploy.tfvars.example deploy.tfvars
+#   tofu apply -var-file=deploy.tfvars
+#
+# THE API TOKEN DOES NOT BELONG HERE. It comes from the environment:
+#
+#   export PROXMOX_VE_API_TOKEN='tofu@pve!deploy=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'
+#
+# See ../SECURITY.md.
+
+# Include the scheme and the port. Unlike the Packer variable, no /api2/json.
+proxmox_endpoint = "https://192.168.5.11:8006/"
+proxmox_node     = "pve02"
+
+# Leave false. Set it true only for a node presenting a self-signed
+# certificate that you have deliberately chosen to accept.
+proxmox_insecure = true
+
+datastore_id = "vmstore"
+
+# Public keys authorised on the clone, in addition to whatever the template
+# already carries.
+ssh_authorized_keys = [
+  "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPA3hxPOnJAjCFoZMz8mcT+fZTy5j0vjLWPGVM2vaA88",
+]
+
+# ---------------------------------------------------------------------------
+# A plain server, which is the common case: clone, boot, nothing else.
+# ---------------------------------------------------------------------------
+template_vm_id = 80026 # ubuntu-26.04-server-template
+vm_name        = "srv-01"
+cores          = 2
+memory         = 2048
+disk_size      = 32
+
+# ---------------------------------------------------------------------------
+# The workstation: a desktop clone that provisions itself into the same
+# machine as the bare-metal PC. Swap the block above for this one.
+#
+# Expect this to take a long time after apply returns - 02 and 03 install the
+# full toolchain - and to reboot itself once at the end.
+# ---------------------------------------------------------------------------
+# template_vm_id     = 80126 # ubuntu-26.04-desktop-template
+# vm_name            = "workstation-01"
+# cores              = 4
+# memory             = 8192
+# disk_size          = 64
+# provisioning_steps = "02,03"

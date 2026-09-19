@@ -43,10 +43,17 @@ proxmox.pkrvars.hcl
 *_ed25519
 
 # OpenTofu / Terraform state
+# .terraform.lock.hcl is deliberately NOT ignored: it pins each provider to a
+# set of checksums, which is the same supply-chain guarantee the SHA-pinned
+# GitHub Actions give the workflows. Ignoring it means every `tofu init`
+# silently resolves a different build.
 .terraform/
-.terraform.lock.hcl
 *.tfstate
 *.tfstate.*
+# Real values for a deployment; deploy.tfvars.example is the committed one.
+*.auto.tfvars
+crash.log
+crash.*.log
 
 # Packer logs
 packer.log

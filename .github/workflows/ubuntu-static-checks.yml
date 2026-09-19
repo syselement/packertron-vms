@@ -45,13 +45,13 @@ jobs:
           sudo apt-get install --yes --no-install-recommends bats shellcheck shfmt
 
       - name: Validate Bash syntax
-        run: bash -n ./*.sh ./lib/*.sh
+        run: bash -n ./*.sh ./lib/*.sh ./firstboot/*.sh
 
       - name: Run ShellCheck
-        run: shellcheck -x ./*.sh ./lib/*.sh
+        run: shellcheck -x ./*.sh ./lib/*.sh ./firstboot/*.sh
 
       - name: Check shell formatting
-        run: shfmt -d -i 4 -ci ./*.sh ./lib/*.sh
+        run: shfmt -d -i 4 -ci ./*.sh ./lib/*.sh ./firstboot/*.sh
 
       - name: Run project tests
         run: bats tests

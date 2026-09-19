@@ -1,4 +1,4 @@
-# Ubuntu Server 24.04 LTS template for Proxmox VE: ISO + autoinstall, sealed
+# Ubuntu Desktop 26.04 LTS template for Proxmox VE: ISO + autoinstall, sealed
 # for cloning.
 #
 # Docs:
@@ -59,13 +59,13 @@ variable "insecure_skip_tls_verify" {
 variable "iso" {
   type        = string
   description = "A URL to the ISO file; Packer downloads it to iso_storage_pool"
-  default     = "https://releases.ubuntu.com/noble/ubuntu-24.04.4-live-server-amd64.iso"
+  default     = "https://releases.ubuntu.com/resolute/ubuntu-26.04.1-desktop-amd64.iso"
 }
 
 variable "checksum" {
   type        = string
   description = "The checksum for the ISO file"
-  default     = "file:https://releases.ubuntu.com/noble/SHA256SUMS"
+  default     = "file:https://releases.ubuntu.com/resolute/SHA256SUMS"
 }
 
 # Setting this uses an ISO already on the node: nothing is downloaded or
@@ -102,7 +102,7 @@ variable "network_bridge" {
 variable "vm_id" {
   type        = number
   description = "VMID for the build. Proxmox requires it to be free on the node."
-  default     = 80024
+  default     = 80126
 }
 
 # Raise this first if the installer never starts: OVMF posts more slowly than
@@ -126,7 +126,7 @@ variable "http_bind_address" {
 variable "template_name" {
   type        = string
   description = "Name of the resulting template"
-  default     = "ubuntu-24.04-server-template"
+  default     = "ubuntu-26.04-desktop-template"
 }
 
 # Must match the identity block in http/user-data; a mismatch makes every build wait out the SSH timeout.
@@ -157,7 +157,7 @@ variable "ssh_password" {
   default     = "packer"
 }
 
-source "proxmox-iso" "ubuntu-24-04-server" {
+source "proxmox-iso" "ubuntu-26-04-desktop" {
   proxmox_url              = var.proxmox_api_url
   node                     = var.proxmox_node
   username                 = var.proxmox_api_token_id
@@ -177,8 +177,8 @@ source "proxmox-iso" "ubuntu-24-04-server" {
 
   vm_id           = var.vm_id
   vm_name         = var.template_name
-  cores           = 2
-  memory          = 2048
+  cores           = 4
+  memory          = 8192
   cpu_type        = "host"
   os              = "l26"
   scsi_controller = "virtio-scsi-single"
@@ -190,7 +190,7 @@ source "proxmox-iso" "ubuntu-24-04-server" {
   bios    = "ovmf"
 
   template_name        = var.template_name
-  template_description = "Ubuntu Server 24.04 LTS, built by Packer on ${timestamp()}. q35/OVMF. Thin: a clone provisions only if it asks."
+  template_description = "Ubuntu Desktop 26.04 LTS, built by Packer on ${timestamp()}. q35/OVMF. Thin: a clone provisions only if it asks."
 
   # OVMF will not start without a variable store. pre_enrolled_keys false: with
   # Microsoft's Secure Boot keys enrolled, anything unsigned fails to boot once cloned.
@@ -202,7 +202,7 @@ source "proxmox-iso" "ubuntu-24-04-server" {
 
   disks {
     type         = "scsi"
-    disk_size    = "30G"
+    disk_size    = "64G"
     storage_pool = var.storage_pool
     format       = "raw"
     discard      = true
@@ -213,6 +213,11 @@ source "proxmox-iso" "ubuntu-24-04-server" {
     model    = "virtio"
     bridge   = var.network_bridge
     firewall = false
+  }
+
+  vga {
+    type   = "std"
+    memory = 32
   }
 
   # The clone-time configuration channel: hostname, user, keys and network are
@@ -238,11 +243,11 @@ source "proxmox-iso" "ubuntu-24-04-server" {
   ssh_host       = var.ssh_host
   ssh_username   = var.ssh_username
   ssh_agent_auth = true
-  ssh_timeout    = "30m"
+  ssh_timeout    = "60m"
 }
 
 build {
-  sources = ["source.proxmox-iso.ubuntu-24-04-server"]
+  sources = ["source.proxmox-iso.ubuntu-26-04-desktop"]
 
   # The `chmod +x` prefix is Packer's own default, which overriding
   # execute_command drops; without it every script fails with "permission

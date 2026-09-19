@@ -1,6 +1,6 @@
 #cloud-config
 #
-# Autoinstall seed for ubuntu-24.04-server.pkr.hcl, served over HTTP by the
+# Autoinstall seed for ubuntu-26.04-desktop.pkr.hcl, served over HTTP by the
 # proxmox-iso build in this directory. Do not alter the first line.
 #
 # Docs:
@@ -25,7 +25,7 @@ autoinstall:
 
   # Verify against casper/install-sources.yaml on the ISO before changing.
   source:
-    id: ubuntu-server
+    id: ubuntu-desktop
 
   storage:
     layout:
@@ -34,7 +34,7 @@ autoinstall:
 
   # Hash from: openssl passwd -6 -stdin <<< 'packer'
   identity:
-    hostname: ubuntu-24.04-server-template
+    hostname: ubuntu-26-04-desktop-template
     username: syselement
     password: "$6$OxXY0.ndy/Q1c4mU$A6QNNCNXD24WVyJXm5gpHd5tq7tjLhJKAf1wAoG0yjsFdO0vFCs02JBtKRUqT0ivHXDdzFtKhs66jvL/x0rKM1"
 

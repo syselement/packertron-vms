@@ -19,6 +19,9 @@ on:
       - "**/http/meta-data"
       - "scripts/ubuntu/autoinstall-*.yaml"
       - "scripts/check-templates.sh"
+      - "scripts/sync-firstboot.sh"
+      - "scripts/ubuntu/firstboot/**"
+      - "deploy/**"
       - "templates/**/*.sh"
       - "**/*.md"
       - ".github/workflows/template-checks.yml"
@@ -43,6 +46,8 @@ jobs:
         template:
           - proxmox/kali
           - proxmox/ubuntu-24.04-server
+          - proxmox/ubuntu-26.04-server
+          - proxmox/ubuntu-26.04-desktop
           - vmware/ubuntu-24.04-desktop
           - vmware/ubuntu-26.04-desktop
           - vmware/ubuntu-24.04-server
@@ -120,6 +125,24 @@ jobs:
           done
           exit "$status"
 
+  opentofu:
+    name: OpenTofu validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Install OpenTofu
+        uses: opentofu/setup-opentofu@a1320f892987e89d278cc92dc5adc984fb93aca4 # v2.0.2
+        with:
+          tofu_wrapper: false
+
+      - name: Validate the deploy module
+        run: ./scripts/check-templates.sh tofu
+
   checker:
     # Lints the shell that ubuntu-static-checks.yml does not cover, and owns
     # the one invariant CI cannot express itself: the matrix above is
@@ -147,6 +170,9 @@ jobs:
 
       - name: Verify the CI matrix matches the templates on disk
         run: ./scripts/check-templates.sh matrix
+
+      - name: Verify the embedded first-boot copies are current
+        run: ./scripts/check-templates.sh firstboot
 
   secrets:
     name: Secret scan
@@ -178,6 +204,7 @@ jobs:
     needs:
       - packer
       - cloud-init
+      - opentofu
       - checker
       - secrets
     runs-on: ubuntu-latest

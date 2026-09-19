@@ -1,13 +1,15 @@
 #!/usr/bin/env bash
 #
-# First-boot orchestration for physical Ubuntu workstations. Runs 02 then 03,
+# First-boot orchestration for Ubuntu workstations and for clones that ask for
+# provisioning. Runs the steps PACKERTRON_STEPS names, 02 and 03 by default,
 # and deliberately never runs 01 - that would seal a machine someone uses.
 #
 # Docs:
-#   README.md  the bare-metal path and its logs
+#   README.md  the bare-metal path, PACKERTRON_STEPS, and the logs
 #
 # Run:
 #   sudo env TARGET_USER="$USER" ./90-bootstrap-baremetal.sh
+#   sudo env TARGET_USER="$USER" PACKERTRON_STEPS=02 ./90-bootstrap-baremetal.sh
 #   git clone https://github.com/syselement/packertron-vms.git && cd packertron-vms/scripts/ubuntu && sudo env TARGET_USER="$USER" ./90-bootstrap-baremetal.sh
 #
 
@@ -23,6 +25,22 @@ STATE_DIR="${PACKERTRON_STATE_DIR:-/var/lib/packertron-bootstrap}"
 LOG_FILE="${PACKERTRON_LOG_FILE:-/var/log/packertron-bootstrap.log}"
 LOCK_FILE="${PACKERTRON_LOCK_FILE:-/run/lock/packertron-bootstrap.lock}"
 BOOTSTRAP_REVISION=""
+
+# Which steps a run is allowed to perform, as a comma-separated list of the
+# numeric prefixes below. A clone that wants a clean machine sets it empty;
+# the default is what a workstation has always done.
+STEPS="${PACKERTRON_STEPS-02,03}"
+
+# 00 and 01 are deliberately absent, not merely unlisted: 00 is VM-template
+# update and guest-agent work, and 01 seals an image, which would strip the
+# machine someone is about to use.
+# -g because this file is sourced: a bare `declare -A` inside a function - which
+# is where a sourcing caller runs it - would make the array local to that
+# function and invisible to selected_steps.
+declare -gA AVAILABLE_STEPS=(
+    [02]="02-provision-system.sh"
+    [03]="03-customize-system.sh"
+)
 
 die() {
     printf 'ERROR: %s\n' "$*" >&2
@@ -92,6 +110,25 @@ run_step() {
     printf 'DONE: %s (%s)\n' "$name" "$BOOTSTRAP_REVISION"
 }
 
+# An unknown step is fatal rather than skipped: it almost always means a typo
+# in a deployment's firstboot.conf, and silently provisioning less than was
+# asked for is the failure that gets noticed last.
+selected_steps() {
+    local step
+    local -a requested=()
+
+    IFS=',' read -ra requested <<<"$STEPS"
+    for step in "${requested[@]}"; do
+        step="${step//[[:space:]]/}"
+        [[ -n "$step" ]] || continue
+        [[ -n "${AVAILABLE_STEPS[$step]:-}" ]] ||
+            die "unknown provisioning step '${step}'; available: $(
+                printf '%s\n' "${!AVAILABLE_STEPS[@]}" | sort | tr '\n' ' '
+            )"
+        printf '%s\n' "$step"
+    done
+}
+
 schedule_reboot() {
     sync
 
@@ -144,11 +181,28 @@ main() {
         return
     fi
 
-    # Intentionally omitted:
-    # 00-update-system.sh  - VM template updates and guest agents
-    # 01-cleanup-system.sh - template hygiene, unsafe/unnecessary here
-    run_step "02-provision-system" "02-provision-system.sh"
-    run_step "03-customize-system" "03-customize-system.sh"
+    local -a steps=()
+    local step selected
+
+    # Command substitution, not a process substitution: die() inside the latter
+    # exits only that subshell, so an unrecognised step would be reported and
+    # then quietly treated as "nothing to run".
+    selected="$(selected_steps)" || exit 1
+    [[ -z "$selected" ]] || mapfile -t steps <<<"$selected"
+
+    # Still record completion: the caller's service retries on failure, and a
+    # run that was asked to do nothing has succeeded. Rebooting would be the
+    # only visible effect, so it is skipped.
+    if ((${#steps[@]} == 0)); then
+        printf 'No provisioning steps selected; nothing to run\n'
+        write_revision_marker "$STATE_DIR/complete"
+        printf 'Bare-metal bootstrap completed successfully for %s\n' "$BOOTSTRAP_REVISION"
+        return
+    fi
+
+    for step in "${steps[@]}"; do
+        run_step "${AVAILABLE_STEPS[$step]%.sh}" "${AVAILABLE_STEPS[$step]}"
+    done
 
     # The persistent first-boot service is ordered after cloud-final. Record
     # completion only after systemd accepts the required reboot timer.

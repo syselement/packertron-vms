@@ -148,7 +148,7 @@ On Server, Syncthing's user unit is enabled by linking it into the target user's
 
 Orchestrates first-boot provisioning for autoinstall and bare-metal systems. It:
 
-- runs `02-provision-system.sh` and `03-customize-system.sh` without their individual reboots
+- runs the steps `PACKERTRON_STEPS` selects - `02-provision-system.sh` and `03-customize-system.sh` by default - without their individual reboots
 - passes `TARGET_USER` through to both steps when it is set
 - records revision-bound step markers under `/var/lib/packertron-bootstrap`
 - resumes incomplete work without repeating completed steps for the same revision
@@ -158,7 +158,36 @@ Orchestrates first-boot provisioning for autoinstall and bare-metal systems. It:
 
 It is an orchestrator, not an additional step to run after manually completing `02` and `03`.
 
-It deliberately skips `00` (guest agents do not apply to bare metal) and `01` (template hygiene, destructive here).
+It deliberately skips `00` (guest agents do not apply to bare metal) and `01` (template hygiene, destructive here). Neither can be selected: they are absent from the step table, and naming one is an error rather than a no-op.
+
+#### Choosing which steps run
+
+`PACKERTRON_STEPS` is a comma-separated list of step prefixes, defaulting to `02,03`. A Proxmox clone sets it through `/etc/packertron/firstboot.conf`, which is how one thin template can serve both a bare server and a full workstation - see [`deploy/`](../../deploy/README.md).
+
+| Value | Runs |
+| --- | --- |
+| unset | `02` then `03`, which is what a workstation has always done |
+| `02` | baseline and developer tooling only |
+| `02,03` | the same as unset, stated explicitly |
+| `""` | nothing. Completion is still recorded, and no reboot is scheduled |
+
+An unrecognised step fails the run rather than being skipped. Silently provisioning less than was asked for is the failure that gets noticed last, and the usual cause is a typo in a deployment's `firstboot.conf`.
+
+---
+
+### `firstboot/`
+
+The per-VM provisioning runner, as three files rather than text inside a YAML seed:
+
+| File | Becomes | Does |
+| --- | --- | --- |
+| `stub.sh` | `/usr/local/sbin/packertron-firstboot` | reads `firstboot.conf`, waits for GitHub, clones the repository, hands off |
+| `run.sh` | copied to `/run` and executed | pins a revision, counts attempts, checks it out, execs `90-bootstrap-baremetal.sh` |
+| `packertron-firstboot.service` | `/etc/systemd/system/…` | oneshot, retries on failure, removes itself after a successful run |
+
+cloud-init has no include directive, so every seed must carry its own copy of `stub.sh` and the unit inline. [`scripts/sync-firstboot.sh`](../sync-firstboot.sh) writes those copies and `--check` fails CI when one has drifted; the OpenTofu layer reads the same files directly with `file()`, so it has no copy to drift.
+
+`run.sh` is executed from a copy in `/run` rather than from the checkout, because it moves that checkout between revisions and Bash re-reads a script file as it executes.
 
 ---
 
@@ -168,7 +197,7 @@ It deliberately skips `00` (guest agents do not apply to bare metal) and `01` (t
 - `autoinstall-server.yaml` installs Ubuntu Server and creates the same first-boot workflow.
 - `autoinstall-noscripts.yaml` is the intentional negative control: it performs the unattended installation but invokes no provisioning scripts.
 
-The scripted YAML files write `/usr/local/sbin/packertron-firstboot` and a temporary systemd service.
+The scripted YAML files embed `firstboot/stub.sh` and the systemd unit, plus a `/etc/packertron/firstboot.conf` naming the target user and the steps to run.
 
 - The runner checks out one fixed repository revision and invokes `90-bootstrap-baremetal.sh`.
 - Transient failures are retried.
@@ -193,6 +222,7 @@ Pick the entry point, not the individual script. Each row is a complete way to b
 | Build a reusable VM template | `packer build` in a template directory | `00` → `01` (Desktop), `00` → `02` → `01` (24.04 Server) | Desktop and Server |
 | Turn a prebuilt box into a workstation | `vagrant up provisioned` | `02` → reboot → `03` → reboot | Desktop |
 | Install a physical machine unattended | `autoinstall-desktop.yaml` / `autoinstall-server.yaml` | firstboot service → `90` → `02` → `03` | Desktop and Server |
+| Clone a Proxmox template into a VM | `tofu apply` in [`deploy/`](../../deploy/README.md) | nothing, unless `provisioning_steps` asks for `90` → `02` → `03` | Desktop and Server |
 | Provision a machine you already installed | `sudo env TARGET_USER="$USER" ./90-bootstrap-baremetal.sh` | `90` → `02` → `03`, one reboot at the end | Desktop and Server |
 | Add tooling to a machine by hand | `02` and/or `03` directly | only what you invoke | Desktop and Server |
 

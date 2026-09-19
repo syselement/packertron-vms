@@ -1,0 +1,18 @@
+[Unit]
+Description=Packertron retryable first-boot provisioning
+Wants=network-online.target
+After=network-online.target cloud-final.service
+StartLimitIntervalSec=0
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/packertron-firstboot
+ExecStartPost=/usr/bin/systemctl disable packertron-firstboot.service
+ExecStartPost=/usr/bin/rm -f /etc/systemd/system/packertron-firstboot.service
+ExecStartPost=/usr/bin/systemctl daemon-reload
+Restart=on-failure
+RestartSec=5min
+TimeoutStartSec=infinity
+
+[Install]
+WantedBy=multi-user.target

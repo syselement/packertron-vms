@@ -36,8 +36,17 @@ Then pass `-var 'iso_file=...'`, as in [Build](#build) below. `iso_file` and `is
 
 It installs the base OS, `qemu-guest-agent`, and leaves cloud-init able to run again. It does **not** bake in the tooling from `02-provision-system.sh` or `03-customize-system.sh`.
 
-- Those run per VM at first boot instead, so a clone created months from now picks up the current scripts rather than whatever was current when the template was baked.
 - Only `00-update-system.sh` (guest agent) and `01-cleanup-system.sh` (sealing) run during the build.
+- A clone runs them at first boot **only if it asks to**, by shipping `/etc/packertron/firstboot.conf` with a `STEPS` line - see [`scripts/ubuntu/README.md`](../../../scripts/ubuntu/README.md). A clone that ships no such file stays as thin as the template.
+- Because they run from a fresh checkout, a clone created months from now picks up the current scripts rather than whatever was current when the template was baked.
+
+## Why the guest agent is installed on first boot, not by the installer
+
+The seed puts `qemu-guest-agent` in its `user-data:` section rather than the autoinstall `packages:` list. The first real 26.04.1 build showed why: subiquity installs `packages:` against `/target` while the ISO is its only APT source, and `qemu-guest-agent` is not on the server ISO - the live installer sees it in `universe`, the target does not, and the install fails with APT exit `100`. The 24.04 ISO happens to carry the package, but relying on that is what broke.
+
+It cannot simply move to `00-update-system.sh` either: the agent is how Packer learns the VM's address, so a build with no agent sits on "Waiting for SSH" and never runs a provisioner. `user-data:` breaks that loop - cloud-init applies it on the first boot of the installed system, where the real `ubuntu.sources` with `universe` is in place. It is the same path that applies the `ssh:` section. The unit is static and normally started by a udev rule when the virtio port appears, which was before the package existed, so `runcmd` starts it explicitly.
+
+The cost is one `apt-get update` and one install on the first boot before Packer connects. All three Proxmox Ubuntu templates use this route.
 
 ## Settings and credentials
 
@@ -135,12 +144,17 @@ It lives one directory up because every Proxmox template needs the same seal, an
 - The seed writes `manage_etc_hosts: localhost` into `99-pve.cfg`, which fixes only the `127.0.1.1` line.
 - `true` would rewrite the whole file from a template on every boot and discard anything added by hand.
 
-## Why the seed deletes two cloud-init files
+## Why subiquity's cloud-init files are removed at the end, not during the install
 
 - Subiquity pins cloud-init to the installer's own NoCloud seed and disables its networking, via `99-installer.cfg` and `subiquity-disable-cloudinit-networking.cfg`.
 - Left in place, a clone ignores the cloud-init drive Proxmox attaches to it: no per-VM hostname, user, SSH key or network is ever applied, and the whole clone-and-configure model silently does nothing while appearing to succeed.
 
-The seed removes both and writes `99-pve.cfg` with `datasource_list: [ NoCloud, ConfigDrive ]`.
+They are removed by `01-cleanup-system.sh`'s `cloud-init clean`, and `../seal-for-clone.sh` writes `99-pve.cfg` afterwards and fails the build if anything survived.
+
+Removing them from the seed's `late-commands` instead looks equivalent and is not, which cost two failed builds to establish:
+
+- `99-installer.cfg` is what applies the seed's `ssh:` section on first boot, so deleting it at install time leaves the machine with no `authorized_keys` and password authentication still on, and the build hangs on "Waiting for SSH".
+- Writing `99-pve.cfg` at install time sets `datasource_list` before the first boot, which drops `None` from it - and `None` is the datasource that carries `99-installer.cfg`, so cloud-init finds no datasource and applies nothing at all.
 
 ## Verify before pushing
 

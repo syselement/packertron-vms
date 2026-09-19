@@ -34,6 +34,7 @@
     - [📁 Directory Structure](#-directory-structure)
     - [🚀 Build \& Deploy VMs](#-build--deploy-vms)
         - [Build a Proxmox template](#build-a-proxmox-template)
+        - [Deploy a VM with OpenTofu](#deploy-a-vm-with-opentofu)
         - [Dedicated Role](#dedicated-role)
             - [CLI](#cli)
             - [UI](#ui)
@@ -193,17 +194,21 @@ packertron-vms/
 │   ├── proxmox/                     <- the primary target
 │   │   ├── proxmox.pkrvars.hcl.example   node settings, shared by all of them
 │   │   ├── seal-for-clone.sh             strips per-machine state before cloning
-│   │   ├── ubuntu-24.04-server/
+│   │   ├── ubuntu-24.04-server/    ubuntu-26.04-server/
+│   │   ├── ubuntu-26.04-desktop/
 │   │   ├── kali/                         stub, does not build yet
 │   │   └── win-11/                       unrepaired, excluded from CI
 │   └── vmware/                      <- kept working alongside
 │       ├── ubuntu-24.04-desktop/   ubuntu-26.04-desktop/
 │       ├── ubuntu-24.04-server/    ubuntu-26.04-server/
 │       └── win-srv-2025/
+├── deploy/              OpenTofu: clone one template into a running VM
 ├── scripts/             provisioners, shared by every template
 │   ├── ubuntu/              Bash chain, lib/, autoinstall seeds, bats tests
+│   │   └── firstboot/       the per-VM provisioning runner, embedded into seeds
 │   ├── windows/             PowerShell and batch provisioners
 │   ├── check-templates.sh   run the CI checks locally
+│   ├── sync-firstboot.sh    re-embed firstboot/ into every seed that uses it
 │   └── install-requirements.{sh,ps1}   host tooling, Linux and Windows
 ├── .github/workflows/   CI
 ├── AGENTS.md            repository standards: file headers, Bash, safety, review
@@ -229,8 +234,9 @@ Templates reach the shared provisioners through `${path.root}/../../../scripts/`
 
 | Kind | Where | Committed |
 | --- | --- | --- |
-| API token, SSH password | environment, `PKR_VAR_*` | never |
+| API token, SSH password | environment, `PKR_VAR_*` and `PROXMOX_VE_API_TOKEN` | never |
 | Node name, storage pools, bridge | `templates/proxmox/proxmox.pkrvars.hcl` | no, only the `.example` |
+| Which template to clone, VM sizing | `deploy/deploy.tfvars` | no, only the `.example` |
 | ISO URL, checksum, sizing | the template's own `.pkr.hcl` / `.auto.pkrvars.hcl` | yes |
 
 One node file rather than one per template, so adding a template inherits the node settings instead of copying them. See [SECURITY.md](SECURITY.md).
@@ -261,19 +267,50 @@ export PKR_VAR_proxmox_api_token_secret="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
 Build:
 
 ```bash
-cd templates/proxmox/ubuntu-24.04-server
+cd templates/proxmox/ubuntu-24.04-server   # or ubuntu-26.04-server, ubuntu-26.04-desktop
 packer init .
 packer build -var-file=../proxmox.pkrvars.hcl .
 ```
 
-- The result is a Proxmox **template** (`vm_id` 80024 by default) that is thin on purpose: base OS, `qemu-guest-agent`, and cloud-init left able to run again.
-- Per-VM provisioning happens at first boot on each clone, not in the image.
+| Template | `vm_id` | Installs |
+| --- | --- | --- |
+| `ubuntu-24.04-server` | 80024 | Ubuntu Server 24.04 LTS |
+| `ubuntu-26.04-server` | 80026 | Ubuntu Server 26.04 LTS |
+| `ubuntu-26.04-desktop` | 80126 | Ubuntu Desktop 26.04 LTS |
+
+Each result is a Proxmox **template** that is thin on purpose: base OS, `qemu-guest-agent`, and cloud-init left able to run again. None of them bakes in the tooling from `02-provision-system.sh` or `03-customize-system.sh`.
+
+That is what lets one template serve both cases. A clone gets the tooling only if it asks for it, at first boot, from a fresh checkout - so a VM created a year from now runs the current scripts rather than whatever was current when its template was built. See [Deploy a VM](#deploy-a-vm-with-opentofu).
 
 Before pushing any template change:
 
 ```bash
 scripts/check-templates.sh proxmox
 ```
+
+### Deploy a VM with OpenTofu
+
+[`deploy/`](deploy/README.md) clones one template into a running VM. It is deliberately small - one VM, no composition, no remote state - because fleet-wide homelab infrastructure belongs in its own repository, which can consume this module by git ref.
+
+```bash
+cd deploy
+cp deploy.tfvars.example deploy.tfvars   # gitignored, never committed
+$EDITOR deploy.tfvars
+
+export PROXMOX_VE_API_TOKEN='automation@pve!deploy=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'
+tofu init
+tofu apply -var-file=deploy.tfvars
+```
+
+Provisioning is opt-in, through one variable:
+
+| `provisioning_steps` | The clone gets |
+| --- | --- |
+| `""` (default) | nothing. It is exactly the template |
+| `"02"` | baseline and developer tooling |
+| `"02,03"` | the full toolchain, GNOME preferences and shell configuration |
+
+So a throwaway server and a workstation built to match the bare-metal PC come from the same template and differ by one line of configuration. The steps run in the background well after `tofu apply` returns; `deploy/README.md` covers following them, and the one awkward requirement - Proxmox has no API for writing snippets, so requesting provisioning needs SSH to the node.
 
 ### Dedicated Role
 
@@ -289,11 +326,13 @@ For the restricted role use these privileges for template builds:
 | Datastore | `Datastore.AllocateSpace`, `Datastore.AllocateTemplate`, `Datastore.Audit` |
 | VM | `SDN.Use`, `VM.Allocate`, `VM.Audit`, `VM.Clone`, `VM.Config.CDROM`, `VM.Config.CPU`, `VM.Config.Cloudinit`, `VM.Config.Disk`, `VM.Config.HWType`, `VM.Config.Memory`, `VM.Config.Network`, `VM.Config.Options`, `VM.Console`, `VM.PowerMgmt`, `VM.GuestAgent.Audit` |
 
-This is a practical starting role, not a guaranteed exact minimum. It covers the normal Packer ISO-build operations and the planned OpenTofu workflow of cloning a template, configuring its hardware and cloud-init, and starting or stopping it.
+This is a practical starting role, not a guaranteed exact minimum. It covers the normal Packer ISO-build operations and the [`deploy/`](deploy/README.md) OpenTofu workflow of cloning a template, configuring its hardware and cloud-init, and starting or stopping it.
 
 `VM.GuestAgent.Audit` is the one that is easy to miss. Packer asks the guest agent for the VM's address, and without it the lookup returns nothing: the build sits on "Waiting for SSH" for the full timeout without a single connection ever reaching the VM. On PVE 8 it replaced the older `VM.Monitor`, which no longer exists.
 
 `iso_download_pve` would additionally need `Sys.AccessNetwork`, which is why the templates leave it off and let Packer do the download - see [templates/proxmox/ubuntu-24.04-server/README.md](templates/proxmox/ubuntu-24.04-server/README.md).
+
+Asking a clone to provision itself needs no further API privilege either: Proxmox has no API for writing snippets, so the provider uploads that one file over SSH instead. What it does need is a storage with the **snippets** content type enabled.
 
 The same role covers the intended workflow:
 
@@ -427,10 +466,12 @@ Pull requests and improvements are welcome! Ensure your code follows the repo’
 ## 🌍 Future Roadmap
 
 - [ ] Proxmox support
-    - [ ] Templates from the official Ubuntu cloud image, plus an ISO + autoinstall path for parity with the bare-metal install
-    - [ ] Provisioning at first boot per VM, through the existing `packertron-firstboot` service, so templates stay thin and every VM picks up current scripts
-    - [ ] Credentials from the environment (`PROXMOX_VE_*` / `PKR_VAR_proxmox_api_token_*`) - never committed, never KeePass
-- [ ] OpenTofu layer to create and manage the VMs cloned from those templates
+    - [x] ISO + autoinstall templates, for parity with the bare-metal install
+    - [ ] Templates from the official Ubuntu cloud image
+    - [x] Provisioning at first boot per VM, through the `packertron-firstboot` service, so templates stay thin and every VM picks up current scripts
+    - [x] Credentials from the environment (`PROXMOX_VE_*` / `PKR_VAR_proxmox_api_token_*`) - never committed, never KeePass
+- [x] OpenTofu layer to create the VMs cloned from those templates, in [`deploy/`](deploy/README.md)
+- [ ] Proxmox LXC containers - out of reach for Packer, whose Proxmox plugin builds only `iso` and `clone`, so they would come from OpenTofu and an upstream LXC template
 - [ ] O.S Packer builds:
     - [ ] Win11
     - [x] Ubuntu Server (24.04 and 26.04)
