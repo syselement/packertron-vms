@@ -1,3 +1,12 @@
+# [0.72.0](https://github.com/syselement/packertron-vms/compare/v0.71.0...v0.72.0) (2026-09-19)
+
+
+### Features
+
+* **proxmox:** streamline SSH host key management and update README for clarity ([2356840](https://github.com/syselement/packertron-vms/commit/2356840904e1ae4291e95e9a2119b92bb321c2c5))
+
+
+
 # [0.71.0](https://github.com/syselement/packertron-vms/compare/v0.70.0...v0.71.0) (2026-09-19)
 
 
@@ -46,23 +55,6 @@
 ### Bug Fixes
 
 * **ci:** drop the custom Dependabot labels ([c9340bd](https://github.com/syselement/packertron-vms/commit/c9340bd9cd20ef4e0f2ddf5f98949e1d2556e73b))
-
-
-
-# [0.68.0](https://github.com/syselement/packertron-vms/compare/v0.67.3...v0.68.0) (2026-09-05)
-
-
-### Bug Fixes
-
-* **packer:** make the Kali template validate, without KeePass ([756e254](https://github.com/syselement/packertron-vms/commit/756e254648f1454f192f6b81a020107394b0118a))
-* **packer:** make the Ubuntu templates validate again ([5e9f6b7](https://github.com/syselement/packertron-vms/commit/5e9f6b747ba291415f1e3d5dd8117917fd78a011))
-* **packer:** make the Windows Server 2025 template validate ([f69cc9e](https://github.com/syselement/packertron-vms/commit/f69cc9eddc27996ba24ec8cf4b052c8f5ab0310d))
-* update comment formatting in .bash_aliases ([4fd13e7](https://github.com/syselement/packertron-vms/commit/4fd13e74d4d490b07760e9e5ddac2c04f9f15d2b))
-
-
-### Features
-
-* **packer:** add an Ubuntu Server 26.04 template ([975d403](https://github.com/syselement/packertron-vms/commit/975d403a06941ba10730104ab4f7df664eb151a0))
 
 
 
