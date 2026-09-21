@@ -1,0 +1,126 @@
+# A catalogue of clone profiles, one per section. The module deploys ONE VM
+# per apply, so exactly one section is active at a time; the others stay
+# commented. To keep several alive side by side, give each its own workspace
+# - a separate state - and its own copy of this file:
+#
+#   cp deploy.tfvars.example2 srv-02.tfvars       # *.tfvars is gitignored
+#   tofu workspace new srv-02
+#   tofu apply -var-file=srv-02.tfvars
+#   tofu workspace select workstation-01 && tofu apply -var-file=workstation-01.tfvars
+#
+# THE API TOKEN DOES NOT BELONG HERE:
+#   export PROXMOX_VE_API_TOKEN='automation@pve!deploy=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'
+# Nor does a console password. Servers do not need one - SSH takes the key.
+# DESKTOPS DO: GDM and the Proxmox console have no key login, and cloud-init
+# locks the template's password unless one is delivered, so a desktop clone
+# with no password cannot be logged into at all. Export it before applying
+# profile 5 or 6:
+#   export TF_VAR_password='...'
+# cloud-init applies it on the first boot only; for a desktop already
+# created without one:  ssh in with the key, then  sudo passwd syselement
+
+# --- node, shared by every profile ------------------------------------------
+
+proxmox_endpoint = "https://192.168.5.11:8006/"   # no /api2/json, unlike Packer
+proxmox_node     = "pve02"
+proxmox_insecure = true                            # only for a self-signed node
+datastore_id     = "vmstore"
+
+ssh_authorized_keys = [
+  "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPA3hxPOnJAjCFoZMz8mcT+fZTy5j0vjLWPGVM2vaA88",
+]
+
+# --- 1. plain server, 26.04 -------------------------------------------------
+# The common case. Exactly the template: no snippet, no repo fetch, nothing
+# installed. One resource in the plan.
+
+template_vm_id = 80026
+vm_name        = "srv-01"
+cores          = 2
+memory         = 2048
+disk_size      = 32
+
+# --- 2. server with the baseline toolchain, 26.04 ---------------------------
+# 02 only: build tooling, Docker, developer CLI. ~5 minutes, then one reboot.
+# Two resources in the plan: the snippet, then the VM.
+
+# template_vm_id     = 80026
+# vm_name            = "srv-02"
+# cores              = 2
+# memory             = 4096
+# disk_size          = 40
+# provisioning_steps = "02"
+
+# --- 3. plain server, 24.04 -------------------------------------------------
+# Same shape as 1 against the older template. Both are thin; the release is
+# the only difference.
+
+# template_vm_id = 80024
+# vm_name        = "srv24-01"
+# cores          = 2
+# memory         = 2048
+# disk_size      = 32
+
+# --- 4. server with a fixed address -----------------------------------------
+# DHCP is the default. A static address is set through the same cloud-init
+# drive; both fields are then required.
+
+# template_vm_id = 80026
+# vm_name        = "srv-static"
+# cores          = 2
+# memory         = 2048
+# disk_size      = 32
+# ipv4_address   = "192.168.5.201/24"
+# ipv4_gateway   = "192.168.5.1"
+
+# --- 5. the workstation: desktop, fully provisioned -------------------------
+# A desktop clone that provisions itself into the same machine as the
+# bare-metal PC. 02 then 03: the full toolchain, GNOME preferences, shell.
+# Expect 30-40 minutes after apply returns, then one reboot.
+#
+# disk_size must be >= 64: the desktop template's disk is 64G and Proxmox can
+# grow a cloned disk but never shrink one. Leaving the module default of 32
+# fails the apply.
+#
+# REQUIRES  export TF_VAR_password='...'  before apply - see the header.
+
+# template_vm_id     = 80126
+# vm_name            = "workstation-01"
+# cores              = 4
+# memory             = 8192
+# disk_size          = 64
+# provisioning_steps = "02,03"
+
+# --- 6. plain desktop --------------------------------------------------------
+# GNOME with nothing else on it. Same disk_size rule as 5, and the same
+# TF_VAR_password requirement: without it there is no way to log in.
+
+# template_vm_id = 80126
+# vm_name        = "desk-01"
+# cores          = 4
+# memory         = 8192
+# disk_size      = 64
+
+# --- 7. linked clone, for a throwaway ---------------------------------------
+# Shares the template's disk instead of copying it: seconds to create and
+# almost no space, but the template cannot be deleted while it exists.
+# Full clones (the default) are the right choice for anything that lasts.
+
+# template_vm_id = 80026
+# vm_name        = "scratch-01"
+# full_clone     = false
+# cores          = 1
+# memory         = 1024
+# disk_size      = 32
+
+# --- 8. provisioning from a branch under test --------------------------------
+# The stub clones main unless told otherwise. Point a clone at a pushed topic
+# branch to test runner or script changes before they are merged.
+
+# template_vm_id           = 80026
+# vm_name                  = "srv-test"
+# cores                    = 2
+# memory                   = 2048
+# disk_size                = 32
+# provisioning_steps       = "02"
+# provisioning_repo_branch = "claude/proxmox-opentofu"

@@ -40,6 +40,10 @@ disk_size      = 32
 #
 # Expect this to take a long time after apply returns - 02 and 03 install the
 # full toolchain - and to reboot itself once at the end.
+#
+# A desktop needs a password: GDM has no key login, and cloud-init locks the
+# template's one unless a password is delivered. Before applying:
+#   export TF_VAR_password='...'
 # ---------------------------------------------------------------------------
 # template_vm_id     = 80126 # ubuntu-26.04-desktop-template
 # vm_name            = "workstation-01"

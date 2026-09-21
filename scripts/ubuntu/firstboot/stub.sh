@@ -108,5 +108,7 @@ git -C "$PACKERTRON_REPO_DIR" show "origin/${PACKERTRON_REPO_BRANCH}:${RUNNER_PA
         echo "ERROR: ${RUNNER_PATH} is not on origin/${PACKERTRON_REPO_BRANCH}" >&2
         exit 1
     }
-chmod 0700 /run/packertron-firstboot-run
-exec /run/packertron-firstboot-run
+chmod 0600 /run/packertron-firstboot-run
+# Through the interpreter, not executed directly: /run is mounted noexec on
+# 24.04, where a direct exec fails with "Permission denied" and exit 126.
+exec bash /run/packertron-firstboot-run

@@ -30,12 +30,14 @@ tofu apply -var-file=deploy.tfvars
 
 ## Console access
 
-cloud-init locks the account's password whenever it configures a user without one, so by default a clone is reachable **only by SSH key** - `packer`, the template's password, stops working on the console. That is the intended posture. For console access while debugging, pass a password through the environment rather than a file:
+cloud-init locks the account's password whenever it configures a user without one, so by default a clone is reachable **only by SSH key** - `packer`, the template's password, stops working on the console. For a server that is the intended posture. Pass a password through the environment rather than a file when one is wanted:
 
 ```bash
 export TF_VAR_password='...'
 tofu apply -var-file=deploy.tfvars
 ```
+
+**For a desktop clone this is required, not optional.** GDM and the Proxmox console have no key login, so a desktop created without a password cannot be logged into at all. cloud-init applies the password on the instance's first boot only, so exporting it afterwards and re-applying does not unlock an existing VM - for that, SSH in with the key and run `sudo passwd syselement`.
 
 ## Provisioning is opt-in, and that is the whole design
 
@@ -69,7 +71,13 @@ Two ways to avoid it, if SSH access to the node is not something you want to gra
 1. Place the snippet on the node once by hand and name it with `vendor_data_file_id`, for example `vendor_data_file_id = "local:snippets/firstboot.yaml"`. Generate its content with `tofu console` and `local.firstboot_vendor_data`, or write the three files by hand.
 2. Leave `provisioning_steps` empty and run `90-bootstrap-baremetal.sh` on the VM yourself afterwards.
 
-The storage named by `snippet_datastore_id` must also have the **snippets** content type enabled, under Datacenter -> Storage.
+The storage named by `snippet_datastore_id` must also have the **snippets** content type enabled. `local` does not by default; the provider then warns and the upload fails with `tee: /var/lib/vz/snippets/...: No such file or directory`. Enable it once on the node:
+
+```bash
+pvesm set local --content backup,iso,vztmpl,snippets   # --content replaces the list; keep what was there
+```
+
+Or under Datacenter -> Storage -> `local` -> Edit -> Content. Destroying a VM removes its snippet through the API, which is why the token's role needs `Datastore.Allocate`.
 
 ## Why vendor-data and not user-data
 

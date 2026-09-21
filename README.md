@@ -310,7 +310,16 @@ Provisioning is opt-in, through one variable:
 | `"02"` | baseline and developer tooling |
 | `"02,03"` | the full toolchain, GNOME preferences and shell configuration |
 
-So a throwaway server and a workstation built to match the bare-metal PC come from the same template and differ by one line of configuration. The steps run in the background well after `tofu apply` returns; `deploy/README.md` covers following them, and the one awkward requirement - Proxmox has no API for writing snippets, so requesting provisioning needs SSH to the node.
+So a throwaway server and a workstation built to match the bare-metal PC come from the same template and differ by one line of configuration. The steps run in the background well after `tofu apply` returns; `deploy/README.md` covers following them.
+
+**How the request reaches the clone.** Proxmox generates the clone's cloud-init user-data itself (hostname, account, keys, network) and offers exactly one way to add to it: `cicustom`, which takes a file from a datastore with the **snippets** content type. So when `provisioning_steps` is set, OpenTofu renders a small cloud-config - `git`, the first-boot conf, stub and unit - uploads it to the node as a snippet, and attaches it as **vendor-data**. vendor-data is merged alongside what Proxmox generated; user-data would replace it, and the clone would come up with no account. A clone that asks for nothing gets no snippet at all.
+
+Two one-time things on the node follow from that. Proxmox has no API for writing snippets, so the provider uploads over SSH as root - which is why `providers.tf` carries an `ssh` block. And `local` does not accept snippets by default:
+
+```bash
+# on the node, once - --content replaces the list, so keep what was there
+pvesm set local --content backup,iso,vztmpl,snippets
+```
 
 ### Dedicated Role
 
@@ -323,7 +332,7 @@ For the restricted role use these privileges for template builds:
 
 | Category | Privileges to select |
 | --- | --- |
-| Datastore | `Datastore.AllocateSpace`, `Datastore.AllocateTemplate`, `Datastore.Audit` |
+| Datastore | `Datastore.Allocate`, `Datastore.AllocateSpace`, `Datastore.AllocateTemplate`, `Datastore.Audit` |
 | VM | `SDN.Use`, `VM.Allocate`, `VM.Audit`, `VM.Clone`, `VM.Config.CDROM`, `VM.Config.CPU`, `VM.Config.Cloudinit`, `VM.Config.Disk`, `VM.Config.HWType`, `VM.Config.Memory`, `VM.Config.Network`, `VM.Config.Options`, `VM.Console`, `VM.PowerMgmt`, `VM.GuestAgent.Audit` |
 
 This is a practical starting role, not a guaranteed exact minimum. It covers the normal Packer ISO-build operations and the [`deploy/`](deploy/README.md) OpenTofu workflow of cloning a template, configuring its hardware and cloud-init, and starting or stopping it.
@@ -363,7 +372,7 @@ Run on the Proxmox node as root:
 pveum user add automation@pve --comment "IAC deployment automation"
 # no password is ok
 
-pveum role add IACDeploy --privs "Datastore.AllocateSpace Datastore.AllocateTemplate Datastore.Audit SDN.Use VM.Allocate VM.Audit VM.Clone VM.Config.CDROM VM.Config.CPU VM.Config.Cloudinit VM.Config.Disk VM.Config.HWType VM.Config.Memory VM.Config.Network VM.Config.Options VM.Console VM.PowerMgmt VM.GuestAgent.Audit"
+pveum role add IACDeploy --privs "Datastore.Allocate Datastore.AllocateSpace Datastore.AllocateTemplate Datastore.Audit SDN.Use VM.Allocate VM.Audit VM.Clone VM.Config.CDROM VM.Config.CPU VM.Config.Cloudinit VM.Config.Disk VM.Config.HWType VM.Config.Memory VM.Config.Network VM.Config.Options VM.Console VM.PowerMgmt VM.GuestAgent.Audit"
 
 pveum acl modify / -user automation@pve -role IACDeploy
 

@@ -29,9 +29,10 @@ die() {
     exit 1
 }
 
-# Overridable only so the check below can be run against a fixture.
+# Overridable only so the check and the rule below can run against a fixture.
 CLOUD_CFG_DIR="${CLOUD_CFG_DIR:-/etc/cloud/cloud.cfg.d}"
-readonly CLOUD_CFG_DIR
+UDEV_RULES_DIR="${UDEV_RULES_DIR:-/etc/udev/rules.d}"
+readonly CLOUD_CFG_DIR UDEV_RULES_DIR
 
 # Written here, not at install time. Setting datasource_list before the first
 # boot drops None from it, and None is the datasource that carries subiquity's
@@ -78,11 +79,24 @@ verify_cloud_init_unpinned() {
     fi
 }
 
+# The cloud-init drive stays attached for the life of a clone: it is how a later
+# address or key change reaches the machine, and OpenTofu re-adds it if removed.
+# On a desktop, udisks auto-mounts it and it sits in the file manager as a CD
+# called "cidata". This tells udisks to leave it alone; cloud-init reads the
+# block device directly and is unaffected. Harmless on a server, which has no
+# udisks to begin with.
+hide_cloud_init_drive() {
+    log "write ${UDEV_RULES_DIR}/99-hide-cidata.rules"
+    cat >"$UDEV_RULES_DIR/99-hide-cidata.rules" <<'RULE'
+ENV{ID_FS_LABEL}=="cidata", ENV{UDISKS_IGNORE}="1"
+RULE
+    chmod 0644 "$UDEV_RULES_DIR/99-hide-cidata.rules"
+}
+
 # Host keys identify the machine, not the image: shipped in a template, every
 # clone answers with the same fingerprint and swapping one for another warns
-# nobody. cloud-init's cc_ssh regenerates them on the clone's first boot, before
-# sshd starts, which is verified: clones of one template answer with different
-# keys.
+# nobody. cloud-init's cc_ssh regenerates them on the clone's first boot,
+# before sshd starts - verified: clones of one template answer with different keys.
 #
 # There is deliberately no unit here to regenerate them as a fallback. One was
 # tried, ordered Before=ssh.socket; as an ordinary service it also ran after
@@ -106,6 +120,7 @@ main() {
 
     write_pve_cloud_init_config
     verify_cloud_init_unpinned
+    hide_cloud_init_drive
     remove_host_keys
     remove_random_seed
     log "done"
