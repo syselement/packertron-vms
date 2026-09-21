@@ -17,8 +17,7 @@
 locals {
   provisioning_enabled = var.provisioning_steps != ""
 
-  # Uploaded only when provisioning is requested and no existing snippet was
-  # named.
+  # Uploaded only when provisioning is requested and no existing snippet was named.
   upload_snippet = local.provisioning_enabled && var.vendor_data_file_id == ""
 
   firstboot_conf = join("\n", concat(

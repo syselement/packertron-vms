@@ -10,8 +10,14 @@
 #
 # THE API TOKEN DOES NOT BELONG HERE:
 #   export PROXMOX_VE_API_TOKEN='automation@pve!deploy=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'
-# Nor does a console password; when one is wanted:
+# Nor does a console password. Servers do not need one - SSH takes the key.
+# DESKTOPS DO: GDM and the Proxmox console have no key login, and cloud-init
+# locks the template's password unless one is delivered, so a desktop clone
+# with no password cannot be logged into at all. Export it before applying
+# profile 5 or 6:
 #   export TF_VAR_password='...'
+# cloud-init applies it on the first boot only; for a desktop already
+# created without one:  ssh in with the key, then  sudo passwd syselement
 
 # --- node, shared by every profile ------------------------------------------
 
@@ -75,6 +81,8 @@ disk_size      = 32
 # disk_size must be >= 64: the desktop template's disk is 64G and Proxmox can
 # grow a cloned disk but never shrink one. Leaving the module default of 32
 # fails the apply.
+#
+# REQUIRES  export TF_VAR_password='...'  before apply - see the header.
 
 # template_vm_id     = 80126
 # vm_name            = "workstation-01"
@@ -84,7 +92,8 @@ disk_size      = 32
 # provisioning_steps = "02,03"
 
 # --- 6. plain desktop --------------------------------------------------------
-# GNOME with nothing else on it. Same disk_size rule as 5.
+# GNOME with nothing else on it. Same disk_size rule as 5, and the same
+# TF_VAR_password requirement: without it there is no way to log in.
 
 # template_vm_id = 80126
 # vm_name        = "desk-01"

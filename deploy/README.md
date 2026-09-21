@@ -30,12 +30,14 @@ tofu apply -var-file=deploy.tfvars
 
 ## Console access
 
-cloud-init locks the account's password whenever it configures a user without one, so by default a clone is reachable **only by SSH key** - `packer`, the template's password, stops working on the console. That is the intended posture. For console access while debugging, pass a password through the environment rather than a file:
+cloud-init locks the account's password whenever it configures a user without one, so by default a clone is reachable **only by SSH key** - `packer`, the template's password, stops working on the console. For a server that is the intended posture. Pass a password through the environment rather than a file when one is wanted:
 
 ```bash
 export TF_VAR_password='...'
 tofu apply -var-file=deploy.tfvars
 ```
+
+**For a desktop clone this is required, not optional.** GDM and the Proxmox console have no key login, so a desktop created without a password cannot be logged into at all. cloud-init applies the password on the instance's first boot only, so exporting it afterwards and re-applying does not unlock an existing VM - for that, SSH in with the key and run `sudo passwd syselement`.
 
 ## Provisioning is opt-in, and that is the whole design
 
