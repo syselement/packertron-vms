@@ -69,7 +69,13 @@ Two ways to avoid it, if SSH access to the node is not something you want to gra
 1. Place the snippet on the node once by hand and name it with `vendor_data_file_id`, for example `vendor_data_file_id = "local:snippets/firstboot.yaml"`. Generate its content with `tofu console` and `local.firstboot_vendor_data`, or write the three files by hand.
 2. Leave `provisioning_steps` empty and run `90-bootstrap-baremetal.sh` on the VM yourself afterwards.
 
-The storage named by `snippet_datastore_id` must also have the **snippets** content type enabled, under Datacenter -> Storage.
+The storage named by `snippet_datastore_id` must also have the **snippets** content type enabled. `local` does not by default; the provider then warns and the upload fails with `tee: /var/lib/vz/snippets/...: No such file or directory`. Enable it once on the node:
+
+```bash
+pvesm set local --content backup,iso,vztmpl,snippets   # --content replaces the list; keep what was there
+```
+
+Or under Datacenter -> Storage -> `local` -> Edit -> Content. Destroying a VM removes its snippet through the API, which is why the token's role needs `Datastore.Allocate`.
 
 ## Why vendor-data and not user-data
 
