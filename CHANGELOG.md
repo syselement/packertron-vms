@@ -1,3 +1,18 @@
+# [0.73.0](https://github.com/syselement/packertron-vms/compare/v0.72.0...v0.73.0) (2026-09-21)
+
+
+### Bug Fixes
+
+* update permissions and execution method for firstboot scripts to resolve permission issues ([420d938](https://github.com/syselement/packertron-vms/commit/420d938d5144d5226cd52251bcd2d9d889f6eb74))
+* update README and example files to clarify password requirements for desktop clones ([20d2860](https://github.com/syselement/packertron-vms/commit/20d2860db460dbf014df9f82ab59098c12a4ce7c))
+
+
+### Features
+
+* **deploy:** add example configuration for VM clone profiles ([1a7d24e](https://github.com/syselement/packertron-vms/commit/1a7d24e8302f4bdaf902873a6050016ac8e24473))
+
+
+
 # [0.72.0](https://github.com/syselement/packertron-vms/compare/v0.71.0...v0.72.0) (2026-09-19)
 
 
@@ -46,15 +61,6 @@
 ### Features
 
 * **scripts:** add check-templates.sh to run the CI checks locally ([d83041e](https://github.com/syselement/packertron-vms/commit/d83041efa59d01f528212493f1ea14257aec96bb))
-
-
-
-## [0.68.1](https://github.com/syselement/packertron-vms/compare/v0.68.0...v0.68.1) (2026-09-05)
-
-
-### Bug Fixes
-
-* **ci:** drop the custom Dependabot labels ([c9340bd](https://github.com/syselement/packertron-vms/commit/c9340bd9cd20ef4e0f2ddf5f98949e1d2556e73b))
 
 
 
