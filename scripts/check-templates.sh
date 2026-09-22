@@ -271,11 +271,20 @@ check_tofu() {
         return
     fi
 
-    if tofu -chdir="$module" fmt -check -recursive >/dev/null; then
-        pass "tofu fmt"
-    else
-        fail "deploy/: tofu fmt (run: tofu -chdir=deploy fmt)"
-    fi
+    # Tracked files only. A local deploy.tfvars or kali.tfvars is the operator's
+    # own, gitignored, and never seen by CI, so formatting it is not this
+    # repository's business - and -recursive would also descend into
+    # terraform.tfstate.d/.
+    local source unformatted=0
+    while read -r source; do
+        [[ -n "$source" ]] || continue
+        tofu fmt -check "$REPO_ROOT/$source" >/dev/null ||
+            {
+                fail "$source: tofu fmt (run: tofu fmt $source)"
+                unformatted=1
+            }
+    done < <(cd "$REPO_ROOT" && git ls-files 'deploy/*.tf' 'deploy/*.tfvars')
+    ((unformatted == 1)) || pass "tofu fmt"
 
     # -backend=false so this never touches remote state.
     if tofu -chdir="$module" init -backend=false -input=false >/dev/null; then

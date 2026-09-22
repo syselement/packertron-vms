@@ -131,6 +131,7 @@ Per-build overrides, which are the knobs a first build usually needs:
 | write `99-pve.cfg` | `datasource_list` narrows a clone to the drive Proxmox attaches, and `manage_etc_hosts` keeps `/etc/hosts` in step with the hostname. It cannot be written at install time: that would drop `None` from `datasource_list`, and `None` is the datasource carrying the seed's `ssh:` section |
 | verify cloud-init is unpinned | `01` already removed subiquity's drop-ins; this only checks it happened. A leftover that pins the datasource or disables networking gives clones no hostname, user, key or address, and nothing in any log to explain it |
 | write `99-hide-cidata.rules` | the cloud-init drive stays attached for life - it is the channel for later changes - and on a desktop udisks would otherwise mount it and show a "cidata" CD in the file manager. The udev rule hides it from udisks only; cloud-init reads the device directly |
+| drop the `/media/cdrom0` line from `/etc/fstab` | a no-op here, because subiquity writes no such entry. debian-installer does, and on a Kali clone it resolves to the cloud-init drive - see [`../kali/README.md`](../kali/README.md) |
 | remove `/etc/ssh/ssh_host_*` | otherwise every clone answers with the same fingerprint. cloud-init's `cc_ssh` regenerates them on the clone's first boot, before `sshd` starts |
 | remove `/var/lib/systemd/random-seed` | systemd credits it to the entropy pool at boot; shipping one means every clone starts from the same seed |
 

@@ -33,7 +33,8 @@ die() {
 CLOUD_CFG_DIR="${CLOUD_CFG_DIR:-/etc/cloud/cloud.cfg.d}"
 CLOUD_DISABLED_FILE="${CLOUD_DISABLED_FILE:-/etc/cloud/cloud-init.disabled}"
 UDEV_RULES_DIR="${UDEV_RULES_DIR:-/etc/udev/rules.d}"
-readonly CLOUD_CFG_DIR CLOUD_DISABLED_FILE UDEV_RULES_DIR
+FSTAB_FILE="${FSTAB_FILE:-/etc/fstab}"
+readonly CLOUD_CFG_DIR CLOUD_DISABLED_FILE UDEV_RULES_DIR FSTAB_FILE
 
 # Written here, not at install time. Setting datasource_list before the first
 # boot drops None from it, and None is the datasource that carries subiquity's
@@ -92,6 +93,32 @@ verify_cloud_init_unpinned() {
         die "${CLOUD_DISABLED_FILE} survived; cloud-init would never run on a clone"
 }
 
+# debian-installer writes an fstab entry for the install CD at /media/cdrom0.
+# It is stale the moment the build ends, and worse than stale on a clone:
+# Proxmox attaches the cloud-init drive as the only optical device, so the
+# entry resolves to it and a desktop clone shows "cdrom0" holding user-data and
+# network-config. udisks cannot be told to ignore that, because fstab is a
+# different mechanism - the rule below is matching and being honoured, and the
+# drive still appears. Subiquity writes no such entry, so this is a no-op on
+# the Ubuntu templates.
+remove_cdrom_fstab_entry() {
+    local temporary_fstab
+
+    grep -qE '^[^#][^[:space:]]*[[:space:]]+/media/cdrom0[[:space:]]' "$FSTAB_FILE" ||
+        return 0
+
+    log "remove the installer's /media/cdrom0 entry from ${FSTAB_FILE}"
+    temporary_fstab="$(mktemp)"
+    # shellcheck disable=SC2064
+    trap "rm -f '$temporary_fstab'" RETURN
+
+    awk '$1 !~ /^#/ && $2 == "/media/cdrom0" { next } { print }' \
+        "$FSTAB_FILE" >"$temporary_fstab" ||
+        die "failed filtering ${FSTAB_FILE}"
+    # Copied back rather than moved, so the original owner and mode survive.
+    cat "$temporary_fstab" >"$FSTAB_FILE" || die "failed rewriting ${FSTAB_FILE}"
+}
+
 # The cloud-init drive stays attached for the life of a clone: it is how a later
 # address or key change reaches the machine, and OpenTofu re-adds it if removed.
 # On a desktop, udisks auto-mounts it and it sits in the file manager as a CD
@@ -134,6 +161,7 @@ main() {
     write_pve_cloud_init_config
     enable_cloud_init
     verify_cloud_init_unpinned
+    remove_cdrom_fstab_entry
     hide_cloud_init_drive
     remove_host_keys
     remove_random_seed

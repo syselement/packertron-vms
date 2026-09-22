@@ -64,6 +64,18 @@ Kali ships `openssh-server` installed but **disabled**, which is a deliberate po
 
 This cost a build here. It is also easy to misdiagnose, because the unit is `ssh.service` on Debian and Kali - `systemctl status sshd` reports "could not be found" whether or not SSH is actually configured, which looks like a missing package when it is not one.
 
+## The installer's cdrom entry has to go
+
+debian-installer writes an fstab line for the install media:
+
+```
+/dev/sr0        /media/cdrom0   udf,iso9660 user,noauto     0       0
+```
+
+It is stale as soon as the build ends, and on a clone it is actively wrong. Proxmox attaches the cloud-init drive as the only optical device, so `/dev/sr0` now *is* `cidata` - and a desktop clone shows a mounted "cdrom0" containing `user-data`, `network-config` and `vendor-data`. Confirmed on the first Kali clone: `lsblk` reported `sr0 cidata /media/cdrom0`.
+
+The `99-hide-cidata.rules` udev rule does not help. It was present and correct on that clone, and the label really was `cidata`, so udisks was ignoring the device exactly as asked - fstab is simply a different mechanism, and gvfs honours it regardless. `seal-for-clone.sh` removes the line instead. Subiquity writes no such entry, so the Ubuntu templates are unaffected.
+
 ## Prior art
 
 Two public Kali preseeds informed this one. Both are worth reading, for opposite reasons.
