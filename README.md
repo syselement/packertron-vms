@@ -277,6 +277,7 @@ packer build -var-file=../proxmox.pkrvars.hcl .
 | `ubuntu-24.04-server` | 80024 | Ubuntu Server 24.04 LTS |
 | `ubuntu-26.04-server` | 80026 | Ubuntu Server 26.04 LTS |
 | `ubuntu-26.04-desktop` | 80126 | Ubuntu Desktop 26.04 LTS |
+| `kali` | 80200 | Kali Linux rolling, `kali-linux-default` + Xfce |
 
 Each result is a Proxmox **template** that is thin on purpose: base OS, `qemu-guest-agent`, and cloud-init left able to run again. None of them bakes in the tooling from `02-provision-system.sh` or `03-customize-system.sh`.
 
@@ -485,7 +486,7 @@ Pull requests and improvements are welcome! Ensure your code follows the repo’
     - [ ] Win11
     - [x] Ubuntu Server (24.04 and 26.04)
     - [x] Ubuntu Desktop (24.04 and 26.04)
-    - [ ] Kali Linux - template and preseed validate; first real build pending
+    - [x] Kali Linux - builds; cloning not yet tested
 - [ ] Integration with **Ansible** for advanced provisioning
 
 ---
