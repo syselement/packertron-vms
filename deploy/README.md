@@ -10,7 +10,7 @@ This is deliberately the smallest useful layer: one VM, no composition, no remot
 | --- | --- |
 | API token | `PROXMOX_VE_API_TOKEN` in the environment, never a file |
 | Endpoint, node, storage | `deploy.tfvars`, which is gitignored |
-| Which template to clone | `template_vm_id` - `80026` server, `80126` desktop |
+| Which template to clone | `template_vm_id` - `80026` server, `80126` desktop, `80200` Kali |
 | First-boot files | read directly from `../scripts/ubuntu/firstboot/` |
 
 The token needs the privileges to clone, configure and start a VM. It does **not** need `Sys.AccessNetwork`.
@@ -39,6 +39,14 @@ tofu apply -var-file=deploy.tfvars
 
 **For a desktop clone this is required, not optional.** GDM and the Proxmox console have no key login, so a desktop created without a password cannot be logged into at all. cloud-init applies the password on the instance's first boot only, so exporting it afterwards and re-applying does not unlock an existing VM - for that, SSH in with the key and run `sudo passwd syselement`.
 
+## Example profiles
+
+| File | Clones |
+| --- | --- |
+| `deploy.tfvars.example` | a plain server, with the workstation as a commented alternative |
+| `deploy.tfvars.example2` | eight profiles - static address, linked clone, branch under test - one active at a time |
+| `kali.tfvars.example` | the Kali template, with the settings it needs that the others do not |
+
 ## Provisioning is opt-in, and that is the whole design
 
 `provisioning_steps` is empty by default, and an empty value means the clone boots and does nothing: no repository is fetched, no snippet is uploaded, nothing is installed. That is what keeps one thin template usable for a throwaway server and for a full workstation.
@@ -50,6 +58,8 @@ Set it to ask for more:
 | `""` | nothing. The clone is exactly the template |
 | `"02"` | baseline and developer tooling |
 | `"02,03"` | the full toolchain, GNOME preferences and shell configuration - a desktop clone that matches the bare-metal machine |
+
+**Not on Kali.** Those scripts are Ubuntu's, and `ubuntu-context.sh` refuses to run on anything else - a Kali clone that asks for them gets a `packertron-firstboot.service` that fails and retries every five minutes forever. Kali carries its toolset in the image instead.
 
 The steps are the scripts in [`../scripts/ubuntu/`](../scripts/ubuntu/), run on the clone by the same `packertron-firstboot` service the autoinstall seeds use. They run from a fresh checkout of the repository, so a VM created a year from now gets the current scripts rather than whatever was current when its template was baked.
 

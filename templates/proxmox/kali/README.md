@@ -2,7 +2,7 @@
 
 Builds a Kali Linux template on Proxmox VE from the official installer ISO, driven by the debian-installer preseed in `http/`.
 
-> **Status: validates, not yet built.** `packer validate` passes in CI, the preseed passes `debconf-set-selections --checkonly`, and the ISO URL and checksum source were checked against `cdimage.kali.org`. It has not been run against a real node. The previous version of this directory was a stub with no seed at all, and a pinned checksum that did not match the ISO it named.
+> **Status: built on a real node** (Proxmox VE, q35/OVMF, Kali 2026.2, ~10 minutes, template 80200). **Cloning it has not been tested yet.** Three defects were found by building: the `http.kali.org` redirector handing apt an unverifiable HTTPS mirror, the rolling-release upgrade failing opaquely inside `pkgsel`, and `openssl-server` installed but left disabled so nothing listened on port 22. Each is covered in its own section below. The previous version of this directory was a stub with no seed at all, and a pinned checksum that did not match the ISO it named.
 
 Adapted from [mttaggart/seclab](https://github.com/mttaggart/seclab) (`Packer/kali/config.pkr.hcl`); the pristine upstream copy is in `tmp/upstream-originals/kali/` for comparison. Everything the upstream did through KeePass and CA-certificate provisioners is gone: credentials come from the environment, and the build block runs the same `00` -> `01` -> seal chain as every other Proxmox template here.
 
@@ -120,7 +120,21 @@ Expect a long build: `kali-linux-default` is large, and `00-update-system.sh` th
 
 ## Clone
 
-Through [`deploy/`](../../../deploy/README.md) like any other template, with `template_vm_id = 80200`. Leave `provisioning_steps` empty: the `02`/`03` scripts are Ubuntu's and refuse to run elsewhere, which is correct - Kali's tooling comes from its own metapackages.
+Through [`deploy/`](../../../deploy/README.md), starting from [`deploy/kali.tfvars.example`](../../../deploy/kali.tfvars.example):
+
+```bash
+cd deploy
+cp kali.tfvars.example kali.tfvars
+export PROXMOX_VE_API_TOKEN='automation@pve!deploy=xxxxxxxx-...'
+export TF_VAR_password='...'
+tofu apply -var-file=kali.tfvars
+```
+
+Three settings differ from a server clone, and each one bites if it is missed:
+
+- **`disk_size` must be at least 50.** The template's disk is 50G and Proxmox can grow a cloned disk but never shrink one, so the module's default of 32 fails the apply outright.
+- **`TF_VAR_password` is required**, not optional. The image runs Xfce, and a display manager has no key login; cloud-init locks the account's password unless one is supplied, so a clone without it cannot be logged into at the console at all.
+- **Leave `provisioning_steps` empty.** The `02`/`03` scripts are Ubuntu's and `ubuntu-context.sh` refuses to run elsewhere, which is correct - Kali's tooling comes from its own metapackages, in the image.
 
 ## Verify before pushing
 
