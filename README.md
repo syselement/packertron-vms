@@ -196,7 +196,7 @@ packertron-vms/
 │   │   ├── seal-for-clone.sh             strips per-machine state before cloning
 │   │   ├── ubuntu-24.04-server/    ubuntu-26.04-server/
 │   │   ├── ubuntu-26.04-desktop/
-│   │   ├── kali/                         stub, does not build yet
+│   │   ├── kali/                         debian-installer preseed, same seal
 │   │   └── win-11/                       unrepaired, excluded from CI
 │   └── vmware/                      <- kept working alongside
 │       ├── ubuntu-24.04-desktop/   ubuntu-26.04-desktop/
@@ -485,7 +485,7 @@ Pull requests and improvements are welcome! Ensure your code follows the repo’
     - [ ] Win11
     - [x] Ubuntu Server (24.04 and 26.04)
     - [x] Ubuntu Desktop (24.04 and 26.04)
-    - [ ] Kali Linux - template validates, but still needs `http/kali.preseed`
+    - [ ] Kali Linux - template and preseed validate; first real build pending
 - [ ] Integration with **Ansible** for advanced provisioning
 
 ---

@@ -1,0 +1,83 @@
+# debian-installer preseed for kali.pkr.hcl, served over HTTP by the
+# proxmox-iso build in this directory. Kali installs with d-i, not subiquity,
+# so this is a preseed and not a cloud-init seed.
+#
+# Docs:
+#   Preseed reference  https://www.debian.org/releases/stable/amd64/apb.en.html
+#   Kali metapackages  https://www.kali.org/docs/general-use/metapackages/
+#   README.md          what differs from the Ubuntu templates, and why
+#
+# Run:
+#   debconf-set-selections --checkonly kali.preseed
+#   ../../../../scripts/check-templates.sh seeds
+
+d-i debian-installer/locale string en_GB.UTF-8
+d-i keyboard-configuration/xkb-keymap select it
+
+d-i netcfg/choose_interface select auto
+d-i netcfg/get_hostname string kali
+d-i netcfg/get_domain string local
+# Set here too, so DHCP offering a name of its own cannot prompt.
+d-i netcfg/hostname string kali
+d-i netcfg/wireless_wep string
+
+# A direct mirror: the http.kali.org redirector can hand apt an HTTPS mirror,
+# which it cannot verify this early.
+d-i mirror/country string manual
+d-i mirror/http/hostname string kali.download
+d-i mirror/http/directory string /kali
+d-i mirror/http/proxy string
+d-i mirror/suite string kali-rolling
+
+d-i clock-setup/utc boolean true
+d-i time/zone string Europe/Rome
+d-i clock-setup/ntp boolean true
+
+# Hash from: openssl passwd -6 -stdin <<< 'packer'
+d-i passwd/root-login boolean false
+d-i passwd/user-fullname string syselement
+d-i passwd/username string syselement
+d-i passwd/user-password-crypted password $6$OxXY0.ndy/Q1c4mU$A6QNNCNXD24WVyJXm5gpHd5tq7tjLhJKAf1wAoG0yjsFdO0vFCs02JBtKRUqT0ivHXDdzFtKhs66jvL/x0rKM1
+
+d-i partman-auto/method string lvm
+d-i partman-auto-lvm/guided_size string max
+d-i partman-lvm/device_remove_lvm boolean true
+d-i partman-md/device_remove_md boolean true
+d-i partman-lvm/confirm boolean true
+d-i partman-lvm/confirm_nooverwrite boolean true
+d-i partman-auto/choose_recipe select atomic
+d-i partman-partitioning/confirm_write_new_label boolean true
+d-i partman/choose_partition select finish
+d-i partman/confirm boolean true
+d-i partman/confirm_nooverwrite boolean true
+
+# A leftover cdrom entry breaks apt on every clone.
+d-i apt-setup/use_mirror boolean true
+d-i apt-setup/disable-cdrom-entries boolean true
+d-i apt-setup/non-free boolean true
+d-i apt-setup/contrib boolean true
+
+# The guest agent cannot move to a provisioner: it is how Packer finds the VM.
+tasksel tasksel/first multiselect standard
+d-i pkgsel/include string kali-linux-default kali-desktop-xfce qemu-guest-agent cloud-init openssh-server ca-certificates
+# The rolling-release upgrade runs in 00-update-system.sh, where a failure is
+# visible and retryable.
+d-i pkgsel/upgrade select none
+d-i pkgsel/update-policy select none
+popularity-contest popularity-contest/participate boolean false
+
+d-i grub-installer/only_debian boolean true
+d-i grub-installer/with_other_os boolean false
+d-i grub-installer/bootdev string default
+
+d-i finish-install/reboot_in_progress note
+d-i cdrom-detect/eject boolean true
+
+# Kali installs openssh-server disabled, hence the enable. cloud-init is
+# switched off for the build; seal-for-clone.sh turns it back on.
+d-i preseed/late_command string \
+    in-target sh -c 'install -d -m 0700 -o syselement -g syselement /home/syselement/.ssh && printf "%s\n" "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPA3hxPOnJAjCFoZMz8mcT+fZTy5j0vjLWPGVM2vaA88" > /home/syselement/.ssh/authorized_keys && chown syselement:syselement /home/syselement/.ssh/authorized_keys && chmod 0600 /home/syselement/.ssh/authorized_keys'; \
+    in-target sh -c 'printf "syselement ALL=(ALL) NOPASSWD:ALL\n" > /etc/sudoers.d/99-syselement && chmod 0440 /etc/sudoers.d/99-syselement && visudo -c -f /etc/sudoers.d/99-syselement'; \
+    in-target sh -c 'printf "PasswordAuthentication no\n" > /etc/ssh/sshd_config.d/50-packertron.conf'; \
+    in-target systemctl enable ssh; \
+    in-target touch /etc/cloud/cloud-init.disabled

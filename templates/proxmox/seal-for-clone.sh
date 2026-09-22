@@ -31,8 +31,9 @@ die() {
 
 # Overridable only so the check and the rule below can run against a fixture.
 CLOUD_CFG_DIR="${CLOUD_CFG_DIR:-/etc/cloud/cloud.cfg.d}"
+CLOUD_DISABLED_FILE="${CLOUD_DISABLED_FILE:-/etc/cloud/cloud-init.disabled}"
 UDEV_RULES_DIR="${UDEV_RULES_DIR:-/etc/udev/rules.d}"
-readonly CLOUD_CFG_DIR UDEV_RULES_DIR
+readonly CLOUD_CFG_DIR CLOUD_DISABLED_FILE UDEV_RULES_DIR
 
 # Written here, not at install time. Setting datasource_list before the first
 # boot drops None from it, and None is the datasource that carries subiquity's
@@ -52,6 +53,15 @@ datasource_list: [ NoCloud, ConfigDrive ]
 manage_etc_hosts: localhost
 CFG
     chmod 0644 "$CLOUD_CFG_DIR/99-pve.cfg"
+}
+
+# The Kali preseed switches cloud-init off for the build with this file, since
+# nothing pins it there the way subiquity's 99-installer.cfg does on Ubuntu.
+# Removing it is what lets a clone read its cloud-init drive. Ubuntu never
+# creates it, so this is a no-op there.
+enable_cloud_init() {
+    log "remove ${CLOUD_DISABLED_FILE}"
+    rm -f "$CLOUD_DISABLED_FILE" || die "failed removing ${CLOUD_DISABLED_FILE}"
 }
 
 # `cloud-init clean` in 01 removes subiquity's drop-ins, so nothing here has to.
@@ -77,6 +87,9 @@ verify_cloud_init_unpinned() {
     if grep -rqs -E 'config: *disabled' "$CLOUD_CFG_DIR"; then
         die "cloud-init networking is disabled in ${CLOUD_CFG_DIR}; clones would come up with no address"
     fi
+
+    [[ ! -e "$CLOUD_DISABLED_FILE" ]] ||
+        die "${CLOUD_DISABLED_FILE} survived; cloud-init would never run on a clone"
 }
 
 # The cloud-init drive stays attached for the life of a clone: it is how a later
@@ -119,6 +132,7 @@ main() {
     [[ "$EUID" -eq 0 ]] || die "run as root"
 
     write_pve_cloud_init_config
+    enable_cloud_init
     verify_cloud_init_unpinned
     hide_cloud_init_drive
     remove_host_keys

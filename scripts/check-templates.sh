@@ -11,7 +11,8 @@
 # Run:
 #   scripts/check-templates.sh            # everything
 #   scripts/check-templates.sh packer     # templates only
-#   scripts/check-templates.sh seeds      # cloud-init seeds only
+#   scripts/check-templates.sh seeds      # cloud-init seeds and d-i preseeds
+#   scripts/check-templates.sh preseeds   # d-i preseeds only
 #   scripts/check-templates.sh matrix     # CI matrix vs the templates on disk
 #   scripts/check-templates.sh shell      # shellcheck/shfmt outside scripts/ubuntu/
 #   scripts/check-templates.sh docs       # Markdown sentences kept on one line
@@ -304,13 +305,60 @@ check_firstboot() {
     fi
 }
 
+# Prints each offending line and returns non-zero if there is one. Continuation
+# lines (a trailing backslash) belong to the entry above and carry no type.
+preseed_type_errors() {
+    local file="$1"
+
+    awk -v file="${file#"$REPO_ROOT"/}" '
+        continued            { continued = /\\$/; next }
+        /^[[:space:]]*(#|$)/ { next }
+        {
+            continued = /\\$/
+            type = $3
+            if (type !~ /^(string|boolean|select|multiselect|note|password|text|title|error)$/) {
+                printf "   %s:%d: unknown debconf type \"%s\"\n", file, NR, type > "/dev/stderr"
+                bad = 1
+            } else if (type == "boolean" && $4 !~ /^(true|false)$/) {
+                printf "   %s:%d: boolean must be true or false, not \"%s\"\n", file, NR, $4 > "/dev/stderr"
+                bad = 1
+            }
+        }
+        END { exit bad }
+    ' "$file"
+}
+
+# debian-installer preseeds are debconf selections, not cloud-config, and get
+# the check debconf itself offers plus the type check above.
+check_preseeds() {
+    local file relative
+
+    note "debian-installer preseeds"
+    for file in "$REPO_ROOT"/templates/*/*/http/*.preseed; do
+        [[ -f "$file" ]] || continue
+        relative="${file#"$REPO_ROOT"/}"
+        if ! command -v debconf-set-selections >/dev/null 2>&1; then
+            fail "debconf-set-selections is not installed (package debconf)"
+            break
+        fi
+        if ! debconf-set-selections --checkonly "$file" 2>/dev/null; then
+            fail "$relative: preseed syntax"
+            debconf-set-selections --checkonly "$file" 2>&1 | tail -5 >&2 || true
+            continue
+        fi
+        # --checkonly only insists on three fields: it accepts a misspelt
+        # type or a boolean set to "maybe", and d-i then stops at a question
+        # nobody is there to answer.
+        if preseed_type_errors "$file"; then
+            pass "$relative"
+        else
+            fail "$relative: unknown debconf type or bad boolean (see above)"
+        fi
+    done
+}
+
 check_seeds() {
     local file documents
-
-    if ! command -v cloud-init >/dev/null 2>&1; then
-        fail "cloud-init is not installed (apt-get install cloud-init)"
-        return
-    fi
 
     note "cloud-init seeds"
     for file in "$REPO_ROOT"/scripts/ubuntu/autoinstall-*.yaml "$REPO_ROOT"/templates/*/*/http/user-data; do
@@ -347,6 +395,7 @@ main() {
     case "$scope" in
         all)
             check_templates
+            check_preseeds
             check_seeds
             check_firstboot
             check_tofu
@@ -355,14 +404,18 @@ main() {
             check_matrix
             ;;
         packer) check_templates ;;
-        seeds) check_seeds ;;
+        seeds)
+            check_preseeds
+            check_seeds
+            ;;
+        preseeds) check_preseeds ;;
         firstboot) check_firstboot ;;
         tofu) check_tofu ;;
         matrix) check_matrix ;;
         shell) check_shell ;;
         docs) check_docs ;;
         *)
-            printf 'usage: %s [<hypervisor>] [all|packer|seeds|firstboot|tofu|shell|docs|matrix]\n' "${BASH_SOURCE[0]##*/}" >&2
+            printf 'usage: %s [<hypervisor>] [all|packer|seeds|preseeds|firstboot|tofu|shell|docs|matrix]\n' "${BASH_SOURCE[0]##*/}" >&2
             printf 'hypervisors: %s\n' "$(cd "$REPO_ROOT/templates" && echo */)" >&2
             exit 2
             ;;

@@ -17,6 +17,7 @@ on:
       - "**/*.pkrvars.hcl"
       - "**/http/user-data"
       - "**/http/meta-data"
+      - "**/http/*.preseed"
       - "scripts/ubuntu/autoinstall-*.yaml"
       - "scripts/check-templates.sh"
       - "scripts/sync-firstboot.sh"
@@ -103,6 +104,9 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install --yes --no-install-recommends cloud-init
+
+      - name: Validate every debian-installer preseed
+        run: ./scripts/check-templates.sh preseeds
 
       - name: Validate every seed file
         run: |
