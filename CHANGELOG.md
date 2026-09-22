@@ -1,3 +1,12 @@
+# [0.75.0](https://github.com/syselement/packertron-vms/compare/v0.74.0...v0.75.0) (2026-09-22)
+
+
+### Features
+
+* **kali:** update fstab handling and improve tofu formatting checks ([867a0b3](https://github.com/syselement/packertron-vms/commit/867a0b3385de75b295491cf0073af6b1acfb633a))
+
+
+
 # [0.74.0](https://github.com/syselement/packertron-vms/compare/v0.73.0...v0.74.0) (2026-09-22)
 
 
@@ -37,25 +46,6 @@
 ### Features
 
 * update runner handling to fetch from repository ref instead of working tree ([19655af](https://github.com/syselement/packertron-vms/commit/19655af9210eb1c36705492732762a9deb21217a))
-
-
-
-# [0.70.0](https://github.com/syselement/packertron-vms/compare/v0.69.0...v0.70.0) (2026-09-09)
-
-
-### Bug Fixes
-
-* **proxmox:** authenticate over the SSH agent, and make the two first-build knobs tunable ([1321201](https://github.com/syselement/packertron-vms/commit/132120128e47ae137d5a462ba56dd3d4ea9eb463))
-* **proxmox:** increase VM cores from 1 to 2 for improved performance ([28b4a3d](https://github.com/syselement/packertron-vms/commit/28b4a3d2b2f1d44d19594a53ddeff56a3fe8bd1e))
-* update Proxmox template VM ID and enhance cloud-init handling ([7f4871b](https://github.com/syselement/packertron-vms/commit/7f4871b36a377dc2b2c1f0c3592259c2e44385d3))
-
-
-### Features
-
-* enhance template checks, add Markdown verification, and update README and user-data for clarity ([78d2af8](https://github.com/syselement/packertron-vms/commit/78d2af80a6370669c6f4695e8329ff6bc07e29b3))
-* **packer:** add an Ubuntu Server 24.04 template for Proxmox ([38a556b](https://github.com/syselement/packertron-vms/commit/38a556bb567af5b0890be3b348b2ea18e1a48c85))
-* **proxmox:** enhance ISO handling and update template description for clarity ([bf29ea0](https://github.com/syselement/packertron-vms/commit/bf29ea0c5343f5344956870a1ed156b29eb13792))
-* **scripts:** add host requirement scripts for Linux and Windows ([e5a2106](https://github.com/syselement/packertron-vms/commit/e5a21060a118185e42f6d4ca476efae173d4a557))
 
 
 
