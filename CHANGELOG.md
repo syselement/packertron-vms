@@ -1,3 +1,12 @@
+# [0.74.0](https://github.com/syselement/packertron-vms/compare/v0.73.0...v0.74.0) (2026-09-22)
+
+
+### Features
+
+* **kali:** enhance Proxmox Kali template with debian-installer preseed and validation checks ([16b7c8a](https://github.com/syselement/packertron-vms/commit/16b7c8a4376876f8fb7a546bde4639f7dadb2865))
+
+
+
 # [0.73.0](https://github.com/syselement/packertron-vms/compare/v0.72.0...v0.73.0) (2026-09-21)
 
 
@@ -47,20 +56,6 @@
 * **packer:** add an Ubuntu Server 24.04 template for Proxmox ([38a556b](https://github.com/syselement/packertron-vms/commit/38a556bb567af5b0890be3b348b2ea18e1a48c85))
 * **proxmox:** enhance ISO handling and update template description for clarity ([bf29ea0](https://github.com/syselement/packertron-vms/commit/bf29ea0c5343f5344956870a1ed156b29eb13792))
 * **scripts:** add host requirement scripts for Linux and Windows ([e5a2106](https://github.com/syselement/packertron-vms/commit/e5a21060a118185e42f6d4ca476efae173d4a557))
-
-
-
-# [0.69.0](https://github.com/syselement/packertron-vms/compare/v0.68.1...v0.69.0) (2026-09-05)
-
-
-### Bug Fixes
-
-* **ci:** push releases with a token that the ruleset lets through ([338c9c3](https://github.com/syselement/packertron-vms/commit/338c9c3d4f584c1fad01b35363175a5de1db10bc))
-
-
-### Features
-
-* **scripts:** add check-templates.sh to run the CI checks locally ([d83041e](https://github.com/syselement/packertron-vms/commit/d83041efa59d01f528212493f1ea14257aec96bb))
 
 
 
