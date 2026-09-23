@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 #
-# Update an Ubuntu VM template and install the guest agent for the detected hypervisor.
+# Update an Ubuntu or Kali VM template and install the guest agent for the
+# detected hypervisor.
 #
 # Docs:
 #   README.md  the provisioning chain and where this fits

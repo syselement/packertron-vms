@@ -15,7 +15,8 @@
 # Docs:
 #   cloud-init      https://cloudinit.readthedocs.io/en/latest/
 #   Proxmox cloning https://pve.proxmox.com/wiki/VM_Templates_and_Clones
-#   README.md       ../ubuntu-24.04-server/README.md, "What the build removes"
+#   README.md       ../ubuntu-24.04-server/README.md, "What the build does
+#                   before the template is sealed"
 #
 # Run:
 #   Packer invokes this as a provisioner; it is not meant to be run by hand.

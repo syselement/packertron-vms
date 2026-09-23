@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
-# Seal an Ubuntu VM template: strip caches, logs and per-machine identity so
-# clones start clean.
+# Seal an Ubuntu or Kali VM template: strip caches, logs and per-machine
+# identity so clones start clean.
 #
 # DESTRUCTIVE on a running system: it truncates the machine-id and deletes
 # every file under /tmp and /var/tmp. 90-bootstrap-baremetal.sh deliberately

@@ -7,7 +7,7 @@
 #
 # CREDENTIALS DO NOT BELONG HERE - the API token comes from the environment:
 #
-#   export PKR_VAR_proxmox_api_token_id="packer@pve!templates"
+#   export PKR_VAR_proxmox_api_token_id="automation@pve!deploy"
 #   export PKR_VAR_proxmox_api_token_secret="..."
 #
 # See ../../SECURITY.md.

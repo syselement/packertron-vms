@@ -21,13 +21,13 @@
 
 # --- node, shared by every profile ------------------------------------------
 
-proxmox_endpoint = "https://192.168.5.11:8006/"   # no /api2/json, unlike Packer
-proxmox_node     = "pve02"
-proxmox_insecure = true                            # only for a self-signed node
+proxmox_endpoint = "https://proxmox.example.lan:8006/"   # no /api2/json, unlike Packer
+proxmox_node     = "pve"
+proxmox_insecure = false                                 # true only for a self-signed node
 datastore_id     = "vmstore"
 
 ssh_authorized_keys = [
-  "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPA3hxPOnJAjCFoZMz8mcT+fZTy5j0vjLWPGVM2vaA88",
+  "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIexampleexampleexampleexampleexample you@workstation",
 ]
 
 # --- 1. plain server, 26.04 -------------------------------------------------
@@ -70,8 +70,8 @@ disk_size      = 32
 # cores          = 2
 # memory         = 2048
 # disk_size      = 32
-# ipv4_address   = "192.168.5.201/24"
-# ipv4_gateway   = "192.168.5.1"
+# ipv4_address   = "192.168.1.201/24"
+# ipv4_gateway   = "192.168.1.1"
 
 # --- 5. the workstation: desktop, fully provisioned -------------------------
 # A desktop clone that provisions itself into the same machine as the

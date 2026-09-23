@@ -6,7 +6,7 @@ Builds a VMware Workstation VM with the `vmware-iso` builder.
 - The result is a fat image: everything is baked in, nothing is deferred to first boot.
 - That is the opposite of the Proxmox template beside it ([proxmox/ubuntu-24.04-server](../../proxmox/ubuntu-24.04-server/README.md)), which stays thin and provisions per VM.
 
-Adapted from [ynlamy/packer-ubuntuserver24_04](https://github.com/ynlamy/packer-ubuntuserver24_04) (GPLv3). The pristine upstream copy is in `tmp/upstream-originals/`.
+Adapted from [ynlamy/packer-ubuntuserver24_04](https://github.com/ynlamy/packer-ubuntuserver24_04) (GPLv3).
 
 ## Layout
 

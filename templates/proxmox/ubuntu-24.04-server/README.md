@@ -69,7 +69,7 @@ $EDITOR proxmox.pkrvars.hcl
 Create a Proxmox API **token** scoped to template creation - not a root password - and export it. The role needs `VM.GuestAgent.Audit` alongside the allocate and config privileges: Packer asks the guest agent for the VM's address, and without that privilege the lookup returns nothing, so the build waits out `ssh_timeout` having never contacted the VM. On PVE 8 it replaced the older `VM.Monitor`, which no longer exists.
 
 ```bash
-export PKR_VAR_proxmox_api_token_id="packer@pve!templates"
+export PKR_VAR_proxmox_api_token_id="automation@pve!deploy"
 export PKR_VAR_proxmox_api_token_secret="..."
 ```
 
@@ -129,9 +129,10 @@ Per-build overrides, which are the knobs a first build usually needs:
 | Step | Why |
 | --- | --- |
 | write `99-pve.cfg` | `datasource_list` narrows a clone to the drive Proxmox attaches, and `manage_etc_hosts` keeps `/etc/hosts` in step with the hostname. It cannot be written at install time: that would drop `None` from `datasource_list`, and `None` is the datasource carrying the seed's `ssh:` section |
+| remove `/etc/cloud/cloud-init.disabled` | a no-op here: only the Kali preseed writes that file, to keep cloud-init off during its own build. Removing it is what lets a clone read its cloud-init drive at all |
 | verify cloud-init is unpinned | `01` already removed subiquity's drop-ins; this only checks it happened. A leftover that pins the datasource or disables networking gives clones no hostname, user, key or address, and nothing in any log to explain it |
-| write `99-hide-cidata.rules` | the cloud-init drive stays attached for life - it is the channel for later changes - and on a desktop udisks would otherwise mount it and show a "cidata" CD in the file manager. The udev rule hides it from udisks only; cloud-init reads the device directly |
 | drop the `/media/cdrom0` line from `/etc/fstab` | a no-op here, because subiquity writes no such entry. debian-installer does, and on a Kali clone it resolves to the cloud-init drive - see [`../kali/README.md`](../kali/README.md) |
+| write `99-hide-cidata.rules` | the cloud-init drive stays attached for life - it is the channel for later changes - and on a desktop udisks would otherwise mount it and show a "cidata" CD in the file manager. The udev rule hides it from udisks only; cloud-init reads the device directly |
 | remove `/etc/ssh/ssh_host_*` | otherwise every clone answers with the same fingerprint. cloud-init's `cc_ssh` regenerates them on the clone's first boot, before `sshd` starts |
 | remove `/var/lib/systemd/random-seed` | systemd credits it to the entropy pool at boot; shipping one means every clone starts from the same seed |
 

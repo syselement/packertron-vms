@@ -31,7 +31,7 @@ Nothing that authenticates to real infrastructure is committed. A value lands in
 | ISO URL, checksum, sizing | the template's `.pkr.hcl` / `.auto.pkrvars.hcl` | yes |
 
 ```bash
-export PKR_VAR_proxmox_api_token_id="packer@pve!templates"
+export PKR_VAR_proxmox_api_token_id="automation@pve!deploy"
 export PKR_VAR_proxmox_api_token_secret="..."
 export PKR_VAR_ssh_password="..."
 ```

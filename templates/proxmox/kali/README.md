@@ -2,9 +2,9 @@
 
 Builds a Kali Linux template on Proxmox VE from the official installer ISO, driven by the debian-installer preseed in `http/`.
 
-> **Status: built on a real node** (Proxmox VE, q35/OVMF, Kali 2026.2, ~10 minutes, template 80200). **Cloning it has not been tested yet.** Three defects were found by building: the `http.kali.org` redirector handing apt an unverifiable HTTPS mirror, the rolling-release upgrade failing opaquely inside `pkgsel`, and `openssl-server` installed but left disabled so nothing listened on port 22. Each is covered in its own section below. The previous version of this directory was a stub with no seed at all, and a pinned checksum that did not match the ISO it named.
+> **Status: built and cloned on a real node** (Proxmox VE, q35/OVMF, Kali 2026.2, ~10 minutes, template 80200; cloned through [`../../../deploy/`](../../../deploy/) with `kali.tfvars.example`). Four defects were found this way, none by `packer validate`: the `http.kali.org` redirector handing apt an unverifiable HTTPS mirror, the rolling-release upgrade failing opaquely inside `pkgsel`, `openssh-server` installed but left disabled so nothing listened on port 22, and the installer's `/media/cdrom0` fstab entry resolving to the cloud-init drive on every clone. Each is covered in its own section below. The previous version of this directory was a stub with no seed at all, and a pinned checksum that did not match the ISO it named.
 
-Adapted from [mttaggart/seclab](https://github.com/mttaggart/seclab) (`Packer/kali/config.pkr.hcl`); the pristine upstream copy is in `tmp/upstream-originals/kali/` for comparison. Everything the upstream did through KeePass and CA-certificate provisioners is gone: credentials come from the environment, and the build block runs the same `00` -> `01` -> seal chain as every other Proxmox template here.
+Adapted from [mttaggart/seclab](https://github.com/mttaggart/seclab) (`Packer/kali/config.pkr.hcl`). Everything the upstream did through KeePass and CA-certificate provisioners is gone: credentials come from the environment, and the build block runs the same `00` -> `01` -> seal chain as every other Proxmox template here.
 
 Firmware, credentials, the SSH-agent login, the seal, and the clone-time model are identical to the Ubuntu templates and documented once, in [`../ubuntu-24.04-server/README.md`](../ubuntu-24.04-server/README.md). This file records only what Kali does differently.
 
@@ -76,6 +76,8 @@ It is stale as soon as the build ends, and on a clone it is actively wrong. Prox
 
 The `99-hide-cidata.rules` udev rule does not help. It was present and correct on that clone, and the label really was `cidata`, so udisks was ignoring the device exactly as asked - fstab is simply a different mechanism, and gvfs honours it regardless. `seal-for-clone.sh` removes the line instead. Subiquity writes no such entry, so the Ubuntu templates are unaffected.
 
+That removal landed after template 80200 was built, so it is the one change here that a rebuild is still needed to pick up: a clone from a template built before it will still show `cdrom0`. Rebuilding is the whole fix - nothing has to be done on an existing clone beyond editing its `/etc/fstab` by hand.
+
 ## Prior art
 
 Two public Kali preseeds informed this one. Both are worth reading, for opposite reasons.
@@ -108,7 +110,7 @@ Read both as evidence about which approaches exist, not as specifications.
 ```bash
 cd templates/proxmox/kali
 ssh-add -l                                            # the seed's key must be loaded
-export PKR_VAR_proxmox_api_token_id="packer@pve!templates"
+export PKR_VAR_proxmox_api_token_id="automation@pve!deploy"
 export PKR_VAR_proxmox_api_token_secret="..."
 packer init .
 packer validate -var-file=../proxmox.pkrvars.hcl .

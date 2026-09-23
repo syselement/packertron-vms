@@ -5,24 +5,24 @@
 #
 # THE API TOKEN DOES NOT BELONG HERE. It comes from the environment:
 #
-#   export PROXMOX_VE_API_TOKEN='tofu@pve!deploy=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'
+#   export PROXMOX_VE_API_TOKEN='automation@pve!deploy=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'
 #
 # See ../SECURITY.md.
 
 # Include the scheme and the port. Unlike the Packer variable, no /api2/json.
-proxmox_endpoint = "https://192.168.5.11:8006/"
-proxmox_node     = "pve02"
+proxmox_endpoint = "https://proxmox.example.lan:8006/"
+proxmox_node     = "pve"
 
 # Leave false. Set it true only for a node presenting a self-signed
 # certificate that you have deliberately chosen to accept.
-proxmox_insecure = true
+proxmox_insecure = false
 
 datastore_id = "vmstore"
 
 # Public keys authorised on the clone, in addition to whatever the template
 # already carries.
 ssh_authorized_keys = [
-  "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPA3hxPOnJAjCFoZMz8mcT+fZTy5j0vjLWPGVM2vaA88",
+  "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIexampleexampleexampleexampleexample you@workstation",
 ]
 
 # ---------------------------------------------------------------------------

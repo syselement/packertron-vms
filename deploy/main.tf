@@ -104,10 +104,18 @@ resource "proxmox_virtual_environment_vm" "this" {
 
   # Matches the template's scsi0. Proxmox can grow a cloned disk but never
   # shrink one, so disk_size below the template's own size fails the apply.
+  #
+  # discard and ssd are restated because naming a disk here means the provider
+  # writes the whole block: left out, they fall back to the provider's own
+  # defaults (ignore/false) and the clone quietly loses what every .pkr.hcl in
+  # templates/proxmox/ sets on the template. Without discard a thin-provisioned
+  # clone never returns freed blocks to the pool, so it only ever grows.
   disk {
     datastore_id = var.datastore_id
     interface    = "scsi0"
     size         = var.disk_size
+    discard      = "on"
+    ssd          = true
   }
 
   agent {

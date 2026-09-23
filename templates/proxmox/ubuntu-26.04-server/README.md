@@ -22,7 +22,7 @@ Both take their checksum from the distribution's signed `SHA256SUMS` in the code
 ```bash
 cd templates/proxmox/ubuntu-26.04-server
 ssh-add -l                                            # the seed's key must be loaded
-export PKR_VAR_proxmox_api_token_id="packer@pve!templates"
+export PKR_VAR_proxmox_api_token_id="automation@pve!deploy"
 export PKR_VAR_proxmox_api_token_secret="..."
 packer init .
 packer validate -var-file=../proxmox.pkrvars.hcl .

@@ -20,6 +20,15 @@ d-i netcfg/get_domain string local
 # Set here too, so DHCP offering a name of its own cannot prompt.
 d-i netcfg/hostname string kali
 d-i netcfg/wireless_wep string
+# The 15s default expires while a Linux bridge is still learning: STP holds a
+# new port down for two forward delays, so nothing answers until ~30s in. d-i
+# then falls through to "configure the network manually" and an unattended
+# build waits there for good.
+d-i netcfg/dhcp_timeout string 60
+# Nothing here needs firmware from removable media - the disk, NIC and console
+# are all virtio - and refusing the search keeps the build from depending on
+# priority=critical to suppress the prompt.
+d-i hw-detect/load_firmware boolean false
 
 # A direct mirror: the http.kali.org redirector can hand apt an HTTPS mirror,
 # which it cannot verify this early.

@@ -8,13 +8,13 @@
 #
 # THE API TOKEN DOES NOT BELONG HERE, and neither does the password.
 
-proxmox_endpoint = "https://192.168.5.11:8006/"   # no /api2/json, unlike Packer
-proxmox_node     = "pve02"
-proxmox_insecure = true                            # only for a self-signed node
+proxmox_endpoint = "https://proxmox.example.lan:8006/"   # no /api2/json, unlike Packer
+proxmox_node     = "pve"
+proxmox_insecure = false                                 # true only for a self-signed node
 datastore_id     = "vmstore"
 
 ssh_authorized_keys = [
-  "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPA3hxPOnJAjCFoZMz8mcT+fZTy5j0vjLWPGVM2vaA88",
+  "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIexampleexampleexampleexampleexample you@workstation",
 ]
 
 template_vm_id = 80200        # kali-template

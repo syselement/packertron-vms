@@ -31,7 +31,7 @@ That is what makes one template serve both cases: a plain desktop VM clones from
 ```bash
 cd templates/proxmox/ubuntu-26.04-desktop
 ssh-add -l                                            # the seed's key must be loaded
-export PKR_VAR_proxmox_api_token_id="packer@pve!templates"
+export PKR_VAR_proxmox_api_token_id="automation@pve!deploy"
 export PKR_VAR_proxmox_api_token_secret="..."
 packer init .
 packer validate -var-file=../proxmox.pkrvars.hcl .

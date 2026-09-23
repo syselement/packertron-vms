@@ -14,7 +14,7 @@
 >
 > Expect updates and improvements as I validate each step.  
 
-`packertron-vms` is a **collection of templates for automated VM deployment**, designed for home lab environments and testing setups. Using **Packer and Vagrant**, it simplifies the creation, provisioning, and management of virtual machines. The templates currently support **VMware Workstation** (future plans include **Ansible** automation and expanding hypervisor support like **VirtualBox**, **Proxmox**, etc).
+`packertron-vms` is a **collection of templates for automated VM deployment**, designed for home lab environments and testing setups. **Proxmox VE** is the primary target: **Packer** builds a thin template from an installer ISO, and **OpenTofu** clones it into a running VM that provisions itself at first boot only if asked. The **VMware Workstation** path is maintained alongside it, with **Vagrant** for the VM lifecycle. Ubuntu Server, Ubuntu Desktop, Kali Linux and Windows are the guests.
 
 ---
 
@@ -29,7 +29,7 @@
     - [🔧 Installation](#-installation)
         - [1️⃣ Install Chocolatey (Windows Users Only)](#1️⃣-install-chocolatey-windows-users-only)
         - [2️⃣ Install Dependencies](#2️⃣-install-dependencies)
-        - [3️⃣ Install Vagrant VMware Plugin](#3️⃣-install-vagrant-vmware-plugin)
+        - [3️⃣ Install Vagrant VMware Plugins](#3️⃣-install-vagrant-vmware-plugins)
         - [4️⃣ Clone packertron-vms Repository](#4️⃣-clone-packertron-vms-repository)
     - [📁 Directory Structure](#-directory-structure)
     - [🚀 Build \& Deploy VMs](#-build--deploy-vms)
@@ -267,7 +267,7 @@ export PKR_VAR_proxmox_api_token_secret="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
 Build:
 
 ```bash
-cd templates/proxmox/ubuntu-24.04-server   # or ubuntu-26.04-server, ubuntu-26.04-desktop
+cd templates/proxmox/ubuntu-24.04-server   # or ubuntu-26.04-server, ubuntu-26.04-desktop, kali
 packer init .
 packer build -var-file=../proxmox.pkrvars.hcl .
 ```
@@ -310,6 +310,8 @@ Provisioning is opt-in, through one variable:
 | `""` (default) | nothing. It is exactly the template |
 | `"02"` | baseline and developer tooling |
 | `"02,03"` | the full toolchain, GNOME preferences and shell configuration |
+
+Those steps are Ubuntu's, and `ubuntu-context.sh` refuses to run anywhere else, so a **Kali** clone must leave `provisioning_steps` empty - asking for them gets a first-boot service that fails and retries every five minutes for good. Kali carries its toolset in the image instead.
 
 So a throwaway server and a workstation built to match the bare-metal PC come from the same template and differ by one line of configuration. The steps run in the background well after `tofu apply` returns; `deploy/README.md` covers following them.
 
@@ -467,7 +469,7 @@ vagrant destroy -f
 
 ## 📜 License
 
-Released under [MIT](/LICENSE) by [@syselement](https://github.com/syselement).
+Released under [MIT](LICENSE) by [@syselement](https://github.com/syselement).
 
 ## 🤝 Contributing
 

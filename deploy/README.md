@@ -22,7 +22,7 @@ cd deploy
 cp deploy.tfvars.example deploy.tfvars
 $EDITOR deploy.tfvars
 
-export PROXMOX_VE_API_TOKEN='tofu@pve!deploy=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'
+export PROXMOX_VE_API_TOKEN='automation@pve!deploy=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'
 tofu init
 tofu plan  -var-file=deploy.tfvars
 tofu apply -var-file=deploy.tfvars
