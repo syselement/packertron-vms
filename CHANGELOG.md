@@ -1,3 +1,12 @@
+# [0.76.0](https://github.com/syselement/packertron-vms/compare/v0.75.0...v0.76.0) (2026-09-23)
+
+
+### Features
+
+* **kali:** enhance Kali template support and update deployment configurations ([e1d8f0f](https://github.com/syselement/packertron-vms/commit/e1d8f0f7371e342dcce941c9798104015817b952))
+
+
+
 # [0.75.0](https://github.com/syselement/packertron-vms/compare/v0.74.0...v0.75.0) (2026-09-22)
 
 
@@ -37,15 +46,6 @@
 ### Features
 
 * **proxmox:** streamline SSH host key management and update README for clarity ([2356840](https://github.com/syselement/packertron-vms/commit/2356840904e1ae4291e95e9a2119b92bb321c2c5))
-
-
-
-# [0.71.0](https://github.com/syselement/packertron-vms/compare/v0.70.0...v0.71.0) (2026-09-19)
-
-
-### Features
-
-* update runner handling to fetch from repository ref instead of working tree ([19655af](https://github.com/syselement/packertron-vms/commit/19655af9210eb1c36705492732762a9deb21217a))
 
 
 
