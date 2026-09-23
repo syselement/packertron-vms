@@ -1,3 +1,12 @@
+# [0.77.0](https://github.com/syselement/packertron-vms/compare/v0.76.0...v0.77.0) (2026-09-23)
+
+
+### Features
+
+* **proxmox:** add task timeout for image conversion in Kali and Ubuntu templates ([d6069fa](https://github.com/syselement/packertron-vms/commit/d6069fad52ec6f6d4f7555d811f3d235421e447c))
+
+
+
 # [0.76.0](https://github.com/syselement/packertron-vms/compare/v0.75.0...v0.76.0) (2026-09-23)
 
 
@@ -37,15 +46,6 @@
 ### Features
 
 * **deploy:** add example configuration for VM clone profiles ([1a7d24e](https://github.com/syselement/packertron-vms/commit/1a7d24e8302f4bdaf902873a6050016ac8e24473))
-
-
-
-# [0.72.0](https://github.com/syselement/packertron-vms/compare/v0.71.0...v0.72.0) (2026-09-19)
-
-
-### Features
-
-* **proxmox:** streamline SSH host key management and update README for clarity ([2356840](https://github.com/syselement/packertron-vms/commit/2356840904e1ae4291e95e9a2119b92bb321c2c5))
 
 
 
