@@ -253,6 +253,10 @@ source "proxmox-iso" "kali" {
   # A full-upgrade of a rolling release plus the default toolset: expect the
   # install itself to take a while before SSH is reachable.
   ssh_timeout = "60m"
+
+  # A Proxmox task timeout, not an SSH one: the final imgcopy that converts
+  # the VM into a template exceeds the 1m default on a busy or slow pool.
+  task_timeout = "20m"
 }
 
 build {

@@ -239,6 +239,10 @@ source "proxmox-iso" "ubuntu-24-04-server" {
   ssh_username   = var.ssh_username
   ssh_agent_auth = true
   ssh_timeout    = "30m"
+
+  # A Proxmox task timeout, not an SSH one: the final imgcopy that converts
+  # the VM into a template exceeds the 1m default on a busy or slow pool.
+  task_timeout = "20m"
 }
 
 build {
