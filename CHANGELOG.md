@@ -1,3 +1,12 @@
+# [0.79.0](https://github.com/syselement/packertron-vms/compare/v0.78.0...v0.79.0) (2026-09-27)
+
+
+### Features
+
+* update dock favorites to include Visual Studio Code ([5a4fed3](https://github.com/syselement/packertron-vms/commit/5a4fed3058ca085903d935eaf1ac29f7a2f4ccb9))
+
+
+
 # [0.78.0](https://github.com/syselement/packertron-vms/compare/v0.77.0...v0.78.0) (2026-09-27)
 
 
@@ -31,15 +40,6 @@
 ### Features
 
 * **kali:** update fstab handling and improve tofu formatting checks ([867a0b3](https://github.com/syselement/packertron-vms/commit/867a0b3385de75b295491cf0073af6b1acfb633a))
-
-
-
-# [0.74.0](https://github.com/syselement/packertron-vms/compare/v0.73.0...v0.74.0) (2026-09-22)
-
-
-### Features
-
-* **kali:** enhance Proxmox Kali template with debian-installer preseed and validation checks ([16b7c8a](https://github.com/syselement/packertron-vms/commit/16b7c8a4376876f8fb7a546bde4639f7dadb2865))
 
 
 
