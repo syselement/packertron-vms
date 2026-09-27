@@ -7,7 +7,9 @@
 # Docs:
 #   Autoinstall  https://canonical-subiquity.readthedocs-hosted.com/en/latest/reference/autoinstall-reference.html
 #   cloud-init   https://cloudinit.readthedocs.io/en/latest/
-#   README.md    which seed to use, and the first-boot runner
+#   Source       https://github.com/syselement/packertron-vms
+#   README.md    scripts/ubuntu/README.md in that repository: which seed
+#                to use, and the first-boot runner
 #
 # Run:
 #   sudo cloud-init schema --config-file autoinstall-desktop.yaml --annotate
