@@ -1,3 +1,12 @@
+# [0.78.0](https://github.com/syselement/packertron-vms/compare/v0.77.0...v0.78.0) (2026-09-27)
+
+
+### Features
+
+* enhance deployment documentation and examples for VM provisioning ([283d1ef](https://github.com/syselement/packertron-vms/commit/283d1ef189287fb8067b82ecd2116d6b7a54b4c2))
+
+
+
 # [0.77.0](https://github.com/syselement/packertron-vms/compare/v0.76.0...v0.77.0) (2026-09-23)
 
 
@@ -31,21 +40,6 @@
 ### Features
 
 * **kali:** enhance Proxmox Kali template with debian-installer preseed and validation checks ([16b7c8a](https://github.com/syselement/packertron-vms/commit/16b7c8a4376876f8fb7a546bde4639f7dadb2865))
-
-
-
-# [0.73.0](https://github.com/syselement/packertron-vms/compare/v0.72.0...v0.73.0) (2026-09-21)
-
-
-### Bug Fixes
-
-* update permissions and execution method for firstboot scripts to resolve permission issues ([420d938](https://github.com/syselement/packertron-vms/commit/420d938d5144d5226cd52251bcd2d9d889f6eb74))
-* update README and example files to clarify password requirements for desktop clones ([20d2860](https://github.com/syselement/packertron-vms/commit/20d2860db460dbf014df9f82ab59098c12a4ce7c))
-
-
-### Features
-
-* **deploy:** add example configuration for VM clone profiles ([1a7d24e](https://github.com/syselement/packertron-vms/commit/1a7d24e8302f4bdaf902873a6050016ac8e24473))
 
 
 
