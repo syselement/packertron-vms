@@ -1,5 +1,8 @@
-# Clone one Packer-built template into a running VM, and optionally ask it to
+# Clone Packer-built templates into running VMs, and optionally ask each one to
 # provision itself at first boot.
+#
+# One resource per entry in var.vms, so a tfvars holding one entry brings up one
+# VM and a tfvars holding the whole lab brings up all of them from one apply.
 #
 # The first-boot files are read straight from scripts/ubuntu/firstboot/ rather
 # than copied here, so this layer cannot drift from the autoinstall seeds that
@@ -11,22 +14,26 @@
 #   README.md      the clone-time model and what provisioning costs
 #
 # Run:
-#   tofu plan  -var-file=deploy.tfvars
-#   tofu apply -var-file=deploy.tfvars
+#   tofu plan  -var-file=lab.tfvars
+#   tofu apply -var-file=lab.tfvars
 
 locals {
-  provisioning_enabled = var.provisioning_steps != ""
+  # Only a VM that asked for provisioning and did not name a snippet of its own
+  # needs one uploaded. Everything else clones and boots untouched.
+  provisioned = {
+    for name, vm in var.vms : name => vm
+    if vm.provisioning_steps != "" && vm.vendor_data_file_id == ""
+  }
 
-  # Uploaded only when provisioning is requested and no existing snippet was named.
-  upload_snippet = local.provisioning_enabled && var.vendor_data_file_id == ""
-
-  firstboot_conf = join("\n", concat(
-    [
-      "TARGET_USER=${var.username}",
-      "STEPS=${var.provisioning_steps}",
-    ],
-    var.provisioning_repo_branch == "" ? [] : ["REPO_BRANCH=${var.provisioning_repo_branch}"],
-  ))
+  firstboot_conf = {
+    for name, vm in local.provisioned : name => join("\n", concat(
+      [
+        "TARGET_USER=${var.username}",
+        "STEPS=${vm.provisioning_steps}",
+      ],
+      var.provisioning_repo_branch == "" ? [] : ["REPO_BRANCH=${var.provisioning_repo_branch}"],
+    ))
+  }
 
   # vendor-data, not user-data: Proxmox generates the user-data that carries
   # the hostname, account, keys and network. Supplying our own user-data would
@@ -34,72 +41,76 @@ locals {
   #
   # yamlencode rather than a template file, because the stub is Bash: every
   # ${...} in it would otherwise be read as an interpolation.
-  firstboot_vendor_data = "#cloud-config\n${yamlencode({
-    # The stub clones the repository, and Ubuntu Server does not ship git. It
-    # arrives here, with the provisioning request, so a clone that asks for
-    # nothing stays exactly the template. cloud-init installs packages before
-    # it runs runcmd, so git is present by the time the unit starts.
-    package_update = true
-    packages       = ["git"]
-    write_files = [
-      {
-        path        = "/etc/packertron/firstboot.conf"
-        owner       = "root:root"
-        permissions = "0644"
-        content     = "${local.firstboot_conf}\n"
-      },
-      {
-        path        = "/usr/local/sbin/packertron-firstboot"
-        owner       = "root:root"
-        permissions = "0750"
-        content     = file("${path.module}/../scripts/ubuntu/firstboot/stub.sh")
-      },
-      {
-        path        = "/etc/systemd/system/packertron-firstboot.service"
-        owner       = "root:root"
-        permissions = "0644"
-        content     = file("${path.module}/../scripts/ubuntu/firstboot/packertron-firstboot.service")
-      },
-    ]
-    runcmd = [
-      ["systemctl", "daemon-reload"],
-      ["systemctl", "enable", "packertron-firstboot.service"],
-      ["systemctl", "start", "--no-block", "packertron-firstboot.service"],
-    ]
-  })}"
+  firstboot_vendor_data = {
+    for name in keys(local.provisioned) : name => "#cloud-config\n${yamlencode({
+      # The stub clones the repository, and Ubuntu Server does not ship git. It
+      # arrives here, with the provisioning request, so a clone that asks for
+      # nothing stays exactly the template. cloud-init installs packages before
+      # it runs runcmd, so git is present by the time the unit starts.
+      package_update = true
+      packages       = ["git"]
+      write_files = [
+        {
+          path        = "/etc/packertron/firstboot.conf"
+          owner       = "root:root"
+          permissions = "0644"
+          content     = "${local.firstboot_conf[name]}\n"
+        },
+        {
+          path        = "/usr/local/sbin/packertron-firstboot"
+          owner       = "root:root"
+          permissions = "0750"
+          content     = file("${path.module}/../scripts/ubuntu/firstboot/stub.sh")
+        },
+        {
+          path        = "/etc/systemd/system/packertron-firstboot.service"
+          owner       = "root:root"
+          permissions = "0644"
+          content     = file("${path.module}/../scripts/ubuntu/firstboot/packertron-firstboot.service")
+        },
+      ]
+      runcmd = [
+        ["systemctl", "daemon-reload"],
+        ["systemctl", "enable", "packertron-firstboot.service"],
+        ["systemctl", "start", "--no-block", "packertron-firstboot.service"],
+      ]
+    })}"
+  }
 }
 
 resource "proxmox_virtual_environment_file" "firstboot" {
-  count = local.upload_snippet ? 1 : 0
+  for_each = local.provisioned
 
   content_type = "snippets"
   datastore_id = var.snippet_datastore_id
   node_name    = var.proxmox_node
 
   source_raw {
-    data      = local.firstboot_vendor_data
-    file_name = "${var.vm_name}-firstboot.yaml"
+    data      = local.firstboot_vendor_data[each.key]
+    file_name = "${each.key}-firstboot.yaml"
   }
 }
 
 resource "proxmox_virtual_environment_vm" "this" {
-  name      = var.vm_name
+  for_each = var.vms
+
+  name      = each.key
   node_name = var.proxmox_node
-  vm_id     = var.vm_id
-  tags      = var.tags
+  vm_id     = each.value.vm_id
+  tags      = each.value.tags
 
   clone {
-    vm_id = var.template_vm_id
-    full  = var.full_clone
+    vm_id = each.value.template_vm_id
+    full  = each.value.full_clone
   }
 
   cpu {
-    cores = var.cores
+    cores = each.value.cores
     type  = "host"
   }
 
   memory {
-    dedicated = var.memory
+    dedicated = each.value.memory
   }
 
   # Matches the template's scsi0. Proxmox can grow a cloned disk but never
@@ -113,7 +124,7 @@ resource "proxmox_virtual_environment_vm" "this" {
   disk {
     datastore_id = var.datastore_id
     interface    = "scsi0"
-    size         = var.disk_size
+    size         = each.value.disk_size
     discard      = "on"
     ssd          = true
   }
@@ -127,8 +138,8 @@ resource "proxmox_virtual_environment_vm" "this" {
 
     ip_config {
       ipv4 {
-        address = var.ipv4_address
-        gateway = var.ipv4_gateway
+        address = each.value.ipv4_address
+        gateway = each.value.ipv4_gateway
       }
     }
 
@@ -138,8 +149,12 @@ resource "proxmox_virtual_environment_vm" "this" {
       keys     = var.ssh_authorized_keys
     }
 
-    vendor_data_file_id = local.upload_snippet ? proxmox_virtual_environment_file.firstboot[0].id : (
-      var.vendor_data_file_id == "" ? null : var.vendor_data_file_id
+    # The uploaded snippet when this VM asked for provisioning, an existing one
+    # when it named it, and nothing at all otherwise.
+    vendor_data_file_id = (
+      contains(keys(local.provisioned), each.key)
+      ? proxmox_virtual_environment_file.firstboot[each.key].id
+      : (each.value.vendor_data_file_id == "" ? null : each.value.vendor_data_file_id)
     )
   }
 }

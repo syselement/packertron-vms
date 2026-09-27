@@ -291,7 +291,7 @@ scripts/check-templates.sh proxmox
 
 ### Deploy a VM with OpenTofu
 
-[`deploy/`](deploy/README.md) clones one template into a running VM. It is deliberately small - one VM, no composition, no remote state - because fleet-wide homelab infrastructure belongs in its own repository, which can consume this module by git ref.
+[`deploy/`](deploy/README.md) clones Packer-built templates into running VMs, one per entry in a `vms` map. It is deliberately small - a flat map, no composition, no remote state - because fleet-wide homelab infrastructure belongs in its own repository, which can consume this module by git ref.
 
 ```bash
 cd deploy
@@ -303,7 +303,7 @@ tofu init
 tofu apply -var-file=deploy.tfvars
 ```
 
-Provisioning is opt-in, through one variable:
+Provisioning is opt-in, per VM, through one field in its map entry:
 
 | `provisioning_steps` | The clone gets |
 | --- | --- |

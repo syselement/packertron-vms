@@ -1,4 +1,4 @@
-# Copy to deploy.tfvars, which is gitignored, and edit.
+# Copy to a *.tfvars of your own, which is gitignored, and edit.
 #
 #   cp deploy.tfvars.example deploy.tfvars
 #   tofu apply -var-file=deploy.tfvars
@@ -7,7 +7,8 @@
 #
 #   export PROXMOX_VE_API_TOKEN='automation@pve!deploy=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'
 #
-# See ../SECURITY.md.
+# See ../SECURITY.md. lab.tfvars.example carries the whole lab in one map;
+# this file is the smallest thing that works.
 
 # Include the scheme and the port. Unlike the Packer variable, no /api2/json.
 proxmox_endpoint = "https://proxmox.example.lan:8006/"
@@ -19,35 +20,17 @@ proxmox_insecure = false
 
 datastore_id = "vmstore"
 
-# Public keys authorised on the clone, in addition to whatever the template
+# Public keys authorised on every clone, in addition to whatever the template
 # already carries.
 ssh_authorized_keys = [
   "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIexampleexampleexampleexampleexample you@workstation",
 ]
 
-# ---------------------------------------------------------------------------
-# A plain server, which is the common case: clone, boot, nothing else.
-# ---------------------------------------------------------------------------
-template_vm_id = 80026 # ubuntu-26.04-server-template
-vm_name        = "srv-01"
-cores          = 2
-memory         = 2048
-disk_size      = 32
-
-# ---------------------------------------------------------------------------
-# The workstation: a desktop clone that provisions itself into the same
-# machine as the bare-metal PC. Swap the block above for this one.
-#
-# Expect this to take a long time after apply returns - 02 and 03 install the
-# full toolchain - and to reboot itself once at the end.
-#
-# A desktop needs a password: GDM has no key login, and cloud-init locks the
-# template's one unless a password is delivered. Before applying:
-#   export TF_VAR_password='...'
-# ---------------------------------------------------------------------------
-# template_vm_id     = 80126 # ubuntu-26.04-desktop-template
-# vm_name            = "workstation-01"
-# cores              = 4
-# memory             = 8192
-# disk_size          = 64
-# provisioning_steps = "02,03"
+# One entry per VM. The key is the VM's name and its cloud-init hostname.
+# Only template_vm_id is required - everything else falls back to a plain
+# 2 core / 2048 MB / 32 GB server on DHCP.
+vms = {
+  "srv-01" = {
+    template_vm_id = 80026
+  }
+}

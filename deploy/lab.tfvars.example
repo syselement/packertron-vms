@@ -1,0 +1,71 @@
+# The whole lab in one map, one apply. The module creates one VM per entry, so
+# adding a key adds a machine and removing one destroys it.
+#
+#   cp lab.tfvars.example lab.tfvars          # *.tfvars is gitignored
+#   tofu workspace new lab                    # its own state
+#   tofu apply -var-file=lab.tfvars
+#
+# To bring machines up one at a time instead, keep a file per VM holding a
+# single-entry map and give each its own workspace. Same module either way.
+#
+# THE API TOKEN DOES NOT BELONG HERE:
+#   export PROXMOX_VE_API_TOKEN='automation@pve!deploy=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'
+# Nor does a console password. Servers do not need one - SSH takes the key.
+# DESKTOPS DO: GDM and the Proxmox console have no key login, and cloud-init
+# locks the account when no password is delivered, so a desktop clone created
+# without one cannot be logged into at all:
+#   export TF_VAR_password='...'
+# cloud-init applies it on the first boot only; for a desktop already created
+# without one, SSH in with the key and run  sudo passwd <user>
+
+proxmox_endpoint = "https://proxmox.example.lan:8006/"
+proxmox_node     = "pve"
+proxmox_insecure = false
+datastore_id     = "vmstore"
+
+ssh_authorized_keys = [
+  "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIexampleexampleexampleexampleexample you@workstation",
+]
+
+vms = {
+  # Only template_vm_id is required, so the common case is one line.
+  "srv-01" = {
+    template_vm_id = 80026
+  }
+
+  # A static address needs both fields; leave them out for DHCP.
+  "srv-02" = {
+    template_vm_id = 80026
+    ipv4_address   = "192.168.1.201/24"
+    ipv4_gateway   = "192.168.1.1"
+  }
+
+  # A linked clone is faster and smaller, but keeps the template undeletable.
+  "srv-03" = {
+    template_vm_id = 80026
+    full_clone     = false
+  }
+
+  # The workstation: 02 then 03 give the full toolchain, GNOME preferences and
+  # shell configuration. Runs in the background for 30-40 minutes after apply
+  # returns, then reboots once. disk_size must be >= the template's 64G.
+  "ws-01" = {
+    template_vm_id     = 80126
+    cores              = 4
+    memory             = 8192
+    disk_size          = 64
+    provisioning_steps = "02,03"
+  }
+
+  # Kali carries its toolset in the image. Leave provisioning_steps unset: the
+  # 02/03 scripts are Ubuntu's and ubuntu-context.sh refuses to run on anything
+  # else, so a Kali clone that asks for them gets a first-boot service that
+  # fails and retries every five minutes for good.
+  "kali-01" = {
+    template_vm_id = 80200
+    cores          = 4
+    memory         = 4096
+    disk_size      = 50
+    tags           = ["opentofu", "kali"]
+  }
+}

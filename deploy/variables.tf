@@ -1,6 +1,6 @@
-# Inputs for one cloned VM. Everything has a default except the template to
-# clone and the VM's name, so a first deployment is two values plus a tfvars
-# file for the node.
+# Inputs for the VMs this module clones. Node settings and the login identity
+# are shared by all of them; everything that differs per machine lives in the
+# vms map, keyed by the VM's name.
 #
 # Docs:
 #   README.md  which values a first deployment actually needs
@@ -18,7 +18,7 @@ variable "proxmox_insecure" {
 
 variable "proxmox_node" {
   type        = string
-  description = "Name of the Proxmox node to create the VM on"
+  description = "Name of the Proxmox node to create the VMs on"
 }
 
 variable "node_ssh_username" {
@@ -27,67 +27,43 @@ variable "node_ssh_username" {
   default     = "root"
 }
 
-variable "template_vm_id" {
-  type        = number
-  description = "VMID of the Packer-built template to clone, e.g. 80026 for Ubuntu Server 26.04"
-}
-
-variable "vm_name" {
-  type        = string
-  description = "Name of the new VM, also used as its cloud-init hostname"
-}
-
-variable "vm_id" {
-  type        = number
-  description = "VMID for the new VM; null lets Proxmox allocate one"
-  default     = null
-}
-
-variable "full_clone" {
-  type        = bool
-  description = "Copy the template's disks rather than linking them. A linked clone is faster and smaller but keeps the template undeletable."
-  default     = true
-}
-
-variable "cores" {
-  type        = number
-  description = "vCPU cores"
-  default     = 2
-}
-
-variable "memory" {
-  type        = number
-  description = "Memory in MB"
-  default     = 2048
-}
-
-variable "disk_size" {
-  type        = number
-  description = "Disk size in GB. Must be at least the template's own size: Proxmox can grow a cloned disk but never shrink one."
-  default     = 32
-}
-
 variable "datastore_id" {
   type        = string
-  description = "Proxmox storage for the VM disk and the cloud-init drive"
+  description = "Proxmox storage for the VM disks and the cloud-init drives"
   default     = "local-lvm"
 }
 
-variable "ipv4_address" {
-  type        = string
-  description = "IPv4 address in CIDR form, or \"dhcp\""
-  default     = "dhcp"
-}
+# The map key is the VM's name, and also the hostname cloud-init sets. Only
+# template_vm_id is required; every other field has the default a plain server
+# would want, so a one-line entry is a valid VM.
+variable "vms" {
+  type = map(object({
+    template_vm_id      = number
+    vm_id               = optional(number)
+    cores               = optional(number, 2)
+    memory              = optional(number, 2048)
+    disk_size           = optional(number, 32)
+    full_clone          = optional(bool, true)
+    ipv4_address        = optional(string, "dhcp")
+    ipv4_gateway        = optional(string)
+    tags                = optional(list(string), ["opentofu"])
+    provisioning_steps  = optional(string, "")
+    vendor_data_file_id = optional(string, "")
+  }))
+  description = "VMs to create, keyed by name. disk_size must be at least the template's own size: Proxmox can grow a cloned disk but never shrink one."
 
-variable "ipv4_gateway" {
-  type        = string
-  description = "Default gateway; leave empty with DHCP"
-  default     = null
+  validation {
+    condition = alltrue([
+      for name, vm in var.vms :
+      can(regex("^([0-9]{2}(,[0-9]{2})*)?$", vm.provisioning_steps))
+    ])
+    error_message = "provisioning_steps must be empty or a comma-separated list of two-digit step numbers, such as \"02,03\"."
+  }
 }
 
 variable "username" {
   type        = string
-  description = "Account cloud-init creates on the clone"
+  description = "Account cloud-init creates on every clone"
   default     = "syselement"
 }
 
@@ -108,25 +84,6 @@ variable "ssh_authorized_keys" {
   default     = []
 }
 
-variable "tags" {
-  type        = list(string)
-  description = "Proxmox tags applied to the VM"
-  default     = ["opentofu"]
-}
-
-# The whole point of the template being thin. Empty means the clone boots and
-# does nothing: no repository is fetched and no snippet is uploaded.
-variable "provisioning_steps" {
-  type        = string
-  description = "Comma-separated first-boot steps, e.g. \"02,03\" for the full workstation toolchain. Empty means no provisioning."
-  default     = ""
-
-  validation {
-    condition     = can(regex("^([0-9]{2}(,[0-9]{2})*)?$", var.provisioning_steps))
-    error_message = "provisioning_steps must be empty or a comma-separated list of two-digit step numbers, such as \"02,03\"."
-  }
-}
-
 variable "provisioning_repo_branch" {
   type        = string
   description = "Branch the first-boot runner provisions from; empty uses the runner's own default"
@@ -135,13 +92,6 @@ variable "provisioning_repo_branch" {
 
 variable "snippet_datastore_id" {
   type        = string
-  description = "Storage holding the first-boot snippet. Must have the \"snippets\" content type enabled."
+  description = "Storage holding the first-boot snippets. Must have the \"snippets\" content type enabled."
   default     = "local"
-}
-
-# Set this to a snippet already on the node to skip the SSH upload entirely.
-variable "vendor_data_file_id" {
-  type        = string
-  description = "Existing snippet to use as vendor-data, as storage:snippets/name.yaml; empty uploads one when provisioning is requested"
-  default     = ""
 }

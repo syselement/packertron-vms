@@ -1,8 +1,10 @@
 # deploy - Proxmox template to running VM
 
-One OpenTofu module that clones a Packer-built template, configures it through cloud-init, and boots it. Optionally it also tells the clone to provision itself at first boot.
+One OpenTofu module that clones Packer-built templates, configures them through cloud-init, and boots them. Optionally it also tells a clone to provision itself at first boot.
 
-This is deliberately the smallest useful layer: one VM, no composition, no remote state, no modules of its own. Fleet-wide homelab infrastructure belongs in a separate repository, which can consume this one as a module by git ref. What lives here is the last step of this repository's own pipeline: **ISO to template to VM**.
+VMs are described in a `vms` map, one entry per machine, and the module creates one VM per entry. A tfvars holding a single entry brings up one machine; a tfvars holding the whole lab brings up all of them from one apply.
+
+This is deliberately the smallest useful layer: a flat map of VMs, no composition, no remote state, no modules of its own. Fleet-wide homelab infrastructure belongs in a separate repository, which can consume this one as a module by git ref. What lives here is the last step of this repository's own pipeline: **ISO to template to VM**.
 
 ## What it needs
 
@@ -10,7 +12,7 @@ This is deliberately the smallest useful layer: one VM, no composition, no remot
 | --- | --- |
 | API token | `PROXMOX_VE_API_TOKEN` in the environment, never a file |
 | Endpoint, node, storage | `deploy.tfvars`, which is gitignored |
-| Which template to clone | `template_vm_id` - `80026` server, `80126` desktop, `80200` Kali |
+| Which templates to clone | `vms.<name>.template_vm_id` - `80024`/`80026` server, `80126` desktop, `80200` Kali |
 | First-boot files | read directly from `../scripts/ubuntu/firstboot/` |
 
 The token needs the privileges to clone, configure and start a VM. It does **not** need `Sys.AccessNetwork`.
@@ -28,6 +30,28 @@ tofu plan  -var-file=deploy.tfvars
 tofu apply -var-file=deploy.tfvars
 ```
 
+Only `template_vm_id` is required per entry. Everything else falls back to a plain 2 core / 2048 MB / 32 GB server on DHCP, so the smallest useful VM is three lines:
+
+```hcl
+vms = {
+  "srv-01" = { template_vm_id = 80026 }
+}
+```
+
+`disk_size` must be at least the template's own size - Proxmox can grow a cloned disk but never shrink one - so the desktop needs `64` and Kali `50`.
+
+To bring up several machines from one map, put them all in one file and give it its own workspace:
+
+```bash
+tofu workspace new lab 2>/dev/null || tofu workspace select lab
+tofu plan  -var-file=lab.tfvars     # one VM per entry, plus a snippet per provisioned VM
+tofu apply -var-file=lab.tfvars
+
+tofu output ipv4_addresses          # keyed by VM name; empty until the guest agent starts
+```
+
+**One state per tfvars.** A file listing the whole lab and a file listing one VM are both valid, but they must not share a workspace: applying the single-VM file in the lab's workspace destroys everything the lab file created and the map no longer mentions. Give each its own with `tofu workspace new <name>`.
+
 ## Console access
 
 cloud-init locks the account's password whenever it configures a user without one, so by default a clone is reachable **only by SSH key** - `packer`, the template's password, stops working on the console. For a server that is the intended posture. Pass a password through the environment rather than a file when one is wanted:
@@ -41,15 +65,15 @@ tofu apply -var-file=deploy.tfvars
 
 ## Example profiles
 
-| File | Clones |
+| File | Holds |
 | --- | --- |
-| `deploy.tfvars.example` | a plain server, with the workstation as a commented alternative |
-| `deploy.tfvars.example2` | eight profiles - static address, linked clone, branch under test - one active at a time |
-| `kali.tfvars.example` | the Kali template, with the settings it needs that the others do not |
+| `deploy.tfvars.example` | the smallest thing that works: node settings and one server |
+| `lab.tfvars.example` | the whole lab in one map - static address, linked clone, workstation, Kali |
+| `kali.tfvars.example` | the Kali template alone, with the settings it needs that the others do not |
 
 ## Provisioning is opt-in, and that is the whole design
 
-`provisioning_steps` is empty by default, and an empty value means the clone boots and does nothing: no repository is fetched, no snippet is uploaded, nothing is installed. That is what keeps one thin template usable for a throwaway server and for a full workstation.
+`provisioning_steps` is empty by default, and an empty value means the clone boots and does nothing: no repository is fetched, no snippet is uploaded, nothing is installed. That is what keeps one thin template usable for a throwaway server and for a full workstation. It is set per VM, so one entry in the map can ask for the full toolchain while the rest stay bare.
 
 Set it to ask for more:
 

@@ -1,10 +1,10 @@
 # Clone the Kali template into a running VM.
 #
-#   cp kali.tfvars.example kali.tfvars          # *.tfvars is gitignored
+#   cp kali.tfvars.example kali-01.tfvars       # *.tfvars is gitignored
 #   tofu workspace new kali-01                  # its own state, beside the others
 #   export PROXMOX_VE_API_TOKEN='automation@pve!deploy=xxxxxxxx-...'
 #   export TF_VAR_password='...'                # REQUIRED, see below
-#   tofu apply -var-file=kali.tfvars
+#   tofu apply -var-file=kali-01.tfvars
 #
 # THE API TOKEN DOES NOT BELONG HERE, and neither does the password.
 
@@ -17,19 +17,21 @@ ssh_authorized_keys = [
   "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIexampleexampleexampleexampleexample you@workstation",
 ]
 
-template_vm_id = 80200        # kali-template
-vm_name        = "kali-01"
-cores          = 4
-memory         = 4096
+vms = {
+  "kali-01" = {
+    template_vm_id = 80200
+    cores          = 4
+    memory         = 4096
 
-# Must be >= 50: the Kali template's disk is 50G, and Proxmox can grow a cloned
-# disk but never shrink one. The module default of 32 fails the apply.
-disk_size = 50
+    # Must be >= 50: the Kali template's disk is 50G, and Proxmox can grow a
+    # cloned disk but never shrink one. The default of 32 fails the apply.
+    disk_size = 50
 
-# Kali ships a full toolset already, and the 02/03 scripts are Ubuntu's -
-# ubuntu-context.sh refuses to run on anything else. Setting this on a Kali
-# clone gets a packertron-firstboot.service that fails and retries every five
-# minutes forever. Leave it empty.
-provisioning_steps = ""
+    tags = ["opentofu", "kali"]
 
-tags = ["opentofu", "kali"]
+    # Kali ships a full toolset already, and the 02/03 scripts are Ubuntu's -
+    # ubuntu-context.sh refuses to run on anything else. Setting this on a Kali
+    # clone gets a packertron-firstboot.service that fails and retries every
+    # five minutes forever. Leaving it out is the default and is correct here.
+  }
+}
