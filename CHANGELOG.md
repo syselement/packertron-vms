@@ -1,3 +1,18 @@
+# [0.81.0](https://github.com/syselement/packertron-vms/compare/v0.80.0...v0.81.0) (2026-10-03)
+
+
+### Bug Fixes
+
+* **ubuntu:** install the plain RustDesk package, not a sibling build ([d236f82](https://github.com/syselement/packertron-vms/commit/d236f82ddb6c19f3179c23d8c315e3ebdc505592))
+
+
+### Features
+
+* **proxmox:** SPICE and staged ISOs for the Linux templates ([86a2f16](https://github.com/syselement/packertron-vms/commit/86a2f16b1079f7eee513afafa031cb8dc14537ef))
+* **ubuntu:** add cv4pve-vdi, virt-viewer and asciinema ([9825e1e](https://github.com/syselement/packertron-vms/commit/9825e1e5cd7e2b634345db3f6fe04bbaf43765e5))
+
+
+
 # [0.80.0](https://github.com/syselement/packertron-vms/compare/v0.79.0...v0.80.0) (2026-10-03)
 
 
@@ -38,15 +53,6 @@
 ### Features
 
 * **proxmox:** add task timeout for image conversion in Kali and Ubuntu templates ([d6069fa](https://github.com/syselement/packertron-vms/commit/d6069fad52ec6f6d4f7555d811f3d235421e447c))
-
-
-
-# [0.76.0](https://github.com/syselement/packertron-vms/compare/v0.75.0...v0.76.0) (2026-09-23)
-
-
-### Features
-
-* **kali:** enhance Kali template support and update deployment configurations ([e1d8f0f](https://github.com/syselement/packertron-vms/commit/e1d8f0f7371e342dcce941c9798104015817b952))
 
 
 
