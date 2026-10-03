@@ -6,9 +6,9 @@ Builds an Ubuntu Server 24.04 LTS template on Proxmox VE from the official ISO, 
 
 ## Where the install media comes from
 
-By default Packer downloads `var.iso`, verifies it against the distribution's signed `SHA256SUMS`, and uploads it. The plugin stores it under a SHA1 of the URL rather than its real name, and ignores `iso_target_path`; `iso_download_pve` would fix the name but needs the API token's role to carry `Sys.AccessNetwork`, which is a wider privilege than building a template should require.
+By default the build uses the ISO already staged on the node, under its upstream name - `iso_file` defaults to `local:iso/ubuntu-24.04.4-live-server-amd64.iso`, the same file `var.iso` points at. Nothing is downloaded or uploaded.
 
-To keep the name readable, stage the ISO on the node once:
+**Packer does not check a staged ISO.** The plugin skips `iso_checksum` entirely once `iso_file` is set, so the pinned `SHA256SUMS` only protects the download path. Verify the file when you stage it, once:
 
 ```bash
 # on the node
@@ -17,7 +17,7 @@ wget https://releases.ubuntu.com/noble/ubuntu-24.04.4-live-server-amd64.iso
 sha256sum -c <(curl -sL https://releases.ubuntu.com/noble/SHA256SUMS | grep live-server-amd64)
 ```
 
-Then pass `-var 'iso_file=...'`, as in [Build](#build) below. `iso_file` and `iso_url` are mutually exclusive, and an empty string counts as unset, so setting one switches the build off the other entirely.
+To let Packer download and verify it instead, pass `-var 'iso_file='`. It then checks the file against the distribution's signed `SHA256SUMS` and uploads it, though the plugin stores it under a SHA1 of the URL rather than its real name, and ignores `iso_target_path`; `iso_download_pve` would fix the name but needs the API token's role to carry `Sys.AccessNetwork`, which is a wider privilege than building a template should require. `iso_file` and `iso_url` are mutually exclusive, and an empty string counts as unset, so setting one switches the build off the other entirely.
 
 ## Firmware
 
@@ -102,10 +102,10 @@ packer validate -var-file=../proxmox.pkrvars.hcl .
 packer build    -var-file=../proxmox.pkrvars.hcl .
 ```
 
-Or build from an ISO already on the node, which transfers nothing and keeps the name you gave it - see [Where the install media comes from](#where-the-install-media-comes-from) for how to stage it:
+That builds from the ISO staged on the node - see [Where the install media comes from](#where-the-install-media-comes-from) for how to stage and verify it. To have Packer download and check it instead:
 
 ```bash
-packer build -var-file=../proxmox.pkrvars.hcl -var 'iso_file=local:iso/ubuntu-24.04.4-live-server-amd64.iso' .
+packer build -var-file=../proxmox.pkrvars.hcl -var 'iso_file=' .
 ```
 
 Per-build overrides, which are the knobs a first build usually needs:
@@ -115,10 +115,11 @@ Per-build overrides, which are the knobs a first build usually needs:
 | `-var 'boot_wait=20s'` | installer never starts; OVMF was still posting when the keys were typed |
 | `-var 'http_bind_address=<your LAN IP>'` | installer starts but cannot fetch the seed; Packer picked a `docker0`/`virbr0` address the VM cannot reach |
 | `-var 'vm_id=80025'` | the VMID is already taken on the node |
-| `-var 'iso_file=local:iso/<name>.iso'` | use an ISO already on the node instead of downloading one |
+| `-var 'iso_file=local:iso/<name>.iso'` | the staged ISO has a different name from the default |
+| `-var 'iso_file='` | download `var.iso` and check it against `SHA256SUMS` instead of using a staged one |
 | `-var 'ssh_host=<VM IP>'` | stuck on "Waiting for SSH" with no connection reaching the VM; the token's role lacks `VM.GuestAgent.Audit`, so the guest-agent address lookup returns nothing |
 
-`vm_id` must be free on the node. Without `iso_file`, the ISO is downloaded to `iso_storage_pool` on the first run.
+`vm_id` must be free on the node. With `iso_file` empty, the ISO is downloaded to `iso_storage_pool` on the first run.
 
 ## What the build does before the template is sealed
 
