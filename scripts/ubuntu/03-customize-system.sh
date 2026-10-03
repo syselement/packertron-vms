@@ -72,6 +72,7 @@ readonly -a COMMON_PACKAGES=(
     apparmor-utils
     aptitude
     arp-scan
+    asciinema
     bash-completion
     bat
     bats
@@ -171,6 +172,7 @@ readonly -a DESKTOP_PACKAGES=(
     terminator
     typora
     usbmuxd
+    virt-viewer
     vlc
     wireshark
     xclip
@@ -2335,6 +2337,9 @@ alias python='python3'
 # Search
 alias ugq='ugrep --pretty --hidden -Qria'
 
+# Proxmox VE VDI client
+alias vdi='cv4pve-vdi'
+
 # Mask stdin after first 5 chars
 alias mask='awk '\''{ printf substr($0, 1, 5); for (i=6; i<=length($0); i++) printf "*"; print "" }'\'''
 
@@ -3048,6 +3053,19 @@ show_manual_setup_hints() {
     manual_command "labctl --version"
     manual_command "labctl auth login"
     manual_line "Documentation: https://github.com/iximiuz/labctl"
+
+    if [[ "$UBUNTU_VARIANT" == "desktop" ]]; then
+        manual_step "$((instruction_number += 1)). cv4pve-vdi (Proxmox VE VDI client)"
+        manual_line "On a Proxmox node, create a dedicated user limited to opening and powering VMs:"
+        manual_command "pveum role add CV4PVEVDI -privs \"VM.Audit VM.Console VM.PowerMgmt VM.GuestAgent.Audit\""
+        manual_command "pveum user add vdi@pve -comment \"cv4pve-vdi client\""
+        manual_command "pveum passwd vdi@pve"
+        manual_command "pveum acl modify /vms -user vdi@pve -role CV4PVEVDI"
+        manual_line "Start the client, add the cluster from the gear in the login window, and log in as vdi@pve:"
+        manual_command "cv4pve-vdi"
+        manual_line "Set remote-viewer for SPICE and VNC: Settings -> Launchers -> /usr/bin/remote-viewer"
+        manual_line "Documentation: https://corsinvest.github.io/cv4pve-vdi/"
+    fi
 }
 
 # update-notifier-common drops /var/run/reboot-required when a package that
@@ -3186,6 +3204,7 @@ main() {
         configure_cryptomator_fuse_access
         install_chatgpt
         install_clockify
+        install_cv4pve_vdi
         install_strawberry
         install_balena_etcher
         install_rustdesk

@@ -86,8 +86,11 @@ setup() {
   [[ "$output" == *"STEP  --- 16. Syncthing ---"* ]]
   [[ "$output" == *"STEP  --- 17. Claude Code ---"* ]]
   [[ "$output" == *"STEP  --- 18. iximiuz Labs control (labctl) ---"* ]]
-  [[ "$(grep -c '^    ------------------------------------------------------------$' <<<"$output")" -eq 18 ]]
-  [[ "$(grep -ci '^    .*documentation: https://' <<<"$output")" -eq 23 ]]
+  [[ "$output" == *"STEP  --- 19. cv4pve-vdi (Proxmox VE VDI client) ---"* ]]
+  [[ "$output" == *'$ pveum role add CV4PVEVDI -privs "VM.Audit VM.Console VM.PowerMgmt VM.GuestAgent.Audit"'* ]]
+  [[ "$output" == *'$ pveum acl modify /vms -user vdi@pve -role CV4PVEVDI'* ]]
+  [[ "$(grep -c '^    ------------------------------------------------------------$' <<<"$output")" -eq 19 ]]
+  [[ "$(grep -ci '^    .*documentation: https://' <<<"$output")" -eq 24 ]]
   [[ "$output" != *"/18"* ]]
   [[ "$output" == *"sudo nmcli connection import type wireguard file /etc/wireguard/wg0.conf"* ]]
   [[ "$output" == *"Visit: https://localhost:9443/"* ]]
@@ -146,6 +149,7 @@ setup() {
   [[ "$output" != *"Brave"* ]]
   [[ "$output" != *"Obsidian"* ]]
   [[ "$output" != *"Telegram"* ]]
+  [[ "$output" != *"cv4pve-vdi"* ]]
 }
 
 @test "external downloads use bounded transfer settings" {
@@ -218,6 +222,138 @@ setup() {
   [[ " ${VIRTUALIZATION_DESKTOP_PACKAGES[*]} " == *" virt-manager "* ]]
   [[ " ${VIRTUALIZATION_DESKTOP_PACKAGES[*]} " != *" cockpit-machines "* ]]
   [[ " ${VIRTUALIZATION_HOST_PACKAGES[*]} " != *" qemu-kvm "* ]]
+}
+
+cv4pve_vdi_fixture() {
+  # Builds a release archive and metadata whose digest is "$1": "match" for
+  # the archive's real SHA-256, "wrong" for a mismatch, "none" for no digest.
+  # $2 names the archive entry, cv4pve-vdi unless a test wants another.
+  local digest_mode="$1"
+  local entry="${2:-cv4pve-vdi}"
+  local digest
+
+  CV4PVE_FIXTURE_DIR="$BATS_TEST_TMPDIR/cv4pve-fixture"
+  mkdir -p "$CV4PVE_FIXTURE_DIR/content"
+  printf '#!/usr/bin/env bash\nprintf cv4pve-vdi\n' >"$CV4PVE_FIXTURE_DIR/content/$entry"
+  (cd "$CV4PVE_FIXTURE_DIR/content" && zip -q ../release.zip "$entry")
+
+  case "$digest_mode" in
+    match) digest="sha256:$(sha256sum "$CV4PVE_FIXTURE_DIR/release.zip" | awk '{print $1}')" ;;
+    wrong) digest="sha256:$(printf '%064d' 0)" ;;
+    none) digest="" ;;
+  esac
+  jq -n --arg digest "$digest" '{
+    tag_name: "v1.7.1",
+    assets: [{
+      name: "cv4pve-vdi-linux-x64.zip",
+      browser_download_url: "https://github.com/Corsinvest/cv4pve-vdi/releases/download/v1.7.1/cv4pve-vdi-linux-x64.zip",
+      digest: (if $digest == "" then null else $digest end)
+    }]
+  }' >"$CV4PVE_FIXTURE_DIR/release.json"
+
+  ARCH="amd64"
+  CV4PVE_VDI_INSTALL_DIR="$BATS_TEST_TMPDIR/opt/cv4pve-vdi"
+  CV4PVE_VDI_DESKTOP_FILE="$BATS_TEST_TMPDIR/usr/local/share/applications/cv4pve-vdi.desktop"
+  CV4PVE_DOWNLOAD_RECORD="$BATS_TEST_TMPDIR/cv4pve-downloads"
+
+  fetch_file() {
+    printf '%s\n' "$1" >>"$CV4PVE_DOWNLOAD_RECORD"
+    case "$1" in
+      https://api.github.com/repos/Corsinvest/cv4pve-vdi/releases/latest)
+        cp "$CV4PVE_FIXTURE_DIR/release.json" "$2"
+        ;;
+      https://github.com/Corsinvest/cv4pve-vdi/releases/download/*)
+        cp "$CV4PVE_FIXTURE_DIR/release.zip" "$2"
+        ;;
+      *)
+        return 2
+        ;;
+    esac
+  }
+}
+
+@test "cv4pve-vdi installs the digest-verified binary and skips an identical rerun" {
+  cv4pve_vdi_fixture match
+
+  run install_cv4pve_vdi
+
+  [[ "$status" -eq 0 ]]
+  [[ "$output" == *"cv4pve-vdi 1.7.1 installed"* ]]
+  [[ -x "$CV4PVE_VDI_INSTALL_DIR/cv4pve-vdi" ]]
+  [[ "$(readlink "$LOCAL_BIN_DIR/cv4pve-vdi")" == "$CV4PVE_VDI_INSTALL_DIR/cv4pve-vdi" ]]
+  [[ "$(<"$CV4PVE_VDI_INSTALL_DIR/.packertron-version")" == "1.7.1" ]]
+  grep -Fqx "Exec=$CV4PVE_VDI_INSTALL_DIR/cv4pve-vdi" "$CV4PVE_VDI_DESKTOP_FILE"
+  [[ -z "$(find "$CV4PVE_VDI_INSTALL_DIR" -name 'cv4pve-vdi.tmp.*' -print -quit)" ]]
+
+  run install_cv4pve_vdi
+
+  [[ "$status" -eq 0 ]]
+  [[ "$output" == *"cv4pve-vdi 1.7.1 already installed, skipping"* ]]
+  [[ "$(grep -c '/releases/download/' "$CV4PVE_DOWNLOAD_RECORD")" -eq 1 ]]
+}
+
+@test "cv4pve-vdi rejects an archive that does not match its published digest" {
+  cv4pve_vdi_fixture wrong
+
+  run install_cv4pve_vdi
+
+  [[ "$status" -ne 0 ]]
+  [[ "$output" == *"SHA-256 verification failed for cv4pve-vdi v1.7.1 archive"* ]]
+  [[ ! -e "$CV4PVE_VDI_INSTALL_DIR/cv4pve-vdi" ]]
+  [[ ! -e "$LOCAL_BIN_DIR/cv4pve-vdi" ]]
+}
+
+@test "cv4pve-vdi refuses a release with no published digest" {
+  cv4pve_vdi_fixture none
+
+  run install_cv4pve_vdi
+
+  [[ "$status" -ne 0 ]]
+  [[ "$output" == *"GitHub published no SHA-256 digest for cv4pve-vdi-linux-x64.zip"* ]]
+  [[ "$(grep -c '/releases/download/' "$CV4PVE_DOWNLOAD_RECORD" || true)" -eq 0 ]]
+  [[ ! -e "$CV4PVE_VDI_INSTALL_DIR/cv4pve-vdi" ]]
+}
+
+@test "cv4pve-vdi rejects an archive that holds anything but its binary" {
+  cv4pve_vdi_fixture match not-cv4pve-vdi
+
+  run install_cv4pve_vdi
+
+  [[ "$status" -ne 0 ]]
+  [[ "$output" == *"archive must contain only the cv4pve-vdi binary"* ]]
+  [[ ! -e "$CV4PVE_VDI_INSTALL_DIR/cv4pve-vdi" ]]
+}
+
+@test "cv4pve-vdi upgrades when the marker names an older release" {
+  cv4pve_vdi_fixture match
+  mkdir -p "$CV4PVE_VDI_INSTALL_DIR"
+  printf '1.6.0\n' >"$CV4PVE_VDI_INSTALL_DIR/.packertron-version"
+
+  run install_cv4pve_vdi
+
+  [[ "$status" -eq 0 ]]
+  [[ "$output" == *"cv4pve-vdi 1.7.1 installed"* ]]
+  [[ "$(<"$CV4PVE_VDI_INSTALL_DIR/.packertron-version")" == "1.7.1" ]]
+  [[ "$(grep -c '/releases/download/' "$CV4PVE_DOWNLOAD_RECORD")" -eq 1 ]]
+}
+
+@test "cv4pve-vdi replaces a hand-installed binary at both paths" {
+  cv4pve_vdi_fixture match
+  mkdir -p "$LOCAL_BIN_DIR" "$(dirname "$CV4PVE_VDI_INSTALL_DIR")"
+  printf 'hand-installed\n' >"$LOCAL_BIN_DIR/cv4pve-vdi"
+  printf 'hand-installed\n' >"$CV4PVE_VDI_INSTALL_DIR"
+
+  run install_cv4pve_vdi
+
+  [[ "$status" -eq 0 ]]
+  [[ -d "$CV4PVE_VDI_INSTALL_DIR" && -x "$CV4PVE_VDI_INSTALL_DIR/cv4pve-vdi" ]]
+  [[ "$(readlink "$LOCAL_BIN_DIR/cv4pve-vdi")" == "$CV4PVE_VDI_INSTALL_DIR/cv4pve-vdi" ]]
+  [[ -z "$(find "$(dirname "$CV4PVE_VDI_INSTALL_DIR")" "$LOCAL_BIN_DIR" -name '*.pre-packertron')" ]]
+
+  run install_cv4pve_vdi
+
+  [[ "$status" -eq 0 ]]
+  [[ "$output" == *"already installed, skipping"* ]]
 }
 
 @test "kubectl installs the checksum-verified stable binary and skips an identical rerun" {
@@ -1898,6 +2034,7 @@ ZED_INSTALLER
   configure_bash_for_user root
 
   grep -Fq 'snap refresh && flatpak update -y" && brew upgrade' "$target_home/.bash_aliases"
+  grep -Fxq "alias vdi='cv4pve-vdi'" "$target_home/.bash_aliases"
   grep -Fq 'export PATH="$PATH:$HOME/.iximiuz/labctl/bin"' "$target_home/.bashrc"
   grep -Fq 'source <(labctl completion bash)' "$target_home/.bashrc"
   if grep -Fq 'snap refresh' "$root_home/.bash_aliases" ||
