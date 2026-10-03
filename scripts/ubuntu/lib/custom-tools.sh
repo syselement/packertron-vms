@@ -47,6 +47,8 @@ LABCTL_INSTALL_URL="${LABCTL_INSTALL_URL:-https://labs.iximiuz.com/cli/install.s
 KUBECTL_STABLE_URL="${KUBECTL_STABLE_URL:-https://dl.k8s.io/release/stable.txt}"
 YUBICO_AUTHENTICATOR_URL="${YUBICO_AUTHENTICATOR_URL:-https://developers.yubico.com/yubioath-flutter/Releases/yubico-authenticator-latest-linux.tar.gz}"
 YUBICO_AUTHENTICATOR_INSTALL_DIR="${PACKERTRON_YUBICO_AUTHENTICATOR_INSTALL_DIR:-/opt/yubico-authenticator}"
+CV4PVE_VDI_INSTALL_DIR="${PACKERTRON_CV4PVE_VDI_INSTALL_DIR:-/opt/cv4pve-vdi}"
+CV4PVE_VDI_DESKTOP_FILE="${PACKERTRON_CV4PVE_VDI_DESKTOP_FILE:-/usr/local/share/applications/cv4pve-vdi.desktop}"
 ZED_INSTALL_URL="${ZED_INSTALL_URL:-https://zed.dev/install.sh}"
 CHATGPT_DEB_URL="${CHATGPT_DEB_URL:-https://persistent.oaistatic.com/codex-app-prod/linux/deb/latest/chatgpt_amd64.deb}"
 CLOCKIFY_DEB_URL="${CLOCKIFY_DEB_URL:-https://clockify.me/downloads/Clockify_Setup_x64.deb}"
@@ -850,6 +852,8 @@ install_strawberry() (
 #   }
 # The asset suffix selects the release asset (e.g. "_amd64.deb"); map it per
 # architecture with a case on "$ARCH" when the project ships several (see install_rustdesk).
+# When a suffix matches more than one asset, pass the whole name with
+# "{version}" where the release version goes; it is then matched exactly.
 
 install_latest_github_debian_package() (
     set -Eeuo pipefail
@@ -859,6 +863,7 @@ install_latest_github_debian_package() (
     local package_name="$3"
     local description="$4"
     local installed_version release_tag release_version
+    local match_type="suffix"
     local temporary_dir
 
     temporary_dir="$(mktemp -d)"
@@ -881,9 +886,14 @@ install_latest_github_debian_package() (
         return
     fi
 
+    if [[ "$asset_suffix" == *"{version}"* ]]; then
+        match_type="exact"
+        asset_suffix="${asset_suffix//\{version\}/$release_version}"
+    fi
+
     info "downloading ${description} package"
     fetch_github_asset_from_metadata \
-        "suffix" \
+        "$match_type" \
         "$asset_suffix" \
         "$temporary_dir/package.deb" \
         "$temporary_dir/release.json" \
@@ -903,8 +913,9 @@ install_rustdesk() {
     local asset_suffix
 
     case "$ARCH" in
-        amd64) asset_suffix="-x86_64.deb" ;;
-        arm64) asset_suffix="-aarch64.deb" ;;
+        # The release also ships -sciter and unattended-wayland builds that
+        # end in the same suffix.
+        amd64) asset_suffix="rustdesk-{version}-x86_64.deb" ;;
         *)
             warn "RustDesk release installation is not configured for ${ARCH}; skipping"
             return
@@ -922,7 +933,7 @@ install_pandoc() {
     local asset_suffix
 
     case "$ARCH" in
-        amd64 | arm64) asset_suffix="-1-${ARCH}.deb" ;;
+        amd64) asset_suffix="-1-amd64.deb" ;;
         *)
             warn "Pandoc release installation is not configured for ${ARCH}; skipping"
             return
@@ -1501,7 +1512,7 @@ install_flameshot() (
 
     architecture="$(dpkg --print-architecture)"
     case "$architecture" in
-        amd64 | arm64) ;;
+        amd64) ;;
         *)
             warn "unsupported Flameshot architecture: ${architecture}"
             return
@@ -1642,7 +1653,7 @@ install_obsidian() (
 
     architecture="$(dpkg --print-architecture)"
     case "$architecture" in
-        amd64 | arm64) ;;
+        amd64) ;;
         *)
             warn "unsupported Obsidian architecture: ${architecture}"
             return
@@ -1755,6 +1766,120 @@ install_obsidian() (
     fi
 
     ok "Obsidian ${installed_version} installed from the official GitHub release"
+)
+
+# cv4pve-vdi publishes one self-contained binary per platform, zipped, with no
+# package and no checksum file. GitHub's asset digest is the only verification
+# there is, so a release without one is refused rather than installed blind.
+install_cv4pve_vdi() (
+    set -Eeuo pipefail
+
+    local asset_digest asset_name
+    local binary="${CV4PVE_VDI_INSTALL_DIR}/cv4pve-vdi"
+    local cmd
+    local installed_version=""
+    local link="${LOCAL_BIN_DIR}/cv4pve-vdi"
+    local marker_file="${CV4PVE_VDI_INSTALL_DIR}/.packertron-version"
+    local metadata_file
+    local release_version
+    local staged_binary=""
+    local tag
+    local temporary_dir
+    local -a entries
+
+    for cmd in jq unzip; do
+        command -v "$cmd" >/dev/null 2>&1 ||
+            die "${cmd} is required to install cv4pve-vdi"
+    done
+
+    case "$ARCH" in
+        amd64) asset_name="cv4pve-vdi-linux-x64.zip" ;;
+        *)
+            warn "cv4pve-vdi is not published for ${ARCH}; skipping"
+            return
+            ;;
+    esac
+
+    temporary_dir="$(mktemp -d)"
+    trap 'rm -rf -- "$temporary_dir"; [[ -z "$staged_binary" ]] || rm -f -- "$staged_binary"' EXIT
+    metadata_file="$temporary_dir/release.json"
+
+    info "checking latest cv4pve-vdi release"
+    fetch_latest_github_release_metadata "Corsinvest/cv4pve-vdi" "$metadata_file" "cv4pve-vdi"
+    tag="$(jq -r '.tag_name // empty' "$metadata_file")" ||
+        die "cv4pve-vdi release metadata is invalid"
+    release_version="${tag#v}"
+    [[ "$release_version" =~ ^[0-9]+(\.[0-9]+)+$ ]] ||
+        die "unexpected cv4pve-vdi release tag: ${tag:-missing}"
+
+    [[ ! -f "$marker_file" ]] || installed_version="$(<"$marker_file")"
+    if [[ "$installed_version" == "$release_version" && -x "$binary" &&
+        -L "$link" && "$(readlink -- "$link")" == "$binary" &&
+        -f "$CV4PVE_VDI_DESKTOP_FILE" ]]; then
+        info "cv4pve-vdi ${installed_version} already installed, skipping"
+        return
+    fi
+
+    asset_digest="$(
+        jq -r --arg name "$asset_name" \
+            '.assets[] | select(.name == $name) | .digest // empty' \
+            "$metadata_file"
+    )" || die "cv4pve-vdi release metadata is invalid"
+    [[ "$asset_digest" =~ ^sha256:[[:xdigit:]]{64}$ ]] ||
+        die "GitHub published no SHA-256 digest for ${asset_name}; refusing to install cv4pve-vdi ${tag}"
+
+    info "downloading cv4pve-vdi ${tag} (${ARCH})"
+    fetch_github_asset_from_metadata \
+        exact \
+        "$asset_name" \
+        "$temporary_dir/$asset_name" \
+        "$metadata_file" \
+        "cv4pve-vdi ${tag} archive"
+    validate_zip_archive "$temporary_dir/$asset_name" "cv4pve-vdi ${tag}"
+    mapfile -t entries < <(unzip -Z1 "$temporary_dir/$asset_name")
+    [[ "${#entries[@]}" -eq 1 && "${entries[0]}" == "cv4pve-vdi" ]] ||
+        die "cv4pve-vdi ${tag} archive must contain only the cv4pve-vdi binary"
+    unzip -q "$temporary_dir/$asset_name" -d "$temporary_dir/extracted"
+    [[ -f "$temporary_dir/extracted/cv4pve-vdi" && ! -L "$temporary_dir/extracted/cv4pve-vdi" ]] ||
+        die "cv4pve-vdi ${tag} archive does not hold a regular file"
+
+    # A hand install can leave the binary itself at either path; this install
+    # replaces it. ln -sfn below already replaces a file at the link path.
+    if [[ -L "$CV4PVE_VDI_INSTALL_DIR" || (-e "$CV4PVE_VDI_INSTALL_DIR" && ! -d "$CV4PVE_VDI_INSTALL_DIR") ]]; then
+        rm -f -- "$CV4PVE_VDI_INSTALL_DIR" ||
+            die "failed removing ${CV4PVE_VDI_INSTALL_DIR}"
+    fi
+    [[ ! -d "$link" || -L "$link" ]] ||
+        die "refusing to replace ${link}: it is a directory"
+    install -d -m 0755 "$CV4PVE_VDI_INSTALL_DIR" "$LOCAL_BIN_DIR"
+    # Staged beside the target and renamed, as install_kubectl does, so the
+    # path always holds a complete binary.
+    staged_binary="$(mktemp "${binary}.tmp.XXXXXX")"
+    install -m 0755 "$temporary_dir/extracted/cv4pve-vdi" "$staged_binary" ||
+        die "failed staging cv4pve-vdi ${tag}"
+    mv -f -- "$staged_binary" "$binary" ||
+        die "failed installing cv4pve-vdi ${tag}"
+    staged_binary=""
+    ln -sfn -- "$binary" "$link" ||
+        die "failed linking cv4pve-vdi into ${LOCAL_BIN_DIR}"
+
+    printf '%s\n' \
+        '[Desktop Entry]' \
+        'Type=Application' \
+        'Name=cv4pve-vdi' \
+        'Comment=VDI client for Proxmox VE' \
+        "Exec=${binary}" \
+        'Terminal=false' \
+        'Categories=Network;RemoteAccess;' \
+        >"$temporary_dir/cv4pve-vdi.desktop"
+    install -d -m 0755 "$(dirname -- "$CV4PVE_VDI_DESKTOP_FILE")"
+    install -m 0644 "$temporary_dir/cv4pve-vdi.desktop" "$CV4PVE_VDI_DESKTOP_FILE" ||
+        die "failed installing the cv4pve-vdi desktop entry"
+
+    # Written last, so the marker never names a version whose install did not
+    # finish, and an interrupted run is simply repeated by the next one.
+    printf '%s\n' "$release_version" >"$marker_file"
+    ok "cv4pve-vdi ${release_version} installed from the official GitHub release"
 )
 
 # -----------------------------------------------------------------------------

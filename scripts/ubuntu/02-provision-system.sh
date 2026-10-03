@@ -211,7 +211,7 @@ Types: deb
 URIs: https://packages.microsoft.com/repos/code
 Suites: stable
 Components: main
-Architectures: amd64,arm64,armhf
+Architectures: amd64
 Signed-By: ${SYSTEM_KEYRING_DIR}/microsoft.gpg
 EOF
     install_file_if_changed "$temporary_dir/microsoft.gpg" "$SYSTEM_KEYRING_DIR/microsoft.gpg"

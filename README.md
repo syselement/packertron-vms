@@ -194,10 +194,12 @@ packertron-vms/
 │   ├── proxmox/                     <- the primary target
 │   │   ├── proxmox.pkrvars.hcl.example   node settings, shared by all of them
 │   │   ├── seal-for-clone.sh             strips per-machine state before cloning
+│   │   ├── autounattend.pkrtpl.xml       Windows answer file, shared by the three below
 │   │   ├── ubuntu-24.04-server/    ubuntu-26.04-server/
 │   │   ├── ubuntu-26.04-desktop/
 │   │   ├── kali/                         debian-installer preseed, same seal
-│   │   └── win-11/                       unrepaired, excluded from CI
+│   │   ├── win-10/    win-11/            sysprep + cloudbase-init
+│   │   └── win-srv-2025/
 │   └── vmware/                      <- kept working alongside
 │       ├── ubuntu-24.04-desktop/   ubuntu-26.04-desktop/
 │       ├── ubuntu-24.04-server/    ubuntu-26.04-server/
@@ -267,7 +269,7 @@ export PKR_VAR_proxmox_api_token_secret="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
 Build:
 
 ```bash
-cd templates/proxmox/ubuntu-24.04-server   # or ubuntu-26.04-server, ubuntu-26.04-desktop, kali
+cd templates/proxmox/ubuntu-24.04-server   # or ubuntu-26.04-server, ubuntu-26.04-desktop, kali, win-10, win-11, win-srv-2025
 packer init .
 packer build -var-file=../proxmox.pkrvars.hcl .
 ```
@@ -278,6 +280,11 @@ packer build -var-file=../proxmox.pkrvars.hcl .
 | `ubuntu-26.04-server` | 80026 | Ubuntu Server 26.04 LTS |
 | `ubuntu-26.04-desktop` | 80126 | Ubuntu Desktop 26.04 LTS |
 | `kali` | 80200 | Kali Linux rolling, `kali-linux-default` + Xfce |
+| `win-10` | 80310 | Windows 10 Enterprise evaluation |
+| `win-11` | 80311 | Windows 11 Enterprise evaluation |
+| `win-srv-2025` | 80325 | Windows Server 2025 Standard evaluation, Desktop Experience |
+
+The three Windows templates are built and cloned on a real node; [`templates/proxmox/WINDOWS.md`](templates/proxmox/WINDOWS.md) covers all three, and each template's README maps the way from its ISO to a VM deployed with `deploy/`.
 
 Each result is a Proxmox **template** that is thin on purpose: base OS, `qemu-guest-agent`, and cloud-init left able to run again. None of them bakes in the tooling from `02-provision-system.sh` or `03-customize-system.sh`.
 
@@ -485,7 +492,7 @@ Pull requests and improvements are welcome! Ensure your code follows the repo’
 - [x] OpenTofu layer to create the VMs cloned from those templates, in [`deploy/`](deploy/README.md)
 - [ ] Proxmox LXC containers - out of reach for Packer, whose Proxmox plugin builds only `iso` and `clone`, so they would come from OpenTofu and an upstream LXC template
 - [ ] O.S Packer builds:
-    - [ ] Win11
+    - [x] Windows 10, 11 and Server 2025 on Proxmox - built, cloned, and deployable through `deploy/`
     - [x] Ubuntu Server (24.04 and 26.04)
     - [x] Ubuntu Desktop (24.04 and 26.04)
     - [x] Kali Linux - builds; cloning not yet tested

@@ -2,7 +2,7 @@
 
 Builds a Kali Linux template on Proxmox VE from the official installer ISO, driven by the debian-installer preseed in `http/`.
 
-> **Status: built and cloned on a real node** (Proxmox VE, q35/OVMF, Kali 2026.2, ~10 minutes, template 80200; cloned through [`../../../deploy/`](../../../deploy/) with `kali.tfvars.example`). Four defects were found this way, none by `packer validate`: the `http.kali.org` redirector handing apt an unverifiable HTTPS mirror, the rolling-release upgrade failing opaquely inside `pkgsel`, `openssh-server` installed but left disabled so nothing listened on port 22, and the installer's `/media/cdrom0` fstab entry resolving to the cloud-init drive on every clone. Each is covered in its own section below. The previous version of this directory was a stub with no seed at all, and a pinned checksum that did not match the ISO it named.
+> **Status: built and cloned on a real node** (Proxmox VE, q35/OVMF, Kali 2026.2, ~10 minutes, template 80200; cloned through [`../../../deploy/`](../../../deploy/) with `kali.tfvars.example`).
 
 Adapted from [mttaggart/seclab](https://github.com/mttaggart/seclab) (`Packer/kali/config.pkr.hcl`). Everything the upstream did through KeePass and CA-certificate provisioners is gone: credentials come from the environment, and the build block runs the same `00` -> `01` -> seal chain as every other Proxmox template here.
 
@@ -27,7 +27,7 @@ The `00` -> `01` -> seal chain runs unchanged from the Ubuntu templates. Both sc
 
 ## Why cloud-init is switched off for the build
 
-Packer attaches a cloud-init drive to the build VM (`cloud_init = true`, so the template carries one for clones to use). On Ubuntu that drive is ignored during the build because subiquity pins cloud-init to the `None` datasource. Kali's installer does nothing of the kind, so on the first boot cloud-init would consume Packer's drive: Proxmox's generated user-data carries `users: [default]` and `package_upgrade: true`, which means a `debian` account on the template and an `apt upgrade` running underneath the provisioners.
+Packer does **not** attach a cloud-init drive to the build VM. `cloud_init = true` adds one only after the finished VM has been converted to a template - `stepFinalizeConfig` in the Proxmox plugin, which runs after `stepConvertToTemplate` - so every clone has the drive and the build never does. Left on, cloud-init would still run its first-boot pass on the build VM, with nothing from Proxmox to read. On Ubuntu, subiquity pins it to the `None` datasource for that first boot; Kali's installer does nothing equivalent, and what Debian's cloud-init then does - probe for other datasources, or apply its own defaults such as a `debian` account - is not something a template should depend on.
 
 The preseed's `late_command` therefore creates `/etc/cloud/cloud-init.disabled`, cloud-init's own off switch. `seal-for-clone.sh` removes it as its last cloud-init step, and fails the build if it somehow survived, since a clone would then never read its drive.
 
@@ -35,7 +35,7 @@ The preseed's `late_command` therefore creates `/etc/cloud/cloud-init.disabled`,
 
 `mirror/http/hostname` is `kali.download`, not the usual `http.kali.org`. The redirector distributes each file across mirrors, and some of them serve HTTPS - three requests for the same `.deb` came back from three different hosts when this was checked. During the install `/target` has no `ca-certificates`, so apt cannot verify any certificate, and a redirect onto an HTTPS mirror fails with `certificate verify failed`.
 
-That is what broke the first build: seven packages unfetchable, `pkgsel` exiting 100, and the installer stopping at "Select and install software". `ca-certificates` is in `pkgsel/include` so the installed system can use HTTPS afterwards, but it cannot help during the install - hence the plain-HTTP mirror.
+The install then stops at "Select and install software", with `pkgsel` exiting 100. `ca-certificates` is in `pkgsel/include` so the installed system can use HTTPS afterwards, but it cannot help during the install - hence the plain-HTTP mirror.
 
 ## The preseed, in one pass
 
@@ -54,7 +54,7 @@ Everything else is standard debian-installer: `en_GB` / `it` / `Europe/Rome`, LV
 
 Kali is rolling, so the ISO is only a snapshot and a fresh template should not start life behind. That upgrade runs in `00-update-system.sh`, not as `pkgsel/upgrade`.
 
-The reason is failure reporting. `pkgsel` is all-or-nothing and says only "Installation step failed" on the console; the first build here died there, and the cause - a TLS error against one mirror - was only visible after pulling `/var/log/syslog` off the installer. The same work in a provisioner names itself in Packer's output, is shellcheck'd and covered by the Bats suite, and can be retried without reinstalling the machine.
+The reason is failure reporting. `pkgsel` is all-or-nothing and says only "Installation step failed" on the console; the cause, such as a TLS error against one mirror, is visible only in `/var/log/syslog` on the installer. The same work in a provisioner names itself in Packer's output, is shellcheck'd and covered by the Bats suite, and can be retried without reinstalling the machine.
 
 `qemu-guest-agent` stays in `pkgsel/include` regardless: Packer needs the agent to learn the VM's address before it can run any provisioner at all.
 
@@ -96,7 +96,7 @@ One thing to watch if you borrow from its `late_command`: the first three comman
 
 **What it gets right, and what this template took from it.** It sets `pkgsel/upgrade select none` and moves the heavy package work into `preseed/late_command` rather than leaving it in `pkgsel`. That instinct is correct for exactly the reason in the section above: `pkgsel` is all-or-nothing and reports nothing useful when it fails. This template reaches the same conclusion and puts the work in a Packer provisioner instead, where a failure names itself, the code is linted and tested, and a retry does not mean reinstalling.
 
-**What it does not do is make the install more reliable.** Both apt commands in its `late_command` end in `|| true`, so a failed package fetch produces an install that reports success. Its mirror is `http.kali.org`, in the preseed and again in the `sources.list` its `late_command` writes - the same redirector that broke the first build here by handing apt an HTTPS mirror it could not verify. That failure mode is not fixed there, only silenced: the result would be a Kali template with no toolset, no error on the console, and nothing in any log to explain it. For an image that gets cloned repeatedly, a silent partial build is worse than a failed one, because it is discovered later and on a clone.
+**What it does not do is make the install more reliable.** Both apt commands in its `late_command` end in `|| true`, so a failed package fetch produces an install that reports success. Its mirror is `http.kali.org`, in the preseed and again in the `sources.list` its `late_command` writes - the redirector that can hand apt an HTTPS mirror it cannot verify, as described above. That failure mode is not fixed there, only silenced: the result would be a Kali template with no toolset, no error on the console, and nothing in any log to explain it. For an image that gets cloned repeatedly, a silent partial build is worse than a failed one, because it is discovered later and on a clone.
 
 Two smaller things to be aware of if you borrow from it:
 
@@ -117,10 +117,10 @@ packer validate -var-file=../proxmox.pkrvars.hcl .
 packer build    -var-file=../proxmox.pkrvars.hcl .
 ```
 
-Or from the ISO already on the node:
+That builds from `local:iso/kali-linux-2026.2-installer-amd64.iso`, staged on the node. To have Packer download and check it against Kali's `SHA256SUMS` instead:
 
 ```bash
-packer build -var-file=../proxmox.pkrvars.hcl -var 'iso_file=local:iso/kali-linux-2026.2-installer-amd64.iso' .
+packer build -var-file=../proxmox.pkrvars.hcl -var 'iso_file=' .
 ```
 
 Expect a long build: `kali-linux-default` is large, and `00-update-system.sh` then full-upgrades a rolling release on top of it. The install itself is the shorter half, so most of the wait happens after Packer connects; `ssh_timeout` is 60m to cover the installer side with room to spare.

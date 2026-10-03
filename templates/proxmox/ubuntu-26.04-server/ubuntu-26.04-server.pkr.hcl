@@ -68,17 +68,18 @@ variable "checksum" {
   default     = "file:https://releases.ubuntu.com/resolute/SHA256SUMS"
 }
 
-# Setting this uses an ISO already on the node: nothing is downloaded or
-# uploaded, and it keeps whatever name you gave it. Leaving it empty downloads
-# var.iso instead.
+# The default is the ISO staged on the node under its upstream name: nothing
+# is downloaded or uploaded. Packer does not check a staged ISO against
+# var.checksum - the plugin skips that step for iso_file - so verify it when
+# staging it. Set this to "" to download var.iso instead, which is checked.
 #
 # The download path stores the file under a SHA1 of the URL. That is the
 # plugin's own behaviour - it ignores iso_target_path - and the only other way
 # out, iso_download_pve, needs the API token's role to carry Sys.AccessNetwork.
 variable "iso_file" {
   type        = string
-  description = "ISO already on the node, as storage:iso/name.iso; empty downloads var.iso"
-  default     = ""
+  description = "ISO already on the node, as storage:iso/name.iso; \"\" downloads var.iso"
+  default     = "local:iso/ubuntu-26.04.1-live-server-amd64.iso"
 }
 
 variable "iso_storage_pool" {
@@ -213,6 +214,11 @@ source "proxmox-iso" "ubuntu-26-04-server" {
     model    = "virtio"
     bridge   = var.network_bridge
     firewall = false
+  }
+
+  # SPICE (qxl), so the Proxmox console offers SPICE as well as noVNC.
+  vga {
+    type = "qxl"
   }
 
   # The clone-time configuration channel: hostname, user, keys and network are

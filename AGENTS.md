@@ -16,6 +16,7 @@ Standards for this repository: Packer templates under `templates/`, the guest pr
 
 ## Target Systems
 
+- Everything is built for x86_64 (amd64) only: templates, VMs, installers and downloaded assets. Do not add ARM (`arm64`, `aarch64`, `armhf`) code paths; an installer meets any other architecture with a warning and a skip, not a failure.
 - Support Ubuntu Desktop and Ubuntu Server.
 - Detect the operating system and release using `/etc/os-release`.
 - Clearly separate Desktop-only functionality from Server-compatible functionality.

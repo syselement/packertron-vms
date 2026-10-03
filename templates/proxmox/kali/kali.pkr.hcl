@@ -71,13 +71,14 @@ variable "checksum" {
   default     = "file:https://cdimage.kali.org/kali-2026.2/SHA256SUMS"
 }
 
-# Setting this uses an ISO already on the node: nothing is downloaded or
-# uploaded, and it keeps whatever name you gave it. Leaving it empty downloads
-# var.iso instead.
+# The default is the ISO staged on the node under its upstream name: nothing
+# is downloaded or uploaded. Packer does not check a staged ISO against
+# var.checksum - the plugin skips that step for iso_file - so verify it when
+# staging it. Set this to "" to download var.iso instead, which is checked.
 variable "iso_file" {
   type        = string
-  description = "ISO already on the node, as storage:iso/name.iso; empty downloads var.iso"
-  default     = ""
+  description = "ISO already on the node, as storage:iso/name.iso; \"\" downloads var.iso"
+  default     = "local:iso/kali-linux-2026.2-installer-amd64.iso"
 }
 
 variable "iso_storage_pool" {
@@ -147,8 +148,8 @@ variable "ssh_username" {
 }
 
 # Not used to log in: the preseed turns password authentication off. Only
-# piped into `sudo -S`, which the preseed's NOPASSWD sudoers means sudo never
-# reads.
+# piped into `sudo -S`, which the preseed's NOPASSWD sudoers means sudo
+# never reads.
 variable "ssh_password" {
   type        = string
   description = "Password fed to sudo -S by the provisioners; not used for SSH login"
@@ -216,10 +217,10 @@ source "proxmox-iso" "kali" {
     firewall = false
   }
 
-  # Xfce needs a real framebuffer; the 16MB default is enough to boot and not
-  # much else.
+  # SPICE (qxl), so the Proxmox console offers SPICE as well as noVNC. Xfce
+  # needs more than the 16MB default to do much beyond booting.
   vga {
-    type   = "std"
+    type   = "qxl"
     memory = 32
   }
 

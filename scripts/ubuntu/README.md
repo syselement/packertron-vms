@@ -129,6 +129,7 @@ Installs common user tooling on both variants and applies the Desktop layer only
   - Obsidian
   - Postman
   - Emote
+  - `cv4pve-vdi` and `virt-viewer` (Desktop only): a Proxmox VE VDI client and the `remote-viewer` it opens SPICE and VNC consoles with, started with `vdi`
   - `tldr` via `pipx`
   - JetBrainsMono Nerd Font
 - applies GNOME settings only on Desktop

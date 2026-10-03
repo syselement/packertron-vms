@@ -2,7 +2,7 @@
 
 Builds an Ubuntu Desktop 26.04 LTS template on Proxmox VE from the official desktop ISO, driven by the autoinstall seed in `http/`.
 
-> **Status: validates, not yet built.** `packer validate` passes in CI and the ISO URL and checksum source were checked against `releases.ubuntu.com`, but this template has not been run against a real node.
+> **Status: built and cloned on a real node** (Proxmox VE, q35/OVMF, 26.04.1, ~12 minutes, template 80126). Cloned through [`../../../deploy/`](../../../deploy/) as a workstation with `provisioning_steps = "02,03"`, which ran to completion on first boot.
 
 Firmware, credentials, the SSH-agent login, the seal, and the clone-time model are identical to every Proxmox template here and are documented once, in [`../ubuntu-24.04-server/README.md`](../ubuntu-24.04-server/README.md). This file records only what a desktop image does differently.
 
@@ -15,7 +15,7 @@ Firmware, credentials, the SSH-agent login, the seal, and the clone-time model a
 | `cores` / `memory` | 2 / 2048 | 4 / 8192 |
 | `disk_size` | 30G | 64G |
 | `ssh_timeout` | 30m | 60m |
-| Display | Proxmox default | `std`, 32MB |
+| Display | `qxl` (SPICE), 16MB | `qxl` (SPICE), 32MB |
 | `vm_id` | `80026` | `80126` |
 
 The longer timeout is not padding: the desktop ISO installs a full GNOME image and fetches language packs, so it takes considerably longer to reach a login prompt than the server ISO. The 16MB of video memory Proxmox defaults to is enough to boot GNOME and not much more.
