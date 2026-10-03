@@ -115,6 +115,8 @@ On a clone's first boot, sysprep's specialize pass runs cloudbase-init once to s
 
   A later `tofu apply` writes `TF_VAR_password` back to the drive, so run it again after one.
 
+  cloudbase-init sets the password once per drive, so removing it changes the drive and the next boot gives the account a random password: only the SSH key works until you set one inside Windows. To keep console login, leave the drive alone and change the password inside Windows instead (`net user <account> *`). It stays until the drive changes - a different `cipassword`, keys, network or `TF_VAR_password` - and the drive then holds only a password that no longer works.
+
 The first boot reboots once, for the hostname. Login does not work until it has.
 
 Two settings in `scripts/windows/cloudbase-init/` are deliberate rather than defaults. The plugin list omits both WinRM plugins, which would otherwise open an HTTPS WinRM listener on every clone. And `11_cloudbase_init.ps1` comments out the `Match Group administrators` block in `sshd_config`: cloudbase-init writes keys to the account's own `authorized_keys`, which stock OpenSSH ignores for administrators, so without it the keys would never work.
