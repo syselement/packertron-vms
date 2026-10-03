@@ -61,6 +61,8 @@ export TF_VAR_password='...'
 tofu apply -var-file=deploy.tfvars
 ```
 
+**Windows clones need one for the console too**, and Windows Server refuses a password that lacks three of upper case, lower case, digits and symbols - a simple one leaves the account with a random password. A Server entry sets `username = "Administrator"`, since cloudbase-init keeps that account there.
+
 **For a desktop clone this is required, not optional.** GDM and the Proxmox console have no key login, so a desktop created without a password cannot be logged into at all. cloud-init applies the password on the instance's first boot only, so exporting it afterwards and re-applying does not unlock an existing VM - for that, SSH in with the key and run `sudo passwd syselement`.
 
 ## Example profiles
@@ -68,7 +70,7 @@ tofu apply -var-file=deploy.tfvars
 | File | Holds |
 | --- | --- |
 | `deploy.tfvars.example` | the smallest thing that works: node settings and one server |
-| `lab.tfvars.example` | the whole lab in one map - static address, linked clone, workstation, Kali |
+| `lab.tfvars.example` | the whole lab in one map - static address, linked clone, workstation, Kali, Windows 10, 11 and Server 2025 |
 | `kali.tfvars.example` | the Kali template alone, with the settings it needs that the others do not |
 
 ## Provisioning is opt-in, and that is the whole design

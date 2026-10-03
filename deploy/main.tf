@@ -28,7 +28,7 @@ locals {
   firstboot_conf = {
     for name, vm in local.provisioned : name => join("\n", concat(
       [
-        "TARGET_USER=${var.username}",
+        "TARGET_USER=${coalesce(vm.username, var.username)}",
         "STEPS=${vm.provisioning_steps}",
       ],
       var.provisioning_repo_branch == "" ? [] : ["REPO_BRANCH=${var.provisioning_repo_branch}"],
@@ -144,7 +144,7 @@ resource "proxmox_virtual_environment_vm" "this" {
     }
 
     user_account {
-      username = var.username
+      username = coalesce(each.value.username, var.username)
       password = var.password
       keys     = var.ssh_authorized_keys
     }

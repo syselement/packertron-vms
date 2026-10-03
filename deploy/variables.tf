@@ -35,11 +35,13 @@ variable "datastore_id" {
 
 # The map key is the VM's name, and also the hostname cloud-init sets. Only
 # template_vm_id is required; every other field has the default a plain server
-# would want, so a one-line entry is a valid VM.
+# would want, so a one-line entry is a valid VM. username overrides the shared
+# account for one VM: a Windows Server clone keeps "Administrator".
 variable "vms" {
   type = map(object({
     template_vm_id      = number
     vm_id               = optional(number)
+    username            = optional(string)
     cores               = optional(number, 2)
     memory              = optional(number, 2048)
     disk_size           = optional(number, 32)

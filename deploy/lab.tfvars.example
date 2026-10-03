@@ -28,6 +28,10 @@ ssh_authorized_keys = [
 ]
 
 vms = {
+  # Each key is the VM's name and hostname, with one dash, before the
+  # number: srv and ws are Linux, win10, win11 and winsrv25 are Windows.
+  # Windows truncates a hostname past 15 characters.
+  #
   # Only template_vm_id is required, so the common case is one line.
   "srv-01" = {
     template_vm_id = 80026
@@ -67,5 +71,37 @@ vms = {
     memory         = 4096
     disk_size      = 50
     tags           = ["opentofu", "kali"]
+  }
+
+  # Windows: cloudbase-init applies the hostname, account, password and key
+  # from the same cloud-init drive, and reboots once. disk_size must be >= the
+  # templates' 64G. Leave provisioning_steps unset - the 02/03 scripts are
+  # Ubuntu's. The console needs TF_VAR_password; Windows has no key login there.
+  "win10-01" = {
+    template_vm_id = 80310
+    cores          = 4
+    memory         = 4096
+    disk_size      = 64
+    tags           = ["opentofu", "windows"]
+  }
+
+  "win11-01" = {
+    template_vm_id = 80311
+    cores          = 4
+    memory         = 4096
+    disk_size      = 64
+    tags           = ["opentofu", "windows"]
+  }
+
+  # Server keeps the built-in Administrator rather than the shared username,
+  # and refuses a password without three of upper case, lower case, digits and
+  # symbols: a simple TF_VAR_password leaves it with a random one.
+  "winsrv25-01" = {
+    template_vm_id = 80325
+    username       = "Administrator"
+    cores          = 4
+    memory         = 4096
+    disk_size      = 64
+    tags           = ["opentofu", "windows"]
   }
 }
