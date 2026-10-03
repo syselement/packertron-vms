@@ -2517,27 +2517,39 @@ EOF
 
 @test "GitHub DEB installer selects one architecture-specific asset" {
   local install_record="$BATS_TEST_TMPDIR/install-record"
+  local download_record="$BATS_TEST_TMPDIR/download-record"
 
   fetch_file() {
     if [[ "$1" == *"/releases/latest" ]]; then
       cat >"$2" <<'EOF'
 {
-  "tag_name": "1.2.3",
+  "tag_name": "1.5.0",
   "assets": [
     {
-      "name": "rustdesk-1.2.3-x86_64.deb",
-      "browser_download_url": "https://github.com/rustdesk/rustdesk/releases/download/1.2.3/rustdesk-1.2.3-x86_64.deb",
+      "name": "rustdesk-1.5.0-x86_64-sciter.deb",
+      "browser_download_url": "https://github.com/rustdesk/rustdesk/releases/download/1.5.0/rustdesk-1.5.0-x86_64-sciter.deb",
+      "digest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+    },
+    {
+      "name": "rustdesk-1.5.0-x86_64.deb",
+      "browser_download_url": "https://github.com/rustdesk/rustdesk/releases/download/1.5.0/rustdesk-1.5.0-x86_64.deb",
       "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
     },
     {
-      "name": "rustdesk-1.2.3-aarch64.deb",
-      "browser_download_url": "https://github.com/rustdesk/rustdesk/releases/download/1.2.3/rustdesk-1.2.3-aarch64.deb",
+      "name": "rustdesk-unattended-wayland-1.5.0-x86_64.deb",
+      "browser_download_url": "https://github.com/rustdesk/rustdesk/releases/download/1.5.0/rustdesk-unattended-wayland-1.5.0-x86_64.deb",
+      "digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+    },
+    {
+      "name": "rustdesk-1.5.0-aarch64.deb",
+      "browser_download_url": "https://github.com/rustdesk/rustdesk/releases/download/1.5.0/rustdesk-1.5.0-aarch64.deb",
       "digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
     }
   ]
 }
 EOF
     else
+      printf '%s\n' "$1" >>"$download_record"
       printf 'test package\n' >"$2"
     fi
   }
@@ -2551,14 +2563,42 @@ EOF
     printf '%s|%s|%s\n' "$1" "$2" "$3" >"$install_record"
   }
 
-  run install_latest_github_debian_package \
-    "rustdesk/rustdesk" \
-    "-x86_64.deb" \
-    "rustdesk" \
-    "RustDesk"
+  ARCH=amd64
+  run install_rustdesk
 
   [[ "$status" -eq 0 ]]
+  [[ "$(<"$download_record")" == "https://github.com/rustdesk/rustdesk/releases/download/1.5.0/rustdesk-1.5.0-x86_64.deb" ]]
   [[ "$(<"$install_record")" == *"/package.deb|rustdesk|RustDesk" ]]
+
+  rm -f "$download_record"
+  ARCH=arm64
+  run install_rustdesk
+
+  [[ "$status" -eq 0 ]]
+  [[ "$output" == *"not configured for arm64; skipping"* ]]
+  [[ ! -e "$download_record" ]]
+}
+
+@test "GitHub DEB installer still fails on an ambiguous suffix" {
+  fetch_file() {
+    cat >"$2" <<'EOF'
+{
+  "tag_name": "1.5.0",
+  "assets": [
+    { "name": "rustdesk-1.5.0-x86_64.deb", "browser_download_url": "https://github.com/a/b/releases/download/1.5.0/rustdesk-1.5.0-x86_64.deb" },
+    { "name": "rustdesk-unattended-wayland-1.5.0-x86_64.deb", "browser_download_url": "https://github.com/a/b/releases/download/1.5.0/rustdesk-unattended-wayland-1.5.0-x86_64.deb" }
+  ]
+}
+EOF
+  }
+  dpkg-query() {
+    return 1
+  }
+
+  run install_latest_github_debian_package "rustdesk/rustdesk" "-x86_64.deb" "rustdesk" "RustDesk"
+
+  [[ "$status" -ne 0 ]]
+  [[ "$output" == *"expected one RustDesk package release asset matching -x86_64.deb, found 2"* ]]
 }
 
 @test "balenaEtcher uses the latest official AMD64 Debian release" {

@@ -850,6 +850,8 @@ install_strawberry() (
 #   }
 # The asset suffix selects the release asset (e.g. "_amd64.deb"); map it per
 # architecture with a case on "$ARCH" when the project ships several (see install_rustdesk).
+# When a suffix matches more than one asset, pass the whole name with
+# "{version}" where the release version goes; it is then matched exactly.
 
 install_latest_github_debian_package() (
     set -Eeuo pipefail
@@ -859,6 +861,7 @@ install_latest_github_debian_package() (
     local package_name="$3"
     local description="$4"
     local installed_version release_tag release_version
+    local match_type="suffix"
     local temporary_dir
 
     temporary_dir="$(mktemp -d)"
@@ -881,9 +884,14 @@ install_latest_github_debian_package() (
         return
     fi
 
+    if [[ "$asset_suffix" == *"{version}"* ]]; then
+        match_type="exact"
+        asset_suffix="${asset_suffix//\{version\}/$release_version}"
+    fi
+
     info "downloading ${description} package"
     fetch_github_asset_from_metadata \
-        "suffix" \
+        "$match_type" \
         "$asset_suffix" \
         "$temporary_dir/package.deb" \
         "$temporary_dir/release.json" \
@@ -903,8 +911,9 @@ install_rustdesk() {
     local asset_suffix
 
     case "$ARCH" in
-        amd64) asset_suffix="-x86_64.deb" ;;
-        arm64) asset_suffix="-aarch64.deb" ;;
+        # The release also ships -sciter and unattended-wayland builds that
+        # end in the same suffix.
+        amd64) asset_suffix="rustdesk-{version}-x86_64.deb" ;;
         *)
             warn "RustDesk release installation is not configured for ${ARCH}; skipping"
             return
