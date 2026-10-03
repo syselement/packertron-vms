@@ -28,7 +28,7 @@ locals {
   firstboot_conf = {
     for name, vm in local.provisioned : name => join("\n", concat(
       [
-        "TARGET_USER=${var.username}",
+        "TARGET_USER=${coalesce(vm.username, var.username)}",
         "STEPS=${vm.provisioning_steps}",
       ],
       var.provisioning_repo_branch == "" ? [] : ["REPO_BRANCH=${var.provisioning_repo_branch}"],
@@ -99,9 +99,14 @@ resource "proxmox_virtual_environment_vm" "this" {
   vm_id     = each.value.vm_id
   tags      = each.value.tags
 
+  # A full clone is written straight to datastore_id. Without it Proxmox clones
+  # onto the template's storage, and the disk block below then moves the copy
+  # across: twice the I/O, and room for it on the template's pool. A linked
+  # clone has to stay on the template's storage, so it gets no target.
   clone {
-    vm_id = each.value.template_vm_id
-    full  = each.value.full_clone
+    vm_id        = each.value.template_vm_id
+    full         = each.value.full_clone
+    datastore_id = each.value.full_clone ? var.datastore_id : null
   }
 
   cpu {
@@ -144,7 +149,7 @@ resource "proxmox_virtual_environment_vm" "this" {
     }
 
     user_account {
-      username = var.username
+      username = coalesce(each.value.username, var.username)
       password = var.password
       keys     = var.ssh_authorized_keys
     }
@@ -156,5 +161,12 @@ resource "proxmox_virtual_environment_vm" "this" {
       ? proxmox_virtual_environment_file.firstboot[each.key].id
       : (each.value.vendor_data_file_id == "" ? null : each.value.vendor_data_file_id)
     )
+  }
+
+  # The clone target only matters when the VM is created, and the provider
+  # replaces a VM whose clone.datastore_id changes - including every VM
+  # created before the module set it.
+  lifecycle {
+    ignore_changes = [clone[0].datastore_id]
   }
 }
