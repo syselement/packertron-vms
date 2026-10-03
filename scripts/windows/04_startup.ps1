@@ -20,7 +20,7 @@ $generalizationState = Get-ItemProperty -Path $regPath -Name GeneralizationState
 
 # Check if CleanupState is 2 and GeneralizationState is 7
 if ($cleanupState -eq 2 -and $generalizationState -eq 7) {
-   Write-Host "CleanupState is 2 and GeneralizationState is 7. Running commands..."
+   Write-Output "CleanupState is 2 and GeneralizationState is 7. Running commands..."
 
    # Enabling a few other options via registry settings.
    if (!(Test-Path -Path "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Advanced")) {
@@ -28,17 +28,17 @@ if ($cleanupState -eq 2 -and $generalizationState -eq 7) {
    }
 
    # Setting view options
-   Set-ItemProperty "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Advanced" "Hidden" 1
-   Set-ItemProperty "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Advanced" "HideFileExt" 0
-   Set-ItemProperty "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Advanced" "HideDrivesWithNoMedia" 0
-   Set-ItemProperty "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Advanced" "ShowSyncProviderNotifications" 0
+   Set-ItemProperty -Path "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -Name "Hidden" -Value 1
+   Set-ItemProperty -Path "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -Name "HideFileExt" -Value 0
+   Set-ItemProperty -Path "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -Name "HideDrivesWithNoMedia" -Value 0
+   Set-ItemProperty -Path "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -Name "ShowSyncProviderNotifications" -Value 0
 
    # Setting default explorer view to This PC
-   Set-ItemProperty "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" "LaunchTo" 1
+   Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -Name "LaunchTo" -Value 1
 
    # Setting Dark theme
-   Set-ItemProperty "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Themes\Personalize" "AppsUseLightTheme" 0
-   Set-ItemProperty "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Themes\Personalize" "SystemUsesLightTheme" 0
+   Set-ItemProperty -Path "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Themes\Personalize" -Name "AppsUseLightTheme" -Value 0
+   Set-ItemProperty -Path "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Themes\Personalize" -Name "SystemUsesLightTheme" -Value 0
 
    # Hide Edge first run experience
    if (!(Test-Path "HKLM:\Software\Policies\Microsoft\Edge")) {
@@ -61,10 +61,10 @@ if ($cleanupState -eq 2 -and $generalizationState -eq 7) {
    # Enable SSH rule in the firewall
    netsh advfirewall firewall set rule name="Allow SSH" new action=allow
 
-   Write-Host "Commands executed successfully."
+   Write-Output "Commands executed successfully."
 }
 else {
-   Write-Host "Conditions not met. CleanupState: $cleanupState, GeneralizationState: $generalizationState"
+   Write-Output "Conditions not met. CleanupState: $cleanupState, GeneralizationState: $generalizationState"
 }
 
 # Verify if the firewall rule was added and enabled. If it has, there's no need to keep the startup.cmd file or this one.
@@ -74,14 +74,14 @@ $ruleExists = Get-NetFirewallRule -DisplayName $firewallRuleName
 if ($ruleExists) {
    #Check action
    if ($ruleExists.Action -eq 'Allow') {
-      write-host "Firewall rule '$firewallRuleName' exists and is set to allow"
-      remove-item $filePath
-      remove-item "C:\tmp\startup.ps1"
+      Write-Output "Firewall rule '$firewallRuleName' exists and is set to allow"
+      Remove-Item -Path $filePath
+      Remove-Item -Path "C:\tmp\startup.ps1"
    }
    else {
-      write-host "Firewall rule '$firewallRuleName' exists but is not set to Allow."
+      Write-Output "Firewall rule '$firewallRuleName' exists but is not set to Allow."
    }
 }
 else {
-   write-host "Firewall rule '$firewallRuleName' does not exist. "
+   Write-Output "Firewall rule '$firewallRuleName' does not exist. "
 }

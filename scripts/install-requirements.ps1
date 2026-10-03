@@ -50,6 +50,7 @@ function Get-ToolVersion {
         if ($output) { return $output.ToString().Trim() }
     } catch {
         # A tool that refuses --version is still installed; the name is enough.
+        Write-Verbose ("{0} --version failed: {1}" -f $Command, $_)
     }
     return 'installed'
 }
@@ -63,7 +64,7 @@ function Get-PackageManager {
 function Install-Tool {
     param([hashtable] $Tool, [string] $Manager)
 
-    Write-Host ("   installing: {0}" -f $Tool.Name)
+    Write-Output ("   installing: {0}" -f $Tool.Name)
     $global:LASTEXITCODE = 0
     switch ($Manager) {
         'winget' {
@@ -79,19 +80,19 @@ function Install-Tool {
     }
 }
 
-function Show-ManualSteps {
-    Write-Host ''
-    Write-Host '== manual'
+function Show-ManualStep {
+    Write-Output ''
+    Write-Output '== manual'
 
     $vmware = Test-Path 'C:\Program Files (x86)\VMware\VMware Workstation\vmrun.exe'
     if (-not $vmware) {
         $vmware = Test-Path 'C:\Program Files\VMware\VMware Workstation\vmrun.exe'
     }
     if ($vmware) {
-        Write-Host '   ok      VMware Workstation found'
+        Write-Output '   ok      VMware Workstation found'
     } else {
         # Needs a Broadcom account, so it cannot be scripted.
-        Write-Host '   MANUAL  VMware Workstation Pro: https://support.broadcom.com/group/ecx/free-downloads'
+        Write-Output '   MANUAL  VMware Workstation Pro: https://support.broadcom.com/group/ecx/free-downloads'
     }
 
     $plugin = $false
@@ -102,63 +103,63 @@ function Show-ManualSteps {
             Select-String 'vagrant-vmware-desktop').Count -gt 0
     }
     if ($plugin) {
-        Write-Host '   ok      vagrant-vmware-desktop installed'
+        Write-Output '   ok      vagrant-vmware-desktop installed'
     } else {
-        Write-Host '   MANUAL  vagrant plugin install vagrant-vmware-desktop'
-        Write-Host '   MANUAL  Vagrant VMware Utility: https://developer.hashicorp.com/vagrant/docs/providers/vmware/vagrant-vmware-utility'
+        Write-Output '   MANUAL  vagrant plugin install vagrant-vmware-desktop'
+        Write-Output '   MANUAL  Vagrant VMware Utility: https://developer.hashicorp.com/vagrant/docs/providers/vmware/vagrant-vmware-utility'
     }
 
     if (Test-Tool 'wsl') {
-        Write-Host '   ok      WSL present - run scripts/install-requirements.sh inside it'
+        Write-Output '   ok      WSL present - run scripts/install-requirements.sh inside it'
     } else {
-        Write-Host '   MANUAL  wsl --install, then run scripts/install-requirements.sh inside it'
-        Write-Host '           The seed and shell checks need cloud-init, shellcheck, shfmt and bats,'
-        Write-Host '           none of which run natively on Windows.'
+        Write-Output '   MANUAL  wsl --install, then run scripts/install-requirements.sh inside it'
+        Write-Output '           The seed and shell checks need cloud-init, shellcheck, shfmt and bats,'
+        Write-Output '           none of which run natively on Windows.'
     }
 }
 
 $manager = Get-PackageManager
 
-Write-Host 'packertron-vms host requirements (Windows)'
+Write-Output 'packertron-vms host requirements (Windows)'
 
 if ($Install) {
     if (-not $manager) {
         throw 'Neither winget nor Chocolatey is available. Install one, or install the tools by hand.'
     }
-    Write-Host ''
-    Write-Host ("== installing (via {0})" -f $manager)
+    Write-Output ''
+    Write-Output ("== installing (via {0})" -f $manager)
     foreach ($tool in $Tools) {
         if (-not (Test-Tool $tool.Command)) { Install-Tool -Tool $tool -Manager $manager }
     }
     # winget and choco both extend PATH for new processes only.
-    Write-Host ''
-    Write-Host 'Open a new terminal so PATH picks up anything just installed.'
+    Write-Output ''
+    Write-Output 'Open a new terminal so PATH picks up anything just installed.'
 }
 
-Write-Host ''
-Write-Host '== tools'
+Write-Output ''
+Write-Output '== tools'
 $missing = 0
 foreach ($tool in $Tools) {
     if (Test-Tool $tool.Command) {
-        Write-Host ('   ok      {0,-10} {1}' -f $tool.Name, (Get-ToolVersion $tool.Command))
+        Write-Output ('   ok      {0,-10} {1}' -f $tool.Name, (Get-ToolVersion $tool.Command))
     } else {
-        Write-Host ('   MISSING {0,-10} {1}' -f $tool.Name, $tool.Purpose)
+        Write-Output ('   MISSING {0,-10} {1}' -f $tool.Name, $tool.Purpose)
         $missing++
     }
 }
 
-Show-ManualSteps
+Show-ManualStep
 
-Write-Host ''
+Write-Output ''
 if ($missing -gt 0) {
-    Write-Host ("{0} tool(s) missing. Install them with:" -f $missing)
-    Write-Host '  powershell -ExecutionPolicy Bypass -File scripts\install-requirements.ps1 -Install'
+    Write-Output ("{0} tool(s) missing. Install them with:" -f $missing)
+    Write-Output '  powershell -ExecutionPolicy Bypass -File scripts\install-requirements.ps1 -Install'
     exit 1
 }
 
-Write-Host 'all tooling present'
-Write-Host ''
-Write-Host 'Next:'
-Write-Host '  cd templates\vmware\ubuntu-24.04-desktop'
-Write-Host '  packer init . ; packer validate . ; packer build .'
+Write-Output 'all tooling present'
+Write-Output ''
+Write-Output 'Next:'
+Write-Output '  cd templates\vmware\ubuntu-24.04-desktop'
+Write-Output '  packer init . ; packer validate . ; packer build .'
 exit 0
