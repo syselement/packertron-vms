@@ -1,4 +1,4 @@
-# Windows 11 template for Proxmox VE: ISO + answer file, generalized with
+# Windows 10 template for Proxmox VE: ISO + answer file, generalized with
 # sysprep and configured per clone by cloudbase-init.
 # Adapted from https://github.com/mttaggart/seclab (Packer/win-11-ws/config.pkr.hcl).
 #
@@ -68,19 +68,19 @@ variable "insecure_skip_tls_verify" {
 variable "iso_file" {
   type        = string
   description = "ISO already on the node, as storage:iso/name.iso; \"\" downloads var.iso"
-  default     = "local:iso/26200.6584.250915-1905.25h2_ge_release_svc_refresh_CLIENTENTERPRISEEVAL_OEMRET_x64FRE_en-us.iso"
+  default     = "local:iso/19045.2006.220908-0225.22h2_release_svc_refresh_CLIENTENTERPRISEEVAL_OEMRET_x64FRE_en-us.iso"
 }
 
 variable "iso" {
   type        = string
   description = "A URL to the ISO; used only when iso_file is empty"
-  default     = "https://software-static.download.prss.microsoft.com/dbazure/888969d5-f34g-4e03-ac9d-1f9786c66749/26200.6584.250915-1905.25h2_ge_release_svc_refresh_CLIENTENTERPRISEEVAL_OEMRET_x64FRE_en-us.iso"
+  default     = "https://software-static.download.prss.microsoft.com/dbazure/988969d5-f34g-4e03-ac9d-1f9786c66750/19045.2006.220908-0225.22h2_release_svc_refresh_CLIENTENTERPRISEEVAL_OEMRET_x64FRE_en-us.iso"
 }
 
 variable "checksum" {
   type        = string
   description = "Checksum for var.iso, e.g. sha256:<hash>; unused for a staged iso_file"
-  default     = "sha256:a61adeab895ef5a4db436e0a7011c92a2ff17bb0357f58b13bbc4062e535e7b9"
+  default     = "sha256:ef7312733a9f5d7d51cfa04ac497671995674ca5e1058d5164d6028f0938d668"
 }
 
 # The edition to install, by its index in install.wim - `wiminfo
@@ -142,13 +142,13 @@ variable "network_bridge" {
 variable "vm_id" {
   type        = number
   description = "VMID for the build. Proxmox requires it to be free on the node."
-  default     = 80311
+  default     = 80310
 }
 
 variable "template_name" {
   type        = string
   description = "Name of the resulting template"
-  default     = "win-11-template"
+  default     = "win-10-template"
 }
 
 # Seconds of Enter presses at boot. The ISO boots only on a keypress, at a
@@ -195,7 +195,7 @@ locals {
   }
 }
 
-source "proxmox-iso" "win-11" {
+source "proxmox-iso" "win-10" {
   proxmox_url              = var.proxmox_api_url
   node                     = var.proxmox_node
   username                 = var.proxmox_api_token_id
@@ -225,7 +225,7 @@ source "proxmox-iso" "win-11" {
     cd_content = {
       "autounattend.xml" = templatefile("${path.root}/../autounattend.pkrtpl.xml", {
         password    = local.xml_password
-        virtio_os   = "w11"
+        virtio_os   = "w10"
         image_index = var.image_index
         product_key = var.product_key
       })
@@ -255,13 +255,13 @@ source "proxmox-iso" "win-11" {
   # cloud-init drive as configdrive2, the format cloudbase-init reads, and pass
   # its password in plain text rather than hashed. Proxmox's win10 covers
   # Windows 10; win11 covers Windows 11 and Server 2022 and 2025.
-  os = "win11"
+  os = "win10"
 
   machine = "q35"
   bios    = "ovmf"
 
   template_name        = var.template_name
-  template_description = "Windows 11, built by Packer on ${timestamp()}. q35/OVMF/TPM 2.0. Sysprepped: clones configure themselves through cloudbase-init."
+  template_description = "Windows 10, built by Packer on ${timestamp()}. q35/OVMF/TPM 2.0. Sysprepped: clones configure themselves through cloudbase-init."
 
   # Secure Boot and a TPM 2.0: required by Windows 11, and kept on 10 and Server
   # 2025 so the three Windows templates stay identical here. pre_enrolled_keys
@@ -323,7 +323,7 @@ source "proxmox-iso" "win-11" {
 }
 
 build {
-  sources = ["source.proxmox-iso.win-11"]
+  sources = ["source.proxmox-iso.win-10"]
 
   # Machine-wide settings: Edge, diagnostic data, power plan, password expiry.
   provisioner "powershell" {

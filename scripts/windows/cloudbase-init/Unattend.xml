@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Sysprep answer file for the Proxmox Windows templates. The template uploads
+  it to C:\Windows\Panther\, and 12_sysprep.ps1 passes it to sysprep.
+
+  Based on the Unattend.xml CloudbaseInitSetup_1_1_8_x64.msi ships, with the
+  Windows-client additions the Proxmox documentation lists, and the locale and
+  time zone of the other Windows templates in this repository.
+
+  Docs:
+    Unattend reference  https://learn.microsoft.com/en-us/windows-hardware/customize/desktop/unattend/
+    Proxmox             https://pve.proxmox.com/pve-docs/chapter-qm.html (Cloudbase-Init and Sysprep)
+    WINDOWS.md          ../../../templates/proxmox/WINDOWS.md, the clone-time model
+
+  Run: sysprep reads this; it is not meant to be run by hand.
+-->
+<unattend xmlns="urn:schemas-microsoft-com:unattend">
+  <settings pass="generalize">
+    <component name="Microsoft-Windows-PnpSysprep" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS" xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <!-- Keeps the virtio drivers across generalize; without it a clone
+           re-detects every device and can come up without a NIC. -->
+      <PersistAllDeviceInstalls>true</PersistAllDeviceInstalls>
+    </component>
+  </settings>
+  <settings pass="specialize">
+    <component name="Microsoft-Windows-Deployment" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS" xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <RunSynchronous>
+        <!-- A client edition will not finish OOBE with no enabled account, and
+             cloudbase-init renames this one to the clone's user. A no-op on
+             Server, where it is already enabled. -->
+        <RunSynchronousCommand wcm:action="add">
+          <Order>1</Order>
+          <Path>net user Administrator /active:yes</Path>
+          <Description>Enable the built-in Administrator</Description>
+        </RunSynchronousCommand>
+        <!-- Exit 1 asks setup to reboot, exit 2 does not: the convention the
+             MSI's own Unattend.xml uses. -->
+        <RunSynchronousCommand wcm:action="add">
+          <Order>2</Order>
+          <Path>cmd.exe /c ""C:\Program Files\Cloudbase Solutions\Cloudbase-Init\Python\Scripts\cloudbase-init.exe" --config-file "C:\Program Files\Cloudbase Solutions\Cloudbase-Init\conf\cloudbase-init-unattend.conf" &amp;&amp; exit 1 || exit 2"</Path>
+          <Description>Run Cloudbase-Init to set the hostname</Description>
+          <WillReboot>OnRequest</WillReboot>
+        </RunSynchronousCommand>
+      </RunSynchronous>
+    </component>
+    <component name="Microsoft-Windows-Shell-Setup" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS" xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <TimeZone>W. Europe Standard Time</TimeZone>
+    </component>
+  </settings>
+  <settings pass="oobeSystem">
+    <component name="Microsoft-Windows-International-Core" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS" xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <InputLocale>it-IT</InputLocale>
+      <SystemLocale>en-US</SystemLocale>
+      <UILanguage>en-US</UILanguage>
+      <UserLocale>en-US</UserLocale>
+    </component>
+    <component name="Microsoft-Windows-Shell-Setup" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS" xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <!-- SkipMachineOOBE and SkipUserOOBE are deprecated but are what the
+           cloudbase-init file relies on. ProtectYourPC 3 declines the
+           recommended diagnostic-data settings instead of accepting them. -->
+      <OOBE>
+        <HideEULAPage>true</HideEULAPage>
+        <HideOEMRegistrationScreen>true</HideOEMRegistrationScreen>
+        <HideOnlineAccountScreens>true</HideOnlineAccountScreens>
+        <HideWirelessSetupInOOBE>true</HideWirelessSetupInOOBE>
+        <ProtectYourPC>3</ProtectYourPC>
+        <SkipMachineOOBE>true</SkipMachineOOBE>
+        <SkipUserOOBE>true</SkipUserOOBE>
+      </OOBE>
+    </component>
+  </settings>
+</unattend>

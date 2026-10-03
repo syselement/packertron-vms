@@ -5,6 +5,8 @@ output/
 # packer-plugin-proxmox writes the ISO it downloads into a directory of this
 # name beside the template, whatever iso_target_path says.
 downloaded_iso_path/
+# The same for additional_iso_files (the virtio-win ISO), numbered per drive.
+downloaded_additional_iso_path_*/
 
 # Crash log
 crash.log

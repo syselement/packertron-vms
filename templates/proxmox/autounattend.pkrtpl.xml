@@ -1,0 +1,281 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Windows Setup answer file shared by the Proxmox Windows templates - win-10,
+  win-11 and win-srv-2025. Each renders it with templatefile() and writes it to
+  the root of a CD with cd_content, where Windows Setup finds it unprompted.
+
+  Placeholders: $${password} is the build password, already XML-escaped by the
+  template; $${virtio_os} is the virtio-win folder for that Windows;
+  $${image_index} picks the edition from install.wim; $${product_key} is empty
+  for evaluation media, which takes no key.
+
+  Docs:
+    Unattend reference  https://learn.microsoft.com/en-us/windows-hardware/customize/desktop/unattend/
+    WINDOWS.md          which ISO each template expects and what the build
+                        does with it
+
+  Run: Windows Setup reads this; it is not meant to be run by hand.
+-->
+<unattend xmlns="urn:schemas-microsoft-com:unattend">
+  <settings pass="windowsPE">
+    <!-- Windows has no inbox virtio driver, so without vioscsi setup finds no
+         disk at all. F: is the virtio CD because the template attaches the
+         Windows ISO, this answer file and virtio-win on sata0, sata1 and sata2,
+         in that order - change the order and every path here moves. Drivers
+         added here are also installed into the new system, NetKVM included. -->
+    <component name="Microsoft-Windows-PnpCustomizationsWinPE" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS" xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <DriverPaths>
+        <PathAndCredentials wcm:action="add" wcm:keyValue="1">
+          <Path>F:\vioscsi\${virtio_os}\amd64</Path>
+        </PathAndCredentials>
+        <PathAndCredentials wcm:action="add" wcm:keyValue="2">
+          <Path>F:\viostor\${virtio_os}\amd64</Path>
+        </PathAndCredentials>
+        <PathAndCredentials wcm:action="add" wcm:keyValue="3">
+          <Path>F:\NetKVM\${virtio_os}\amd64</Path>
+        </PathAndCredentials>
+        <PathAndCredentials wcm:action="add" wcm:keyValue="4">
+          <Path>F:\Balloon\${virtio_os}\amd64</Path>
+        </PathAndCredentials>
+        <PathAndCredentials wcm:action="add" wcm:keyValue="5">
+          <Path>F:\pvpanic\${virtio_os}\amd64</Path>
+        </PathAndCredentials>
+        <PathAndCredentials wcm:action="add" wcm:keyValue="6">
+          <Path>F:\qemupciserial\${virtio_os}\amd64</Path>
+        </PathAndCredentials>
+        <PathAndCredentials wcm:action="add" wcm:keyValue="7">
+          <Path>F:\vioinput\${virtio_os}\amd64</Path>
+        </PathAndCredentials>
+        <PathAndCredentials wcm:action="add" wcm:keyValue="8">
+          <Path>F:\viorng\${virtio_os}\amd64</Path>
+        </PathAndCredentials>
+        <PathAndCredentials wcm:action="add" wcm:keyValue="9">
+          <Path>F:\vioserial\${virtio_os}\amd64</Path>
+        </PathAndCredentials>
+      </DriverPaths>
+    </component>
+    <component name="Microsoft-Windows-International-Core-WinPE" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS" xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <SetupUILanguage>
+        <UILanguage>en-US</UILanguage>
+      </SetupUILanguage>
+      <InputLocale>it-IT</InputLocale>
+      <SystemLocale>en-US</SystemLocale>
+      <UILanguage>en-US</UILanguage>
+      <UserLocale>en-US</UserLocale>
+    </component>
+    <component name="Microsoft-Windows-Setup" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS" xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <!-- No recovery partition after C:, so cloudbase-init's ExtendVolumes
+           can grow C: into whatever disk_size deploy/ gives the clone. WinRE
+           lives in C:\Recovery instead. Sizes are Microsoft's current ones. -->
+      <DiskConfiguration>
+        <Disk wcm:action="add">
+          <DiskID>0</DiskID>
+          <WillWipeDisk>true</WillWipeDisk>
+          <CreatePartitions>
+            <CreatePartition wcm:action="add">
+              <Order>1</Order>
+              <Type>EFI</Type>
+              <Size>260</Size>
+            </CreatePartition>
+            <CreatePartition wcm:action="add">
+              <Order>2</Order>
+              <Type>MSR</Type>
+              <Size>16</Size>
+            </CreatePartition>
+            <CreatePartition wcm:action="add">
+              <Order>3</Order>
+              <Type>Primary</Type>
+              <Extend>true</Extend>
+            </CreatePartition>
+          </CreatePartitions>
+          <ModifyPartitions>
+            <ModifyPartition wcm:action="add">
+              <Order>1</Order>
+              <PartitionID>1</PartitionID>
+              <Format>FAT32</Format>
+              <Label>System</Label>
+            </ModifyPartition>
+            <ModifyPartition wcm:action="add">
+              <Order>2</Order>
+              <PartitionID>3</PartitionID>
+              <Format>NTFS</Format>
+              <Label>Windows</Label>
+              <Letter>C</Letter>
+            </ModifyPartition>
+          </ModifyPartitions>
+        </Disk>
+        <WillShowUI>OnError</WillShowUI>
+      </DiskConfiguration>
+      <ImageInstall>
+        <OSImage>
+          <!-- By index, as vmware/win-srv-2025 and Ludus both select it: an
+               evaluation ISO's edition names vary between releases, its
+               indexes do not. -->
+          <InstallFrom>
+            <MetaData wcm:action="add">
+              <Key>/IMAGE/INDEX</Key>
+              <Value>${image_index}</Value>
+            </MetaData>
+          </InstallFrom>
+          <InstallTo>
+            <DiskID>0</DiskID>
+            <PartitionID>3</PartitionID>
+          </InstallTo>
+          <WillShowUI>OnError</WillShowUI>
+        </OSImage>
+      </ImageInstall>
+      <UserData>
+        <AcceptEula>true</AcceptEula>
+%{ if product_key != "" ~}
+        <ProductKey>
+          <Key>${product_key}</Key>
+          <WillShowUI>OnError</WillShowUI>
+        </ProductKey>
+%{ endif ~}
+      </UserData>
+    </component>
+  </settings>
+  <settings pass="specialize">
+    <!-- Belt and braces on client editions, where the built-in Administrator
+         is disabled out of the box. Server already has it enabled. -->
+    <component name="Microsoft-Windows-Deployment" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS" xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <RunSynchronous>
+        <RunSynchronousCommand wcm:action="add">
+          <Order>1</Order>
+          <Path>net user Administrator /active:yes</Path>
+          <Description>Enable the built-in Administrator</Description>
+        </RunSynchronousCommand>
+        <!-- Windows 11 24H2 and later encrypt the OS volume on their own once
+             TPM 2.0 and Secure Boot are present, and sysprep refuses to
+             generalize an encrypted volume (0x80310039). Set before the first
+             boot, when that encryption would start. -->
+        <RunSynchronousCommand wcm:action="add">
+          <Order>2</Order>
+          <Path>reg add HKLM\SYSTEM\CurrentControlSet\Control\BitLocker /v PreventDeviceEncryption /t REG_DWORD /d 1 /f</Path>
+          <Description>Stop automatic device encryption</Description>
+        </RunSynchronousCommand>
+        <!-- Dark mode, set in the Default profile every new profile is copied
+             from - the build's Administrator here, and each clone's user,
+             whose profile is created fresh after sysprep. Windows 11 applies
+             its default light theme when it creates a profile, overwriting
+             the copied values, so a RunOnce sets them again at first logon. -->
+        <RunSynchronousCommand wcm:action="add">
+          <Order>3</Order>
+          <Path>reg load HKU\DefaultUser C:\Users\Default\NTUSER.DAT</Path>
+          <Description>Load the Default user hive</Description>
+        </RunSynchronousCommand>
+        <RunSynchronousCommand wcm:action="add">
+          <Order>4</Order>
+          <Path>reg add HKU\DefaultUser\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize /v AppsUseLightTheme /t REG_DWORD /d 0 /f</Path>
+          <Description>Dark mode for apps</Description>
+        </RunSynchronousCommand>
+        <RunSynchronousCommand wcm:action="add">
+          <Order>5</Order>
+          <Path>reg add HKU\DefaultUser\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize /v SystemUsesLightTheme /t REG_DWORD /d 0 /f</Path>
+          <Description>Dark mode for the taskbar and Start</Description>
+        </RunSynchronousCommand>
+        <RunSynchronousCommand wcm:action="add">
+          <Order>6</Order>
+          <Path>reg add HKU\DefaultUser\Software\Microsoft\Windows\CurrentVersion\RunOnce /v PackertronDarkApps /t REG_SZ /d "reg add HKCU\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize /v AppsUseLightTheme /t REG_DWORD /d 0 /f" /f</Path>
+          <Description>Dark mode for apps, again at first logon</Description>
+        </RunSynchronousCommand>
+        <RunSynchronousCommand wcm:action="add">
+          <Order>7</Order>
+          <Path>reg add HKU\DefaultUser\Software\Microsoft\Windows\CurrentVersion\RunOnce /v PackertronDarkSystem /t REG_SZ /d "reg add HKCU\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize /v SystemUsesLightTheme /t REG_DWORD /d 0 /f" /f</Path>
+          <Description>Dark mode for the taskbar and Start, again at first logon</Description>
+        </RunSynchronousCommand>
+        <!-- The Explorer view, in the same Default hive. Unlike the theme,
+             Windows leaves these alone when it creates a profile. -->
+        <RunSynchronousCommand wcm:action="add">
+          <Order>8</Order>
+          <Path>reg add HKU\DefaultUser\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced /v Hidden /t REG_DWORD /d 1 /f</Path>
+          <Description>Explorer shows hidden files</Description>
+        </RunSynchronousCommand>
+        <RunSynchronousCommand wcm:action="add">
+          <Order>9</Order>
+          <Path>reg add HKU\DefaultUser\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced /v HideFileExt /t REG_DWORD /d 0 /f</Path>
+          <Description>Explorer shows file extensions</Description>
+        </RunSynchronousCommand>
+        <RunSynchronousCommand wcm:action="add">
+          <Order>10</Order>
+          <Path>reg add HKU\DefaultUser\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced /v HideDrivesWithNoMedia /t REG_DWORD /d 0 /f</Path>
+          <Description>Explorer shows empty drives</Description>
+        </RunSynchronousCommand>
+        <RunSynchronousCommand wcm:action="add">
+          <Order>11</Order>
+          <Path>reg add HKU\DefaultUser\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced /v ShowSyncProviderNotifications /t REG_DWORD /d 0 /f</Path>
+          <Description>No OneDrive ads in Explorer</Description>
+        </RunSynchronousCommand>
+        <RunSynchronousCommand wcm:action="add">
+          <Order>12</Order>
+          <Path>reg add HKU\DefaultUser\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced /v LaunchTo /t REG_DWORD /d 1 /f</Path>
+          <Description>Explorer opens on This PC</Description>
+        </RunSynchronousCommand>
+        <RunSynchronousCommand wcm:action="add">
+          <Order>13</Order>
+          <Path>reg unload HKU\DefaultUser</Path>
+          <Description>Unload the Default user hive</Description>
+        </RunSynchronousCommand>
+      </RunSynchronous>
+    </component>
+    <component name="Microsoft-Windows-Shell-Setup" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS" xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <TimeZone>W. Europe Standard Time</TimeZone>
+    </component>
+    <!-- Evaluation media activates on its own; this only stops the build from
+         trying, and failing noisily, while it has a network. -->
+    <component name="Microsoft-Windows-Security-SPP-UX" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS" xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <SkipAutoActivation>true</SkipAutoActivation>
+    </component>
+  </settings>
+  <settings pass="oobeSystem">
+    <component name="Microsoft-Windows-International-Core" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS" xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <InputLocale>it-IT</InputLocale>
+      <SystemLocale>en-US</SystemLocale>
+      <UILanguage>en-US</UILanguage>
+      <UserLocale>en-US</UserLocale>
+    </component>
+    <component name="Microsoft-Windows-Shell-Setup" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS" xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <!-- The build logs in as the built-in Administrator, as
+           vmware/win-srv-2025 does. It is RID 500, which UAC never filters, so
+           SSH sessions are fully elevated without switching UAC off - and it is
+           the account cloudbase-init renames to the clone's user. -->
+      <UserAccounts>
+        <AdministratorPassword>
+          <Value>${password}</Value>
+          <PlainText>true</PlainText>
+        </AdministratorPassword>
+      </UserAccounts>
+      <!-- LogonCount 1: Windows clears the stored password after the one logon
+           that FirstLogonCommands needs. -->
+      <AutoLogon>
+        <Enabled>true</Enabled>
+        <Username>Administrator</Username>
+        <Password>
+          <Value>${password}</Value>
+          <PlainText>true</PlainText>
+        </Password>
+        <LogonCount>1</LogonCount>
+      </AutoLogon>
+      <!-- HideLocalAccountScreen is only valid with AdministratorPassword set,
+           which it is above. -->
+      <OOBE>
+        <HideEULAPage>true</HideEULAPage>
+        <HideLocalAccountScreen>true</HideLocalAccountScreen>
+        <HideOEMRegistrationScreen>true</HideOEMRegistrationScreen>
+        <HideOnlineAccountScreens>true</HideOnlineAccountScreens>
+        <HideWirelessSetupInOOBE>true</HideWirelessSetupInOOBE>
+        <ProtectYourPC>3</ProtectYourPC>
+      </OOBE>
+      <!-- The script sits beside this file on the answer-file CD. It is found
+           by name rather than by drive letter, which is the one thing here that
+           does not depend on attachment order. -->
+      <FirstLogonCommands>
+        <SynchronousCommand wcm:action="add">
+          <Order>1</Order>
+          <CommandLine>powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "Get-PSDrive -PSProvider FileSystem | ForEach-Object { Join-Path $_.Root '00_firstlogon.ps1' } | Where-Object { Test-Path $_ } | Select-Object -First 1 | ForEach-Object { &amp; $_ }"</CommandLine>
+          <Description>Guest agent, RDP and OpenSSH Server</Description>
+        </SynchronousCommand>
+      </FirstLogonCommands>
+    </component>
+  </settings>
+</unattend>
