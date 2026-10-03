@@ -20,6 +20,16 @@ It follows that:
 
 `.gitleaks.toml` allowlists the crypt-hash pattern only, never the files, so a real credential committed to those same seeds is still reported.
 
+### Windows
+
+The Windows Proxmox templates have no seed that could hold a hash: the build password is the `ssh_password` variable, default `packer`, and Packer renders it into the answer file in plain text, because Windows Setup reads nothing else at that stage. It is set on the built-in `Administrator`, which the build logs into over SSH with that password - Windows has no way to authorize a key before the first connection.
+
+It is not meant to reach a clone. Sysprep generalizes the image, and on the clone's first boot cloudbase-init replaces the password with the one on the cloud-init drive, or a random one when there is none - renaming the account to `syselement` on Windows 10 and 11, and leaving it `Administrator` on Server 2025. Server refuses a password that fails its complexity rule, and the random one then stays. The answer file's single autologon is cleared before sysprep, so the password is not left under `Winlogon` either.
+
+That depends on cloudbase-init running. **Until it has, assume a clone may still accept the build password for `Administrator` over SSH and RDP** - so do not put one on a network anyone else can reach before confirming it configured itself, and treat the build password as public like the Linux one.
+
+The clone's own password is exposed differently. Proxmox writes a Windows VM's password to its cloud-init drive in plain text, and the drive stays attached, so any local user can read it. Change it after the first login, or remove it from the drive with `qm set <vmid> --delete cipassword` and `qm cloudinit update <vmid>`.
+
 ## Credentials belong in the environment
 
 Nothing that authenticates to real infrastructure is committed. A value lands in one of three places, decided by what it is:
@@ -69,7 +79,8 @@ It also fails the build if subiquity's cloud-init pinning survived the install, 
 - GitHub Actions are pinned to commit SHAs, not tags, with the version in a trailing comment. Dependabot proposes the updates.
 - `changelog-ci` is the only job with `contents: write`, granted at job level; the workflow default is `contents: read`.
 - Every other workflow checks out with `persist-credentials: false`.
-- ISO checksums are verified on every build, either as a literal `sha256:` or via the distribution's signed `SHA256SUMS`.
+- An ISO Packer downloads is verified on every build, either as a literal `sha256:` or via the distribution's signed `SHA256SUMS`. An ISO already staged on the node (`iso_file`, the default for the Proxmox templates) is not checked by Packer at all, so it is verified once when it is staged - each template's README has the commands.
+- Packer plugins are pinned. The one third-party plugin, `rgl/windows-update`, is pinned to an exact version because it runs as SYSTEM on the Windows build VMs; `packer init` checks it against its release's `SHA256SUMS`. virtio-win and cloudbase-init, which the Windows builds download, are pinned by SHA-256, and cloudbase-init's Authenticode signature is checked too.
 
 ## Recommended repository settings
 
@@ -105,11 +116,11 @@ remote: - 2 of 2 required status checks are expected.
 
 The workflow therefore uses a `RELEASE_TOKEN` secret:
 
-1. **Create a fine-grained PAT** — Settings → Developer settings → Personal access tokens → Fine-grained tokens.
+1. **Create a fine-grained PAT** - Settings → Developer settings → Personal access tokens → Fine-grained tokens.
    - Scope it to this repository only, with **Repository permissions → Contents: Read and write**. Nothing else.
    - Give it the shortest expiry you are willing to renew.
 2. **Store it** as repository secret `RELEASE_TOKEN`.
-3. **Allow the bypass** — in the `main` ruleset, *Bypass list* → *Add bypass* → **Repository admin**.
+3. **Allow the bypass** - in the `main` ruleset, *Bypass list* → *Add bypass* → **Repository admin**.
 
 - The token is a real credential: it can write to this repository.
 - Rotate it on expiry, and revoke it immediately if it leaks.
