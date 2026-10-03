@@ -922,7 +922,7 @@ install_pandoc() {
     local asset_suffix
 
     case "$ARCH" in
-        amd64 | arm64) asset_suffix="-1-${ARCH}.deb" ;;
+        amd64) asset_suffix="-1-amd64.deb" ;;
         *)
             warn "Pandoc release installation is not configured for ${ARCH}; skipping"
             return
@@ -1501,7 +1501,7 @@ install_flameshot() (
 
     architecture="$(dpkg --print-architecture)"
     case "$architecture" in
-        amd64 | arm64) ;;
+        amd64) ;;
         *)
             warn "unsupported Flameshot architecture: ${architecture}"
             return
@@ -1642,7 +1642,7 @@ install_obsidian() (
 
     architecture="$(dpkg --print-architecture)"
     case "$architecture" in
-        amd64 | arm64) ;;
+        amd64) ;;
         *)
             warn "unsupported Obsidian architecture: ${architecture}"
             return

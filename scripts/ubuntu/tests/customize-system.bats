@@ -375,20 +375,6 @@ KUBECTL
   grep -Fqx "virt-manager" "$query_record"
 }
 
-@test "virtualization selects native QEMU for ARM64" {
-  ARCH="arm64"
-  UBUNTU_VARIANT="server"
-
-  install_package_array() {
-    printf '<%s>\n' "$@"
-  }
-
-  run install_virtualization_stack
-
-  [[ "$status" -eq 0 ]]
-  [[ "$output" == *"<qemu-system-arm>"* ]]
-}
-
 @test "virtualization rejects an unsupported architecture clearly" {
   ARCH="unsupported"
   UBUNTU_VARIANT="server"

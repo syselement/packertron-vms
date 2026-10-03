@@ -676,7 +676,6 @@ install_available_package_array() {
 virtualization_qemu_package() {
     case "$ARCH" in
         amd64) printf 'qemu-system-x86\n' ;;
-        arm64 | armhf) printf 'qemu-system-arm\n' ;;
         *) return 1 ;;
     esac
 }
@@ -2725,9 +2724,6 @@ homebrew_cpu_is_supported() {
     case "$(uname -m)" in
         x86_64 | amd64)
             [[ -r /proc/cpuinfo ]] && grep -Eq '(^|[[:space:]])ssse3([[:space:]]|$)' /proc/cpuinfo
-            ;;
-        aarch64 | arm64)
-            return 0
             ;;
         *)
             return 1

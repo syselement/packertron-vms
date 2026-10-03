@@ -10,7 +10,7 @@ setup() {
   SYSTEM_KEYRING_DIR="$BATS_TEST_TMPDIR/usr/share/keyrings"
   APT_SOURCES_DIR="$BATS_TEST_TMPDIR/etc/apt/sources.list.d"
   SYSTEMD_RUNTIME_DIR="$BATS_TEST_TMPDIR/run/systemd/system"
-  ARCH="arm64"
+  ARCH="amd64"
   UBUNTU_CODENAME="noble"
   USER_NAME="testuser"
 
@@ -106,7 +106,7 @@ setup() {
   second_checksum="$(sha256sum "$APT_KEYRING_DIR/docker.asc" "$APT_SOURCES_DIR/docker.sources")"
 
   [[ "$first_checksum" == "$second_checksum" ]]
-  grep -Fqx 'Architectures: arm64' "$APT_SOURCES_DIR/docker.sources"
+  grep -Fqx 'Architectures: amd64' "$APT_SOURCES_DIR/docker.sources"
   grep -Fqx "Signed-By: ${APT_KEYRING_DIR}/docker.asc" "$APT_SOURCES_DIR/docker.sources"
 }
 
