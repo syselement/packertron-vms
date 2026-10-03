@@ -10,7 +10,7 @@ This is the 24.04 template with the release changed. Everything about firmware, 
 
 | Setting | 24.04 | 26.04 |
 | --- | --- | --- |
-| ISO | `ubuntu-24.04.4-live-server-amd64.iso` | `ubuntu-26.04.1-live-server-amd64.iso` |
+| ISO | `ubuntu-24.04.5-live-server-amd64.iso` | `ubuntu-26.04.1-live-server-amd64.iso` |
 | Release directory | `noble` | `resolute` |
 | `vm_id` | `80024` | `80026` |
 | `template_name` | `ubuntu-24.04-server-template` | `ubuntu-26.04-server-template` |

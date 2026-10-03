@@ -59,7 +59,7 @@ variable "insecure_skip_tls_verify" {
 variable "iso" {
   type        = string
   description = "A URL to the ISO file; Packer downloads it to iso_storage_pool"
-  default     = "https://releases.ubuntu.com/noble/ubuntu-24.04.4-live-server-amd64.iso"
+  default     = "https://releases.ubuntu.com/noble/ubuntu-24.04.5-live-server-amd64.iso"
 }
 
 variable "checksum" {
@@ -79,7 +79,7 @@ variable "checksum" {
 variable "iso_file" {
   type        = string
   description = "ISO already on the node, as storage:iso/name.iso; \"\" downloads var.iso"
-  default     = "local:iso/ubuntu-24.04.4-live-server-amd64.iso"
+  default     = "local:iso/ubuntu-24.04.5-live-server-amd64.iso"
 }
 
 variable "iso_storage_pool" {

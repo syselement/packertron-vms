@@ -86,11 +86,13 @@ setup() {
   [[ "$output" == *"STEP  --- 16. Syncthing ---"* ]]
   [[ "$output" == *"STEP  --- 17. Claude Code ---"* ]]
   [[ "$output" == *"STEP  --- 18. iximiuz Labs control (labctl) ---"* ]]
-  [[ "$output" == *"STEP  --- 19. cv4pve-vdi (Proxmox VE VDI client) ---"* ]]
+  [[ "$output" == *"STEP  --- 19. GitHub CLI (gh) ---"* ]]
+  [[ "$output" == *'$ gh auth login'* ]]
+  [[ "$output" == *"STEP  --- 20. cv4pve-vdi (Proxmox VE VDI client) ---"* ]]
   [[ "$output" == *'$ pveum role add CV4PVEVDI -privs "VM.Audit VM.Console VM.PowerMgmt VM.GuestAgent.Audit"'* ]]
   [[ "$output" == *'$ pveum acl modify /vms -user vdi@pve -role CV4PVEVDI'* ]]
-  [[ "$(grep -c '^    ------------------------------------------------------------$' <<<"$output")" -eq 19 ]]
-  [[ "$(grep -ci '^    .*documentation: https://' <<<"$output")" -eq 24 ]]
+  [[ "$(grep -c '^    ------------------------------------------------------------$' <<<"$output")" -eq 20 ]]
+  [[ "$(grep -ci '^    .*documentation: https://' <<<"$output")" -eq 25 ]]
   [[ "$output" != *"/18"* ]]
   [[ "$output" == *"sudo nmcli connection import type wireguard file /etc/wireguard/wg0.conf"* ]]
   [[ "$output" == *"Visit: https://localhost:9443/"* ]]
@@ -140,6 +142,8 @@ setup() {
   [[ "$output" == *"STEP  --- 8. Syncthing ---"* ]]
   [[ "$output" == *"STEP  --- 9. Claude Code ---"* ]]
   [[ "$output" == *"STEP  --- 10. iximiuz Labs control (labctl) ---"* ]]
+  [[ "$output" == *"STEP  --- 11. GitHub CLI (gh) ---"* ]]
+  [[ "$output" == *'$ gh auth status'* ]]
   [[ "$output" == *'$ claude /config'* ]]
   [[ "$output" == *'$ labctl auth login'* ]]
   [[ "$output" == *"Manage this headless host with virsh or a remote virt-manager client."* ]]
@@ -3304,6 +3308,39 @@ FAKE_INSTALLER
   [[ "$output" == *"invalid test repository signing key"* ]]
 }
 
+@test "OpenPGP keyring check rejects any key outside the expected set" {
+  local gnupg_home="$BATS_TEST_TMPDIR/gnupg"
+  local keyring="$BATS_TEST_TMPDIR/keyring.gpg"
+  local first second
+  local -a fingerprints
+
+  install -d -m 0700 "$gnupg_home"
+  for name in first second; do
+    gpg --batch --homedir "$gnupg_home" --passphrase '' \
+      --quick-gen-key "${name} <${name}@example.invalid>" ed25519 sign never 2>/dev/null
+  done
+  gpg --batch --homedir "$gnupg_home" --export >"$keyring"
+  gpgconf --homedir "$gnupg_home" --kill all 2>/dev/null || true
+  mapfile -t fingerprints < <(
+    gpg --batch --show-keys --with-colons "$keyring" |
+      awk -F: '$1 == "pub" { primary = 1; next } $1 == "fpr" && primary { print $10; primary = 0 }'
+  )
+  first="${fingerprints[0]}"
+  second="${fingerprints[1]}"
+
+  run validate_openpgp_keyring "$keyring" "test repository" "$first" "${second,,}"
+  [[ "$status" -eq 0 ]]
+
+  run validate_openpgp_keyring "$keyring" "test repository" "$first"
+  [[ "$status" -ne 0 ]]
+  [[ "$output" == *"unexpected test repository signing-key fingerprint: ${second}"* ]]
+
+  printf 'not an OpenPGP key\n' >"$keyring"
+  run validate_openpgp_keyring "$keyring" "test repository" "$first" "$second"
+  [[ "$status" -ne 0 ]]
+  [[ "$output" == *"invalid test repository signing key"* ]]
+}
+
 @test "unchanged repository files do not request an APT refresh" {
   fetch_file() {
     printf 'Sublime test key\n' >"$2"
@@ -3391,6 +3428,67 @@ FAKE_INSTALLER
   [[ "$APT_SOURCES_CHANGED" == false ]]
   [[ "$(<"$validation_record")" == 'Helm|DDF78C3E6EBB2D2CC223C95C62BA89D07698DBC6' ]]
   grep -Fqx "deb [arch=amd64 signed-by=${SYSTEM_KEYRING_DIR}/helm.gpg] https://packages.buildkite.com/helm-linux/helm-debian/any/ any main" "$APT_SOURCES_DIR/helm-stable-debian.list"
+}
+
+@test "GitHub CLI repository is repeatable and accepts only GitHub's published keys" {
+  local validation_record="$BATS_TEST_TMPDIR/github-cli-validation"
+  ARCH="amd64"
+
+  fetch_file() {
+    [[ "$1" == "https://cli.github.com/packages/githubcli-archive-keyring.gpg" ]]
+    printf 'GitHub CLI test key\n' >"$2"
+  }
+  validate_openpgp_keyring() {
+    local IFS='|'
+    printf '%s\n' "${*:2}" >"$validation_record"
+  }
+
+  apply_repository_setup ensure_github_cli_repository
+  [[ "$APT_SOURCES_CHANGED" == true ]]
+
+  APT_SOURCES_CHANGED=false
+  apply_repository_setup ensure_github_cli_repository
+
+  [[ "$APT_SOURCES_CHANGED" == false ]]
+  [[ "$(<"$validation_record")" == 'GitHub CLI|2C6106201985B60E6C7AC87323F3D4EA75716059|7F38BBB59D064DBCB3D84D725612B36462313325' ]]
+  grep -Fqx \
+    "deb [arch=amd64 signed-by=${SYSTEM_KEYRING_DIR}/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" \
+    "$APT_SOURCES_DIR/github-cli.list"
+}
+
+@test "GitHub CLI repository replaces a hand-made entry for the same repository" {
+  ARCH="amd64"
+  printf 'deb [arch=amd64 signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main\n' \
+    >"$APT_SOURCES_DIR/github-cli.list"
+
+  fetch_file() {
+    printf 'GitHub CLI test key\n' >"$2"
+  }
+  validate_openpgp_keyring() {
+    return 0
+  }
+
+  apply_repository_setup ensure_github_cli_repository
+
+  [[ "$APT_SOURCES_CHANGED" == true ]]
+  [[ "$(grep -c 'cli.github.com' "$APT_SOURCES_DIR/github-cli.list")" -eq 1 ]]
+  grep -Fq "signed-by=${SYSTEM_KEYRING_DIR}/githubcli-archive-keyring.gpg" "$APT_SOURCES_DIR/github-cli.list"
+}
+
+@test "GitHub CLI repository is skipped on a non-amd64 architecture" {
+  ARCH="arm64"
+
+  fetch_file() {
+    printf 'downloaded\n' >&2
+    return 1
+  }
+
+  run apply_repository_setup ensure_github_cli_repository
+
+  [[ "$status" -eq 0 ]]
+  [[ "$output" == *"GitHub CLI repository is not configured for arm64; skipping"* ]]
+  [[ "$output" != *"downloaded"* ]]
+  [[ ! -e "$APT_SOURCES_DIR/github-cli.list" ]]
 }
 
 @test "Typora repository removes its obsolete key and is repeatable" {

@@ -31,7 +31,8 @@
 # validate_debian_package, validate_zip_archive, validate_tar_gzip_archive,
 # verify_github_asset_digest, fetch_latest_github_asset,
 # install_package_array, install_target_config_file, validate_openpgp_key,
-# dearmor_openpgp_key, validate_repository_source, apt_transaction_record_file.
+# validate_openpgp_keyring, dearmor_openpgp_key, validate_repository_source,
+# apt_transaction_record_file.
 # Sourcing only registers function bodies, so definition order across the two
 # files does not matter; every helper is defined before main() runs.
 # Source this file only from 03-customize-system.sh.
@@ -283,6 +284,62 @@ EOF
         ok "configured Helm repository"
     else
         info "Helm repository already configured"
+    fi
+
+    [[ "$changed" == false ]] || return "$APT_SOURCES_CHANGED_STATUS"
+)
+
+# The keyring holds GitHub's 2022 key, which expired in September 2026, and its
+# 2026 successor. Both fingerprints are the ones GitHub CLI's Linux install
+# documentation publishes.
+ensure_github_cli_repository() (
+    set -Eeuo pipefail
+
+    local changed=false
+    local key_file="${SYSTEM_KEYRING_DIR}/githubcli-archive-keyring.gpg"
+    # The name GitHub's own instructions use, so a machine set up by hand has
+    # its file replaced. A second entry with a different Signed-By would make
+    # apt refuse to read any sources at all.
+    local source_file="${APT_SOURCES_DIR}/github-cli.list"
+    local temporary_dir
+
+    if [[ "$ARCH" != "amd64" ]]; then
+        warn "GitHub CLI repository is not configured for ${ARCH}; skipping"
+        return 0
+    fi
+
+    temporary_dir="$(mktemp -d)"
+    trap 'rm -rf -- "$temporary_dir"' EXIT
+
+    fetch_file \
+        "https://cli.github.com/packages/githubcli-archive-keyring.gpg" \
+        "$temporary_dir/githubcli-archive-keyring.gpg" ||
+        die "failed downloading the GitHub CLI signing key"
+    validate_openpgp_keyring \
+        "$temporary_dir/githubcli-archive-keyring.gpg" \
+        "GitHub CLI" \
+        "2C6106201985B60E6C7AC87323F3D4EA75716059" \
+        "7F38BBB59D064DBCB3D84D725612B36462313325"
+
+    cat >"$temporary_dir/github-cli.list" <<EOF
+deb [arch=amd64 signed-by=${key_file}] https://cli.github.com/packages stable main
+EOF
+    validate_repository_source \
+        "$temporary_dir/github-cli.list" \
+        "https://cli.github.com/packages" \
+        "$key_file"
+
+    if write_file_if_changed "$temporary_dir/githubcli-archive-keyring.gpg" "$key_file"; then
+        changed=true
+        ok "installed GitHub CLI repository signing key"
+    else
+        info "GitHub CLI repository signing key already current"
+    fi
+    if write_file_if_changed "$temporary_dir/github-cli.list" "$source_file"; then
+        changed=true
+        ok "configured GitHub CLI repository"
+    else
+        info "GitHub CLI repository already configured"
     fi
 
     [[ "$changed" == false ]] || return "$APT_SOURCES_CHANGED_STATUS"

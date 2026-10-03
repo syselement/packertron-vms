@@ -130,6 +130,7 @@ Installs common user tooling on both variants and applies the Desktop layer only
   - Postman
   - Emote
   - `cv4pve-vdi` and `virt-viewer` (Desktop only): a Proxmox VE VDI client and the `remote-viewer` it opens SPICE and VNC consoles with, started with `vdi`
+  - GitHub CLI (`gh`) from GitHub's own APT repository, on both variants, with `gh auth login` left to the manual steps
   - `tldr` via `pipx`
   - JetBrainsMono Nerd Font
 - applies GNOME settings only on Desktop
