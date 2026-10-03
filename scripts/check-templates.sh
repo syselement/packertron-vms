@@ -13,6 +13,8 @@
 #   scripts/check-templates.sh packer     # templates only
 #   scripts/check-templates.sh seeds      # cloud-init seeds and d-i preseeds
 #   scripts/check-templates.sh preseeds   # d-i preseeds only
+#   scripts/check-templates.sh unattend   # Windows answer files
+#   scripts/check-templates.sh powershell # PowerShell syntax and PSScriptAnalyzer
 #   scripts/check-templates.sh matrix     # CI matrix vs the templates on disk
 #   scripts/check-templates.sh shell      # shellcheck/shfmt outside scripts/ubuntu/
 #   scripts/check-templates.sh docs       # Markdown sentences kept on one line
@@ -31,11 +33,8 @@ readonly WORKFLOW="\
 # - Discovered rather than listed, so a new template is covered the day it is added.
 # - The CI matrix cannot discover them - GitHub evaluates it before any
 #   checkout - so check_matrix below keeps that one hand-written list honest.
-readonly -a SKIP_TEMPLATES=(
-    # Unrepaired build block, and depends on a KeePass database that is not in
-    # this repository.
-    proxmox/win-11
-)
+# Empty today; a template that cannot validate yet goes here, with the reason.
+readonly -a SKIP_TEMPLATES=()
 
 failures=0
 
@@ -273,8 +272,8 @@ check_tofu() {
 
     # Tracked files only. A local deploy.tfvars or kali.tfvars is the operator's
     # own, gitignored, and never seen by CI, so formatting it is not this
-    # repository's business - and -recursive would also descend into
-    # terraform.tfstate.d/.
+    # repository's business - and -recursive would also descend
+    # into terraform.tfstate.d/.
     local source unformatted=0
     while read -r source; do
         [[ -n "$source" ]] || continue
@@ -366,6 +365,99 @@ check_preseeds() {
     done
 }
 
+# Windows Setup reads an answer file once, at install time, and a malformed
+# one fails there with nothing Packer can see.
+check_unattend() {
+    local file relative
+
+    note "Windows answer files"
+
+    if ! command -v xmllint >/dev/null 2>&1; then
+        fail "xmllint is not installed (package libxml2-utils)"
+        return
+    fi
+
+    # Per-template answer files, the one shared by the Proxmox Windows
+    # templates, and the sysprep file beside cloudbase-init's configuration.
+    for file in "$REPO_ROOT"/templates/*/*/config/*.xml "$REPO_ROOT"/templates/*/*.xml \
+        "$REPO_ROOT"/scripts/windows/*/*.xml; do
+        [[ -f "$file" ]] || continue
+        relative="${file#"$REPO_ROOT"/}"
+        if ! xmllint --noout "$file" 2>/dev/null; then
+            fail "$relative: not well-formed XML"
+            xmllint --noout "$file" 2>&1 | head -5 >&2 || true
+            continue
+        fi
+        # Placeholders from the upstream this was adapted from; nothing
+        # substitutes them.
+        if grep -q 'SECLAB_' "$file"; then
+            fail "$relative: unsubstituted SECLAB_ placeholder"
+            continue
+        fi
+        # Proxmox attaches no floppy, so an a:\ path there can never resolve.
+        # VMware can, so the rule stops at templates/proxmox/.
+        if [[ "$relative" == templates/proxmox/* ]] && grep -qiE '\ba:[\]' "$file"; then
+            fail "$relative: a:\\ path, but Proxmox attaches no floppy drive"
+            continue
+        fi
+        pass "$relative"
+    done
+}
+
+# The Windows provisioners only run inside a build, half an hour in, so a
+# syntax error there is the most expensive typo in this repository; pwsh's own
+# parser finds it in a second. PSScriptAnalyzer then holds every script to zero
+# findings. Neither is in the Ubuntu archive, so where one is missing its check
+# is skipped, not failed. GitHub's runners ship both, so CI does not skip.
+check_powershell() {
+    local state relative message
+
+    note "PowerShell syntax and PSScriptAnalyzer"
+
+    if ! command -v pwsh >/dev/null 2>&1; then
+        printf '   skip PowerShell syntax (pwsh is not installed here; CI runs it)\n'
+        return
+    fi
+
+    # One pwsh for every file, fed on stdin: its startup is slower than the
+    # parsing. Tracked files plus new ones not yet added, never ignored ones.
+    # shellcheck disable=SC2016 # the script is PowerShell; its $ are pwsh's
+    while IFS=$'\t' read -r state relative message; do
+        case "$state" in
+            ok) pass "$relative" ;;
+            FAIL) fail "$relative: $message" ;;
+            SKIP) printf '   skip %s\n' "$relative" ;;
+        esac
+    done < <(
+        cd "$REPO_ROOT" &&
+            git ls-files --cached --others --exclude-standard '*.ps1' |
+            pwsh -NoProfile -NonInteractive -Command '
+                $analyze = [bool](Get-Module -ListAvailable -Name PSScriptAnalyzer)
+                if (-not $analyze) {
+                    "SKIP`tPSScriptAnalyzer (not installed here; CI runs it)"
+                }
+                $input | ForEach-Object {
+                    $path = Join-Path (Get-Location) $_
+                    $errors = $null
+                    [System.Management.Automation.Language.Parser]::ParseFile(
+                        $path, [ref]$null, [ref]$errors) | Out-Null
+                    if ($errors.Count) {
+                        "FAIL`t$_`tline $($errors[0].Extent.StartLineNumber): $($errors[0].Message)"
+                        return
+                    }
+                    if ($analyze) {
+                        $findings = @(Invoke-ScriptAnalyzer -Path $path)
+                        if ($findings.Count) {
+                            $first = $findings[0]
+                            "FAIL`t$_`t$($findings.Count) PSScriptAnalyzer finding(s), first at line $($first.Line): $($first.RuleName)"
+                            return
+                        }
+                    }
+                    "ok`t$_"
+                }'
+    )
+}
+
 check_seeds() {
     local file documents
 
@@ -406,9 +498,11 @@ main() {
             check_templates
             check_preseeds
             check_seeds
+            check_unattend
             check_firstboot
             check_tofu
             check_shell
+            check_powershell
             check_docs
             check_matrix
             ;;
@@ -418,13 +512,15 @@ main() {
             check_seeds
             ;;
         preseeds) check_preseeds ;;
+        unattend) check_unattend ;;
+        powershell) check_powershell ;;
         firstboot) check_firstboot ;;
         tofu) check_tofu ;;
         matrix) check_matrix ;;
         shell) check_shell ;;
         docs) check_docs ;;
         *)
-            printf 'usage: %s [<hypervisor>] [all|packer|seeds|preseeds|firstboot|tofu|shell|docs|matrix]\n' "${BASH_SOURCE[0]##*/}" >&2
+            printf 'usage: %s [<hypervisor>] [all|packer|seeds|preseeds|unattend|powershell|firstboot|tofu|shell|docs|matrix]\n' "${BASH_SOURCE[0]##*/}" >&2
             printf 'hypervisors: %s\n' "$(cd "$REPO_ROOT/templates" && echo */)" >&2
             exit 2
             ;;

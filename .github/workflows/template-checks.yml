@@ -1,7 +1,8 @@
 name: Template checks
 
-# Validates the Packer HCL and the cloud-init seeds, lints the shell outside
-# scripts/ubuntu/, and scans the tree for committed secrets.
+# Validates the Packer HCL, the cloud-init seeds and the Windows answer files,
+# lints the shell outside scripts/ubuntu/ and the PowerShell, and scans the
+# tree for committed secrets.
 
 on:
   # - No paths filter on pull_request, deliberately: a path-filtered workflow
@@ -18,6 +19,8 @@ on:
       - "**/http/user-data"
       - "**/http/meta-data"
       - "**/http/*.preseed"
+      - "templates/**/*.xml"
+      - "scripts/windows/**"
       - "scripts/ubuntu/autoinstall-*.yaml"
       - "scripts/check-templates.sh"
       - "scripts/sync-firstboot.sh"
@@ -41,11 +44,11 @@ jobs:
       matrix:
         # Each entry is the template's path under templates/. The checker job
         # below fails if this list and the directories on disk disagree.
-        #
-        # proxmox/win-11 is deliberately absent: it depends on a KeePass
-        # database that is not in this repository, so it cannot validate.
         template:
           - proxmox/kali
+          - proxmox/win-10
+          - proxmox/win-11
+          - proxmox/win-srv-2025
           - proxmox/ubuntu-24.04-server
           - proxmox/ubuntu-26.04-server
           - proxmox/ubuntu-26.04-desktop
@@ -67,8 +70,13 @@ jobs:
         with:
           version: "latest"
 
+      # A third-party plugin (rgl/windows-update) is fetched through the GitHub
+      # API, which allows 60 unauthenticated requests an hour per runner IP.
+      # The job's read-only token lifts that; only this step sees it.
       - name: Install plugins
         working-directory: templates/${{ matrix.template }}
+        env:
+          PACKER_GITHUB_API_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: packer init .
 
       - name: Check formatting
@@ -161,10 +169,10 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Install shell tooling
+      - name: Install shell and XML tooling
         run: |
           sudo apt-get update
-          sudo apt-get install --yes --no-install-recommends shellcheck shfmt
+          sudo apt-get install --yes --no-install-recommends shellcheck shfmt libxml2-utils
 
       - name: Lint shell outside scripts/ubuntu/
         run: ./scripts/check-templates.sh shell
@@ -177,6 +185,20 @@ jobs:
 
       - name: Verify the embedded first-boot copies are current
         run: ./scripts/check-templates.sh firstboot
+
+      - name: Validate the Windows answer files
+        run: ./scripts/check-templates.sh unattend
+
+      # The runner image ships pwsh and PSScriptAnalyzer, and check-templates.sh
+      # skips rather than fails where either is missing. Asserting them here
+      # stops a change of image from quietly turning this check into a skip.
+      - name: Require pwsh and PSScriptAnalyzer
+        run: |
+          pwsh -NoProfile -Command '$PSVersionTable.PSVersion.ToString()'
+          pwsh -NoProfile -Command '$m = Get-Module -ListAvailable -Name PSScriptAnalyzer | Select-Object -First 1; if (-not $m) { Write-Error "PSScriptAnalyzer is not installed"; exit 1 }; $m.Version.ToString()'
+
+      - name: Parse and lint every PowerShell script
+        run: ./scripts/check-templates.sh powershell
 
   secrets:
     name: Secret scan

@@ -47,6 +47,12 @@ die() {
 
 have() { command -v "$1" >/dev/null 2>&1; }
 
+# A PowerShell module, not a command, so it is only visible through pwsh.
+have_psscriptanalyzer() {
+    have pwsh && pwsh -NoProfile -NonInteractive -Command \
+        'if (-not (Get-Module -ListAvailable -Name PSScriptAnalyzer)) { exit 1 }' >/dev/null 2>&1
+}
+
 # First line only: several of these print a banner.
 tool_version() {
     local command_name="$1"
@@ -54,6 +60,7 @@ tool_version() {
         packer) packer version 2>/dev/null | head -1 ;;
         vagrant) vagrant --version 2>/dev/null | head -1 ;;
         cloud-init) cloud-init --version 2>&1 | head -1 ;;
+        xmllint) xmllint --version 2>&1 | head -1 ;;
         bats) bats --version 2>/dev/null | head -1 ;;
         gitleaks) gitleaks version 2>/dev/null | head -1 ;;
         *) "$command_name" --version 2>/dev/null | head -1 ;;
@@ -79,6 +86,7 @@ check_core() {
     local -a core=(
         "packer:builds and validates every template"
         "cloud-init:validates the autoinstall seeds (Linux only)"
+        "xmllint:checks the Windows answer files are well-formed"
         "shellcheck:lints every Bash script"
         "shfmt:checks Bash formatting"
         "bats:runs the scripts/ubuntu test suite"
@@ -103,6 +111,8 @@ check_optional() {
     local entry command_name purpose
     local -a optional=(
         "gitleaks:scans the tree and history for committed secrets"
+        "xorriso:builds the answer-file CD for the Windows Proxmox templates"
+        "pwsh:parses and lints the Windows PowerShell scripts"
     )
     if [[ "$WITH_VMWARE" == true ]]; then
         optional+=("vagrant:runs the VMware desktop boxes")
@@ -120,6 +130,13 @@ check_optional() {
             missing_optional=$((missing_optional + 1))
         fi
     done
+
+    if have_psscriptanalyzer; then
+        printf '   ok      %-14s %s\n' PSScriptAnalyzer "PowerShell module"
+    else
+        report missing PSScriptAnalyzer "lints the Windows PowerShell scripts (needs pwsh)"
+        missing_optional=$((missing_optional + 1))
+    fi
 }
 
 # Not installable from here: the download needs a Broadcom account, and the
@@ -206,6 +223,8 @@ install_core() {
     have shfmt || apt_packages+=(shfmt)
     have bats || apt_packages+=(bats)
     have cloud-init || apt_packages+=(cloud-init)
+    # The command and the package it ships in are named differently.
+    have xmllint || apt_packages+=(libxml2-utils)
     have git || apt_packages+=(git)
 
     if ((${#apt_packages[@]} > 0)); then
@@ -226,6 +245,21 @@ install_optional() {
         # binary, which needs a checksum this script cannot pin sensibly, so it
         # stays a pointer rather than an unverified download.
         warn "gitleaks is not packaged for Ubuntu; install it from https://github.com/gitleaks/gitleaks/releases"
+    fi
+
+    # Neither is in the Ubuntu archive; both come from Microsoft's own feeds,
+    # which this script does not add.
+    if ! have pwsh; then
+        warn "pwsh is not packaged for Ubuntu; install it from https://learn.microsoft.com/en-us/powershell/scripting/install/install-ubuntu"
+    elif ! have_psscriptanalyzer; then
+        warn "PSScriptAnalyzer is missing; install it with: pwsh -Command 'Install-Module PSScriptAnalyzer -Scope CurrentUser'"
+    fi
+
+    # Packer writes the Windows answer file to a CD at build time, and needs an
+    # ISO tool to do it; the build fails at that step without one.
+    if ! have xorriso; then
+        log '   installing: xorriso'
+        apt_install xorriso
     fi
 
     if [[ "$WITH_VMWARE" == true ]] && ! have vagrant; then
