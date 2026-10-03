@@ -1,3 +1,19 @@
+# [0.80.0](https://github.com/syselement/packertron-vms/compare/v0.79.0...v0.80.0) (2026-10-03)
+
+
+### Bug Fixes
+
+* **windows:** harden the VMware-path PowerShell scripts ([61ac75e](https://github.com/syselement/packertron-vms/commit/61ac75ea1119ca416b23d89c51415fd99353caac))
+
+
+### Features
+
+* **deploy:** clone straight to datastore_id ([5280f6f](https://github.com/syselement/packertron-vms/commit/5280f6f5940f24b4edc10d723914cc0b756f32ac))
+* **deploy:** deploy the Windows templates ([8e0b63e](https://github.com/syselement/packertron-vms/commit/8e0b63e2edaff8020f8daa5d578b406297fb10c4))
+* **proxmox:** add Windows 10, 11 and Server 2025 templates ([f7e3336](https://github.com/syselement/packertron-vms/commit/f7e33362504160283200b91c54c9ef8d562ca1ea))
+
+
+
 # [0.79.0](https://github.com/syselement/packertron-vms/compare/v0.78.0...v0.79.0) (2026-09-27)
 
 
@@ -31,15 +47,6 @@
 ### Features
 
 * **kali:** enhance Kali template support and update deployment configurations ([e1d8f0f](https://github.com/syselement/packertron-vms/commit/e1d8f0f7371e342dcce941c9798104015817b952))
-
-
-
-# [0.75.0](https://github.com/syselement/packertron-vms/compare/v0.74.0...v0.75.0) (2026-09-22)
-
-
-### Features
-
-* **kali:** update fstab handling and improve tofu formatting checks ([867a0b3](https://github.com/syselement/packertron-vms/commit/867a0b3385de75b295491cf0073af6b1acfb633a))
 
 
 
