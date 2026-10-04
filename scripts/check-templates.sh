@@ -1,26 +1,23 @@
 #!/usr/bin/env bash
 #
-# Run the checks that .github/workflows/template-checks.yml runs, locally,
-# before pushing.
+# Run every check CI runs - the template checks, the Ubuntu suite and the
+# secret scan - locally, before pushing.
 #
 # Docs:
 #   Packer CLI   https://developer.hashicorp.com/packer/docs/commands
 #   cloud-init   https://cloudinit.readthedocs.io/en/latest/reference/cli.html
-#   README.md    repository layout and where a template belongs
+#   README.md    ../scripts/README.md, which check covers what, and the hook
 #
 # Run:
-#   scripts/check-templates.sh            # everything
-#   scripts/check-templates.sh packer     # templates only
-#   scripts/check-templates.sh seeds      # cloud-init seeds and d-i preseeds
-#   scripts/check-templates.sh preseeds   # d-i preseeds only
-#   scripts/check-templates.sh unattend   # Windows answer files
-#   scripts/check-templates.sh powershell # PowerShell syntax and PSScriptAnalyzer
-#   scripts/check-templates.sh matrix     # CI matrix vs the templates on disk
-#   scripts/check-templates.sh shell      # shellcheck/shfmt outside scripts/ubuntu/
-#   scripts/check-templates.sh docs       # Markdown sentences kept on one line
-#   scripts/check-templates.sh firstboot  # embedded first-boot copies are current
-#   scripts/check-templates.sh tofu       # the deploy/ OpenTofu module
-#   scripts/check-templates.sh proxmox    # one hypervisor only
+#   scripts/check-templates.sh                 # everything
+#   scripts/check-templates.sh docs links      # several scopes
+#   scripts/check-templates.sh proxmox packer  # one hypervisor's templates
+#
+# Scopes: packer, seeds, preseeds, unattend, powershell, matrix, shell, docs,
+# markdown, links, yaml, workflows, firstboot, tofu, ubuntu, bats, secrets.
+# A tool that is not packaged for Ubuntu - pwsh, actionlint, zizmor,
+# markdownlint-cli2, gitleaks - is skipped where missing, unless
+# CHECKS_REQUIRE_TOOLS=1, which CI sets, makes that a failure.
 
 set -Eeuo pipefail
 
@@ -46,6 +43,17 @@ pass() { printf '   ok   %s\n' "$*"; }
 fail() {
     printf '   FAIL %s\n' "$*" >&2
     failures=$((failures + 1))
+}
+
+# A missing optional tool: skipped here, a failure where CI asks for every one.
+missing_tool() {
+    local tool="$1" what="$2"
+
+    if [[ "${CHECKS_REQUIRE_TOOLS:-0}" == 1 ]]; then
+        fail "$tool is not installed; it ${what}"
+    else
+        printf '   skip %s (%s is not installed here; CI runs it)\n' "$what" "$tool"
+    fi
 }
 
 is_skipped() {
@@ -175,10 +183,12 @@ check_matrix() {
 }
 
 # Everything outside scripts/ubuntu/, which ubuntu-static-checks.yml covers.
-# Discovered, so a new script is linted the day it is added.
+# Discovered, so a new script is linted the day it is added. Git hooks have no
+# extension, and shfmt reads their language from the shebang.
 repository_shell_scripts() {
     local path
-    for path in "$REPO_ROOT"/scripts/*.sh "$REPO_ROOT"/templates/*/*.sh "$REPO_ROOT"/templates/*/*/*.sh; do
+    for path in "$REPO_ROOT"/scripts/*.sh "$REPO_ROOT"/scripts/proxmox/*.sh \
+        "$REPO_ROOT"/templates/*/*.sh "$REPO_ROOT"/templates/*/*/*.sh "$REPO_ROOT"/.githooks/*; do
         [[ -f "$path" ]] || continue
         printf '%s\n' "${path#"$REPO_ROOT"/}"
     done | sort -u
@@ -415,7 +425,7 @@ check_powershell() {
     note "PowerShell syntax and PSScriptAnalyzer"
 
     if ! command -v pwsh >/dev/null 2>&1; then
-        printf '   skip PowerShell syntax (pwsh is not installed here; CI runs it)\n'
+        missing_tool pwsh "parses and lints the PowerShell"
         return
     fi
 
@@ -426,7 +436,7 @@ check_powershell() {
         case "$state" in
             ok) pass "$relative" ;;
             FAIL) fail "$relative: $message" ;;
-            SKIP) printf '   skip %s\n' "$relative" ;;
+            SKIP) missing_tool PSScriptAnalyzer "lints the PowerShell" ;;
         esac
     done < <(
         cd "$REPO_ROOT" &&
@@ -434,7 +444,7 @@ check_powershell() {
             pwsh -NoProfile -NonInteractive -Command '
                 $analyze = [bool](Get-Module -ListAvailable -Name PSScriptAnalyzer)
                 if (-not $analyze) {
-                    "SKIP`tPSScriptAnalyzer (not installed here; CI runs it)"
+                    "SKIP`tPSScriptAnalyzer"
                 }
                 $input | ForEach-Object {
                     $path = Join-Path (Get-Location) $_
@@ -456,6 +466,233 @@ check_powershell() {
                     "ok`t$_"
                 }'
     )
+}
+
+# Tracked files only, never the operator's own: a local tfvars, the state, or
+# a file someone has not added yet is not this repository's to judge.
+tracked() {
+    (cd "$REPO_ROOT" && git ls-files -- "$@")
+}
+
+# The checks .github/workflows/ubuntu-static-checks.yml runs.
+check_ubuntu() {
+    local dir="$REPO_ROOT/scripts/ubuntu" tool missing=0
+
+    note "scripts/ubuntu/ lint and Bats suite"
+    for tool in bash shellcheck shfmt bats; do
+        command -v "$tool" >/dev/null 2>&1 || {
+            fail "$tool is not installed"
+            missing=1
+        }
+    done
+    ((missing == 0)) || return
+
+    if (cd "$dir" && bash -n ./*.sh ./lib/*.sh ./firstboot/*.sh); then
+        pass "bash -n"
+    else
+        fail "scripts/ubuntu: bash -n"
+    fi
+    if (cd "$dir" && shellcheck -x ./*.sh ./lib/*.sh ./firstboot/*.sh); then
+        pass "shellcheck"
+    else
+        fail "scripts/ubuntu: shellcheck"
+    fi
+    if (cd "$dir" && shfmt -d -i 4 -ci ./*.sh ./lib/*.sh ./firstboot/*.sh); then
+        pass "shfmt"
+    else
+        fail "scripts/ubuntu: shfmt (run: shfmt -w -i 4 -ci on the files above)"
+    fi
+    if (cd "$dir" && bats tests >/dev/null); then
+        pass "bats tests"
+    else
+        fail "scripts/ubuntu: bats tests (run: cd scripts/ubuntu && bats tests)"
+    fi
+}
+
+# Every Bats suite outside scripts/ubuntu/, discovered as scripts/*/tests/.
+check_bats() {
+    local suite relative
+
+    note "Bats suites outside scripts/ubuntu/"
+    command -v bats >/dev/null 2>&1 || {
+        fail "bats is not installed"
+        return
+    }
+    for suite in "$REPO_ROOT"/scripts/*/tests; do
+        [[ -d "$suite" ]] || continue
+        relative="${suite#"$REPO_ROOT"/}"
+        [[ "$relative" == scripts/ubuntu/tests ]] && continue
+        if bats "$suite" >/dev/null; then
+            pass "$relative"
+        else
+            fail "$relative (run: bats $relative)"
+        fi
+    done
+}
+
+# History, not the working tree: a tree scan would read the operator's own
+# tfvars and state, which are gitignored and never pushed.
+check_secrets() {
+    note "secrets in the git history"
+    command -v gitleaks >/dev/null 2>&1 || {
+        missing_tool gitleaks "scans the history for secrets"
+        return
+    }
+    if gitleaks git "$REPO_ROOT" --no-banner --redact --log-level error; then
+        pass "gitleaks: no leaks"
+    else
+        fail "gitleaks found a secret in the history; see above"
+    fi
+}
+
+# actionlint checks workflow syntax and expressions, and shellcheck's view of
+# every run: block; zizmor checks them for security mistakes. zizmor's online
+# audits - an action pinned to an impostor commit, a known-vulnerable version
+# - run when a GitHub token is in the environment, as in CI.
+check_workflows() {
+    local -a zizmor_flags=(--config "$REPO_ROOT/.github/zizmor.yml" --format plain)
+
+    note "GitHub Actions workflows"
+    if command -v actionlint >/dev/null 2>&1; then
+        if (cd "$REPO_ROOT" && actionlint -no-color); then
+            pass "actionlint"
+        else
+            fail "actionlint; see above"
+        fi
+    else
+        missing_tool actionlint "lints the workflows"
+    fi
+
+    if ! command -v zizmor >/dev/null 2>&1; then
+        missing_tool zizmor "audits the workflows for security mistakes"
+        return
+    fi
+    [[ -n "${GH_TOKEN:-}${GITHUB_TOKEN:-}" ]] || zizmor_flags+=(--offline)
+    if zizmor "${zizmor_flags[@]}" "$REPO_ROOT/.github/workflows" >/dev/null 2>&1; then
+        pass "zizmor"
+    else
+        zizmor "${zizmor_flags[@]}" "$REPO_ROOT/.github/workflows" >&2 || true
+        fail "zizmor; see above"
+    fi
+}
+
+# version.yaml is rewritten by the release workflow on every release.
+check_yaml() {
+    local -a files=()
+
+    note "YAML"
+    command -v yamllint >/dev/null 2>&1 || {
+        missing_tool yamllint "lints the YAML"
+        return
+    }
+    mapfile -t files < <(tracked '*.yml' '*.yaml' 'templates/*/*/http/user-data' | grep -v '^version\.yaml$')
+    if (cd "$REPO_ROOT" && yamllint --strict "${files[@]}"); then
+        pass "${#files[@]} file(s)"
+    else
+        fail "yamllint; see above"
+    fi
+}
+
+check_markdown() {
+    local -a files=()
+
+    note "Markdown style"
+    command -v markdownlint-cli2 >/dev/null 2>&1 || {
+        missing_tool markdownlint-cli2 "lints the Markdown"
+        return
+    }
+    mapfile -t files < <(tracked '*.md')
+    if (cd "$REPO_ROOT" && markdownlint-cli2 "${files[@]}" >/dev/null 2>&1); then
+        pass "${#files[@]} file(s)"
+    else
+        (cd "$REPO_ROOT" && markdownlint-cli2 "${files[@]}") >&2 || true
+        fail "markdownlint; see above"
+    fi
+}
+
+# A relative link or anchor that points nowhere is invisible in review and
+# only found by a reader. External URLs are not fetched: that would make the
+# check depend on the network and on other people's sites.
+check_links() {
+    local found
+
+    note "relative links and anchors in Markdown"
+    command -v python3 >/dev/null 2>&1 || {
+        missing_tool python3 "checks the Markdown links"
+        return
+    }
+    # shellcheck disable=SC2016 # the quoted text is Python
+    found="$(tracked '*.md' | (cd "$REPO_ROOT" && python3 -c '
+import os, re, sys
+
+FENCE = re.compile(r"^\s*(```|~~~)")
+LINK = re.compile(r"(?<!\!)\[[^\]]*\]\(([^)\s]+)(?:\s+\"[^\"]*\")?\)")
+REF = re.compile(r"^\s*\[[^\]]+\]:\s*(\S+)")
+
+def prose(path):
+    """Lines outside fenced blocks, with inline code removed."""
+    inside = False
+    with open(path, encoding="utf-8") as handle:
+        for number, line in enumerate(handle, 1):
+            if FENCE.match(line):
+                inside = not inside
+                continue
+            if not inside:
+                yield number, re.sub(r"`[^`]*`", "", line)
+
+def slug(text):
+    # GitHub: drop link targets and markup, lowercase, keep word characters,
+    # spaces and hyphens, then turn spaces into hyphens.
+    text = re.sub(r"\[([^\]]*)\]\([^)]*\)", r"\1", text)
+    text = re.sub(r"[^\w\- ]", "", text.strip().lower())
+    return text.replace(" ", "-")
+
+anchors = {}
+def anchors_of(path):
+    if path not in anchors:
+        seen, found = {}, set()
+        inside = False
+        with open(path, encoding="utf-8") as handle:
+            for line in handle:
+                if FENCE.match(line):
+                    inside = not inside
+                    continue
+                match = None if inside else re.match(r"^#{1,6}\s+(.*?)\s*#*\s*$", line)
+                if match:
+                    base = slug(match.group(1).replace("`", ""))
+                    count = seen.get(base, 0)
+                    seen[base] = count + 1
+                    found.add(base if count == 0 else f"{base}-{count}")
+        anchors[path] = found
+    return anchors[path]
+
+broken = []
+for source in sys.stdin.read().split():
+    for number, line in prose(source):
+        targets = LINK.findall(line) + REF.findall(line)
+        for target in targets:
+            if re.match(r"^[a-z][a-z0-9+.-]*:", target, re.I) or target.startswith("<"):
+                continue
+            path, _, anchor = target.partition("#")
+            resolved = os.path.normpath(os.path.join(os.path.dirname(source), path)) if path else source
+            if not os.path.exists(resolved):
+                broken.append(f"{source}:{number}: {target} - no such file")
+            elif anchor and resolved.endswith(".md") and anchor.lower() not in anchors_of(resolved):
+                broken.append(f"{source}:{number}: {target} - no such heading")
+print("\n".join(broken))
+'))" || {
+        fail "the link checker itself failed"
+        return
+    }
+
+    if [[ -z "$found" ]]; then
+        pass "every relative link and anchor resolves"
+        return
+    fi
+    while read -r location; do
+        [[ -n "$location" ]] || continue
+        fail "$location"
+    done < <(printf '%s\n' "$found")
 }
 
 check_seeds() {
@@ -484,47 +721,66 @@ check_seeds() {
 }
 
 main() {
-    local scope="${1:-all}"
+    local scope
+    local -a scopes=()
 
-    # A hypervisor name is accepted wherever a scope is, validated against the
-    # directories that exist rather than a hard-coded list.
-    if [[ -n "$scope" && -d "$REPO_ROOT/templates/$scope" ]]; then
-        HYPERVISOR="$scope"
-        scope="${2:-all}"
+    # A hypervisor name is accepted first, validated against the directories
+    # that exist rather than a hard-coded list.
+    if [[ -n "${1:-}" && -d "$REPO_ROOT/templates/$1" ]]; then
+        HYPERVISOR="$1"
+        shift
     fi
+    scopes=("${@:-all}")
 
-    case "$scope" in
-        all)
-            check_templates
-            check_preseeds
-            check_seeds
-            check_unattend
-            check_firstboot
-            check_tofu
-            check_shell
-            check_powershell
-            check_docs
-            check_matrix
-            ;;
-        packer) check_templates ;;
-        seeds)
-            check_preseeds
-            check_seeds
-            ;;
-        preseeds) check_preseeds ;;
-        unattend) check_unattend ;;
-        powershell) check_powershell ;;
-        firstboot) check_firstboot ;;
-        tofu) check_tofu ;;
-        matrix) check_matrix ;;
-        shell) check_shell ;;
-        docs) check_docs ;;
-        *)
-            printf 'usage: %s [<hypervisor>] [all|packer|seeds|preseeds|unattend|powershell|firstboot|tofu|shell|docs|matrix]\n' "${BASH_SOURCE[0]##*/}" >&2
-            printf 'hypervisors: %s\n' "$(cd "$REPO_ROOT/templates" && echo */)" >&2
-            exit 2
-            ;;
-    esac
+    for scope in "${scopes[@]}"; do
+        case "$scope" in
+            all)
+                check_templates
+                check_preseeds
+                check_seeds
+                check_unattend
+                check_firstboot
+                check_tofu
+                check_shell
+                check_powershell
+                check_docs
+                check_markdown
+                check_links
+                check_yaml
+                check_workflows
+                check_matrix
+                check_ubuntu
+                check_bats
+                check_secrets
+                ;;
+            packer) check_templates ;;
+            seeds)
+                check_preseeds
+                check_seeds
+                ;;
+            preseeds) check_preseeds ;;
+            unattend) check_unattend ;;
+            powershell) check_powershell ;;
+            firstboot) check_firstboot ;;
+            tofu) check_tofu ;;
+            matrix) check_matrix ;;
+            shell) check_shell ;;
+            docs) check_docs ;;
+            markdown) check_markdown ;;
+            links) check_links ;;
+            yaml) check_yaml ;;
+            workflows) check_workflows ;;
+            ubuntu) check_ubuntu ;;
+            bats) check_bats ;;
+            secrets) check_secrets ;;
+            *)
+                printf 'usage: %s [<hypervisor>] [scope ...]\n' "${BASH_SOURCE[0]##*/}" >&2
+                printf 'scopes: all packer seeds preseeds unattend powershell firstboot tofu matrix shell docs markdown links yaml workflows ubuntu bats secrets\n' >&2
+                printf 'hypervisors: %s\n' "$(cd "$REPO_ROOT/templates" && echo */)" >&2
+                exit 2
+                ;;
+        esac
+    done
 
     printf '\n'
     if ((failures > 0)); then

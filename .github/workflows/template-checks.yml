@@ -24,6 +24,10 @@ on:
       - "scripts/ubuntu/autoinstall-*.yaml"
       - "scripts/check-templates.sh"
       - "scripts/sync-firstboot.sh"
+      - "scripts/proxmox/**"
+      - ".githooks/**"
+      - "**/*.yml"
+      - "**/*.yaml"
       - "scripts/ubuntu/firstboot/**"
       - "deploy/**"
       - "templates/**/*.sh"
@@ -162,17 +166,36 @@ jobs:
     # cannot discover directories.
     name: Checker script
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
+    env:
+      # check-templates.sh skips a linter that is missing; here a missing one
+      # fails instead, so a change of runner image cannot quietly drop a check.
+      CHECKS_REQUIRE_TOOLS: "1"
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
 
-      - name: Install shell and XML tooling
+      - name: Install shell, XML and YAML tooling
         run: |
           sudo apt-get update
-          sudo apt-get install --yes --no-install-recommends shellcheck shfmt libxml2-utils
+          sudo apt-get install --yes --no-install-recommends shellcheck shfmt libxml2-utils bats yamllint
+
+      # Pinned, and actionlint checked against its digest: a linter runs on the
+      # same runner as everything else in this job.
+      - name: Install actionlint and zizmor
+        env:
+          ACTIONLINT_VERSION: "1.7.12"
+          ACTIONLINT_SHA256: "8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8"
+          ZIZMOR_VERSION: "1.30.1"
+        run: |
+          curl --fail --show-error --silent --location --output "$RUNNER_TEMP/actionlint.tar.gz" \
+            "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
+          echo "${ACTIONLINT_SHA256}  $RUNNER_TEMP/actionlint.tar.gz" | sha256sum --check --strict
+          sudo tar -xzf "$RUNNER_TEMP/actionlint.tar.gz" -C /usr/local/bin actionlint
+          pipx install "zizmor==${ZIZMOR_VERSION}"
+          echo "$HOME/.local/bin" >>"$GITHUB_PATH"
 
       - name: Lint shell outside scripts/ubuntu/
         run: ./scripts/check-templates.sh shell
@@ -194,11 +217,29 @@ jobs:
       # stops a change of image from quietly turning this check into a skip.
       - name: Require pwsh and PSScriptAnalyzer
         run: |
-          pwsh -NoProfile -Command '$PSVersionTable.PSVersion.ToString()'
-          pwsh -NoProfile -Command '$m = Get-Module -ListAvailable -Name PSScriptAnalyzer | Select-Object -First 1; if (-not $m) { Write-Error "PSScriptAnalyzer is not installed"; exit 1 }; $m.Version.ToString()'
+          # shellcheck disable=SC2016 # the quoted text is PowerShell, its $ are pwsh's
+          pwsh -NoProfile -Command '
+            $PSVersionTable.PSVersion.ToString()
+            $m = Get-Module -ListAvailable -Name PSScriptAnalyzer | Select-Object -First 1
+            if (-not $m) { Write-Error "PSScriptAnalyzer is not installed"; exit 1 }
+            $m.Version.ToString()
+          '
 
       - name: Parse and lint every PowerShell script
         run: ./scripts/check-templates.sh powershell
+
+      - name: Lint the YAML
+        run: ./scripts/check-templates.sh yaml
+
+      # The token lets zizmor run its online audits too: an action pinned to an
+      # impostor commit, or to a version with a known vulnerability.
+      - name: Lint and audit the workflows
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: ./scripts/check-templates.sh workflows
+
+      - name: Run the Bats suites outside scripts/ubuntu/
+        run: ./scripts/check-templates.sh bats
 
   secrets:
     name: Secret scan

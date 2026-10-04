@@ -1,0 +1,23 @@
+# markdownlint rules for the repository's Markdown. AGENTS.md sets the house
+# style - one sentence per line, never wrapped - and these follow it.
+#
+# Docs:
+#   markdownlint  https://github.com/DavidAnson/markdownlint/blob/main/doc/Rules.md
+#   README.md     scripts/README.md, which checks run where
+#
+# Run:
+#   scripts/check-templates.sh markdown
+
+config:
+  # A sentence or list item stays on one line however long it runs.
+  MD013: false
+  # Nested list items are indented by four spaces.
+  MD007:
+    indent: 4
+  # The same heading may appear under different parents, such as "Build".
+  MD024:
+    siblings_only: true
+
+# Written by the release workflow, not by hand.
+ignores:
+  - CHANGELOG.md

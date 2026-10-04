@@ -1,0 +1,25 @@
+# yamllint rules for the repository's YAML: workflows, Dependabot, the
+# autoinstall seeds and the linter configurations.
+#
+# Docs:
+#   yamllint   https://yamllint.readthedocs.io/en/stable/rules.html
+#   README.md  scripts/README.md, which checks run where
+#
+# Run:
+#   scripts/check-templates.sh yaml
+
+extends: default
+
+rules:
+  # Seeds and workflows carry commands and URLs that cannot wrap.
+  line-length: disable
+  # A seed opens with "#cloud-config", and a workflow needs no "---".
+  document-start: disable
+  # "#cloud-config" has no space after the "#", and Dependabot writes one space
+  # before the "# vN" comment of a pinned action.
+  comments:
+    require-starting-space: false
+    min-spaces-from-content: 1
+  # GitHub's "on:" key names the triggers; it is not a boolean.
+  truthy:
+    check-keys: false
