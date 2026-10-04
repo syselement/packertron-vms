@@ -40,6 +40,7 @@ Both scripts log in one format, with `STEP` section banners and `INFO` / `OK` / 
 ## Files
 
 ### `00-update-system.sh`
+
 Updates the base system and installs a minimal baseline required for the VM itself. It:
 
 - runs `apt-get update` and `apt-get dist-upgrade`
@@ -55,6 +56,7 @@ Use this during a VM template build. Bare-metal provisioning intentionally skips
 ---
 
 ### `01-cleanup-system.sh`
+
 Seals a VM template so clones start clean. It:
 
 - runs `apt autoremove` and `apt clean`
@@ -78,6 +80,7 @@ Run it last in a template build, after every other provisioning step.
 ---
 
 ### `02-provision-system.sh`
+
 Installs the main tooling stack for Ubuntu Desktop or Server. It:
 
 - logs to `/var/log/provision-system-<run_id>.log`
@@ -114,6 +117,7 @@ This script can be used by itself when only system provisioning is required.
 ---
 
 ### `03-customize-system.sh`
+
 Installs common user tooling on both variants and applies the Desktop layer only when Ubuntu Desktop is detected. It:
 
 - logs to `/var/log/customize-system-<run_id>.log`
@@ -205,12 +209,16 @@ The seeds carry an `@SSH_AUTHORIZED_KEY@` placeholder rather than a key. Render 
 
 ```bash
 # render the seed with your public key, beside an empty meta-data
+
 sed "s|@SSH_AUTHORIZED_KEY@|$(cat ~/.ssh/id_ed25519.pub)|" scripts/ubuntu/autoinstall-server.yaml > user-data
 touch meta-data
 # publish both as one secret gist, and print its URL
+
 gh gist create user-data meta-data
 # on the installer's kernel line, quoted so GRUB does not end the command at ';':
+
 #   autoinstall 'ds=nocloud;s=https://gist.githubusercontent.com/<user>/<gist-id>/raw/'
+
 ```
 
 A secret gist is unlisted, not private: anyone with the URL can read it. It holds only a public key and the published password hash, so that is the same exposure as this repository.
@@ -268,9 +276,11 @@ These images are not suitable for a shared or internet-reachable network as ship
 
 ```text
 # Desktop templates
+
 00-update-system.sh → 01-cleanup-system.sh
 
 # 24.04 Server
+
 00-update-system.sh → 02-provision-system.sh → 01-cleanup-system.sh
 ```
 
@@ -379,7 +389,7 @@ Snapshot before each run. Record the release, the detected variant and the exact
 | 1 | 24.04 Desktop | Vagrant (`02` → `03`) | full toolchain; GNOME applied; `variant=desktop` in the log; the `24.*` release arm is taken (`software-properties-common`, fastfetch PPA); any package missing on noble is listed in the skip warning rather than failing the run |
 | 2 | 24.04 Server | bare-metal autoinstall | no GNOME, dconf, flatpak or snap work attempted; VS Code **absent** and `02` still passes its toolchain validation; Syncthing's user unit is linked into `~/.config/systemd/user/default.target.wants` and the run logs the deferred-start warning - it is **not** running before the user logs in, and lingering is deliberately not enabled (see above); `stat -c '%A' /var/log` is still group-writable (`drwxrwxr-x`) |
 | 3 | 26.04 Desktop | Vagrant and bare-metal | as #1 but the `26.*` arm (PPA skipped) |
-| 4 | 26.04 Server | bare-metal autoinstall only | as #2. No Packer or Vagrant path exists for this combination |
+| 4 | 26.04 Server | bare-metal autoinstall, and the Proxmox and VMware templates | as #2 |
 | 5 | Second execution | all four above | no `installing` or `downloading` lines; no repository rewrites; Cockpit not restarted; `SET … dock-position` is expected (a deliberate persisted value) |
 | 6 | Packer build | `00` → `01`, plus `02` on 24.04 Server | template seals; guest agent matches the hypervisor; `/etc/machine-id` is empty; the staged `/var/tmp/packertron-ubuntu` tree is gone |
 | 7 | Autoinstall | `autoinstall-{desktop,server}.yaml` | unattended completion; the firstboot service is created and enabled, and removes itself only after real work |

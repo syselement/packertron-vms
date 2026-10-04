@@ -203,6 +203,17 @@ jobs:
       - name: Verify Markdown keeps each sentence on one line
         run: ./scripts/check-templates.sh docs
 
+      # The official action, pinned like every other, with
+      # .markdownlint-cli2.yaml: an npm install here would be unpinned below
+      # the top-level package.
+      - name: Lint the Markdown
+        uses: DavidAnson/markdownlint-cli2-action@21c1be1b93ad9ed58fa840aacc3f279cde2a72ff # v24.2.0
+        with:
+          globs: "**/*.md"
+
+      - name: Resolve every relative link and anchor in the Markdown
+        run: ./scripts/check-templates.sh links
+
       - name: Verify the CI matrix matches the templates on disk
         run: ./scripts/check-templates.sh matrix
 

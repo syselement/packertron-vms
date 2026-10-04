@@ -11,9 +11,6 @@
 config:
   # A sentence or list item stays on one line however long it runs.
   MD013: false
-  # Nested list items are indented by four spaces.
-  MD007:
-    indent: 4
   # The same heading may appear under different parents, such as "Build".
   MD024:
     siblings_only: true

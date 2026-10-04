@@ -1,96 +1,16 @@
-# Windows Server 2025 (VMware + Packer)
+# Windows Server 2025 - VMware template
 
-Repeatable **Windows Server 2025** build for VMware Workstation with optional Vagrant box export.
+Windows Server 2025 Standard with the Desktop Experience for VMware Workstation, packaged as a Vagrant box. Requirements, the build and Vagrant are in [README.md](../README.md).
 
-## Requirements
+> **Status: the build chain is new and not yet built on VMware.** It now runs the same chain as the [Proxmox Windows templates](../../proxmox/WINDOWS.md#the-build).
 
-- Windows host with VMware Workstation
-- Packer >= 1.8 (HCL2)
-- Disk space + BIOS virtualization
-- Optional: Vagrant + vagrant-vmware-desktop/vagrant-vmware-workstation
+| | |
+| --- | --- |
+| Result | `output/win2025_gui.box`, about 17 GB |
+| ISO | `26100.1742.240906-0331.ge_release_svc_refresh_SERVER_EVAL_x64FRE_en-us.iso`, from `C:/ISO/windows/` when present; SHA-256 `d0ef4502e350e3c6c53c15b1b3020d38a5ded011bf04998e950720ac8579b23d` |
+| `cpus` / `memory` / `disk_size` | 4 / 8192 / 60 GB, set in `win-srv-2025.auto.pkrvars.hcl` |
+| Build login | `Administrator`, `ssh_password` - the answer files in `config/` set it |
 
-## Quick build
+The build installs from `config/autounattend.xml` on a floppy, adds VMware Tools, then runs the Proxmox chain: `09_system_settings.ps1`, the `rgl/windows-update` loop, `10_wait_for_servicing.ps1`, then `03_cleanup.ps1` and `12_sysprep.ps1` with `config/unattend.xml`. There is no cloudbase-init here, which `12_sysprep.ps1` is told with `PACKERTRON_CLOUDBASE_INIT=false`. The shutdown command, [`packer_shutdown.bat`](../../../scripts/windows/packer_shutdown.bat), blocks inbound SSH and shuts the generalized image down; on the box's first boot, `04_startup.ps1` opens SSH again once that boot has finished.
 
-```powershell
-cd templates/vmware/win-srv-2025
-packer init .
-packer validate win-srv-2025.pkr.hcl
-packer build .
-```
-
-Artifacts land in `output/`
-    - e.g. `win2025_gui.box` - size ~17GB
-
-## Use in VMware Workstation
-
-1. Extract the .box:
-
-```powershell
-mkdir tmp && tar -xf output/win2025_gui.box -C tmp
-```
-
-2. Open `tmp/Win2025VM.vmx` in Workstation (File -> Open) and power it on.
-    - The `.vmxf`, `.nvram`, `.vmdk`, and `.vmsd` sit alongside it.
-3. Optional VMX tweaks (before first boot):
-   - `displayname = "Win2025VM"`
-   - `hgfs.linkrootshare = "FALSE"`
-   - `hgfs.maprootshare = "FALSE"`
-   - `isolation.tools.hgfs.disable = "TRUE"`
-4. Alternative: create a new VM and point the disk to `tmp/disk.vmdk`.
-
-## Use with Vagrant (VMware provider)
-
-**Start machine**
-
-```powershell
-vagrant up --provider=vmware_desktop
-```
-Vagrant/VMware will manage VMX adjustments during `vagrant up`; no manual VMX edits needed when using Vagrant.
-
-- Re-run with `--provision` to re-provision the VM (Vagrant runs provisioners once by default).
-
-```powershell
-# Re-Provision VM
-vagrant up --provision
-```
-
-### VM lifecycle
-
-```powershell
-# Stop VM
-vagrant halt
-
-# Start VM
-vagrant up
-
-# Destroy VM
-vagrant destroy -f
-```
-
-## Customize
-
-- `win-srv-2025.pkr.hcl` - contains the Packer variables with some defaults.
-- `win-srv-2025.auto.pkrvars.hcl` - auto-loaded Packer Build variables
-- Override variables at build time with `-var "key=value"`.
-- Update `iso_url` and `iso_checksum` to match your ISO.
-- `../../../scripts/` are used
-    - during Packer build for preseed/install automation
-    - during Vagrant provisioning
-
-## Troubleshoot fast
-
-- Build hangs on updates: wait for `../../../scripts/windows/02_win_updates.ps1` to complete and check the Packer log output.
-- ISO issues: verify the checksum and that the URL is reachable.
-- Run `packer build -debug` for an interactive troubleshooting VM.
-
-## Files of note
-
-- `Vagrantfile`
-- `win-srv-2025.pkr.hcl`
-- `win-srv-2025.auto.pkrvars.hcl`
-- `output/`
-- `config/`
-- `../../../scripts/`
-
----
-
+The [`Vagrantfile`](Vagrantfile) defines one machine, `win2025srv01` (2 vCPUs, 4 GB, NAT), runs [`install_utils.ps1`](../../../scripts/windows/install_utils.ps1) on it - Chocolatey, its utilities and UniGetUI - and renames it.

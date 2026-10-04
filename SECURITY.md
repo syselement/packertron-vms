@@ -110,7 +110,7 @@ Do **not** require `Changelog CI`. It has no `pull_request` trigger, so it would
 
 The push is rejected:
 
-```
+```text
 remote: - 2 of 2 required status checks are expected.
 ```
 

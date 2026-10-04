@@ -1,4 +1,7 @@
 # Ubuntu 26.04 Desktop template for VMware Workstation, packaged as a Vagrant box.
+# STATUS: unverified. The 26.04 build stopped on subiquity bug 2150197
+# (https://bugs.launchpad.net/subiquity/+bug/2150197); the Proxmox desktop
+# template builds from 26.04.1, and this one is to be retested with it.
 #
 # Docs:
 #   vmware-iso builder  https://developer.hashicorp.com/packer/integrations/hashicorp/vmware/latest/components/builder/iso

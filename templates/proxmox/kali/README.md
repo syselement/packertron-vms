@@ -1,160 +1,59 @@
 # Kali Linux - Proxmox template
 
-Builds a Kali Linux template on Proxmox VE from the official installer ISO, driven by the debian-installer preseed in `http/`.
+Kali Linux from the official installer ISO, installed by the debian-installer preseed in `http/`. Shared Linux behaviour is in [LINUX.md](../LINUX.md); staging and building in [README.md](../README.md). This page covers what Kali does differently.
 
-> **Status: built and cloned on a real node** (Proxmox VE, q35/OVMF, Kali 2026.2, ~10 minutes, template 80200; cloned through [`../../../deploy/`](../../../deploy/) with `kali.tfvars.example`).
+> **Status: built and cloned on a real node** (Proxmox VE, q35/OVMF, Kali 2026.2, ~10 minutes; cloned through [`deploy/`](../../../deploy/README.md) with `kali.tfvars.example`).
 
-Adapted from [mttaggart/seclab](https://github.com/mttaggart/seclab) (`Packer/kali/config.pkr.hcl`). Everything the upstream did through KeePass and CA-certificate provisioners is gone: credentials come from the environment, and the build block runs the same `00` -> `01` -> seal chain as every other Proxmox template here.
-
-Firmware, credentials, the SSH-agent login, the seal, and the clone-time model are identical to the Ubuntu templates and documented once, in [`../ubuntu-24.04-server/README.md`](../ubuntu-24.04-server/README.md). This file records only what Kali does differently.
-
-## What differs from the Ubuntu templates
+Adapted from [mttaggart/seclab](https://github.com/mttaggart/seclab) (`Packer/kali/config.pkr.hcl`), without its KeePass and CA-certificate provisioners: credentials come from the environment, and the build runs the same `00` -> `01` -> seal chain as the Ubuntu templates.
 
 | | Ubuntu | Kali |
 | --- | --- | --- |
-| Installer | subiquity, `http/user-data` (cloud-config) | debian-installer, `http/kali.preseed` |
-| Boot | `<esc>`, edit the GRUB entry | `c` for the GRUB console, start the kernel by hand |
-| Seed check | `cloud-init schema` | `debconf-set-selections --checkonly` |
-| `00-update-system.sh` | runs | runs - it carries the rolling-release upgrade, which the preseed skips |
+| `vm_id` / `template_name` | 80024, 80026, 80126 | 80200 / `kali-template` |
+| `iso_file` | | `local:iso/kali-linux-2026.2-installer-amd64.iso`, checked against `cdimage.kali.org/kali-2026.2/SHA256SUMS` |
+| Installer and seed | subiquity, `http/user-data` | debian-installer, `http/kali.preseed` |
+| Boot | `<esc>`, then edit the GRUB entry | `c` for GRUB's console, then start the kernel by hand |
+| Seed check | `cloud-init schema` | `debconf-set-selections --checkonly`, plus a type check |
 | Guest agent | first-boot `user-data:` | `pkgsel/include`, from the network mirror |
-| SSH | enabled by subiquity's `ssh: install-server` | installed but **disabled**; `late_command` enables it explicitly |
-| cloud-init during the build | pinned to `None` by subiquity's `99-installer.cfg` | switched off by `/etc/cloud/cloud-init.disabled`; the seal removes it |
-| Packages | base | `kali-linux-default` + `kali-desktop-xfce` |
-| Disk / RAM | 30G / 2048 | 50G / 4096 |
-| `vm_id` | 80024, 80026, 80126 | 80200 |
+| SSH | enabled by subiquity | installed **disabled**; `late_command` enables it |
+| cloud-init during the build | pinned by subiquity | switched off by `/etc/cloud/cloud-init.disabled`; the seal removes it |
+| Packages | base | `kali-linux-default` and `kali-desktop-xfce` |
+| `cores` / `memory` / `disk_size` | 2-4 / 2048-8192 / 30-64G | 4 / 4096 / 50G |
+| `ssh_timeout` | 30-60m | 60m - `kali-linux-default` is large, and `00` full-upgrades a rolling release on top of it |
 
-The `00` -> `01` -> seal chain runs unchanged from the Ubuntu templates. Both scripts are distro-agnostic on this path: `01` is apt, cloud-init, journalctl and truncate, with its only guard being "am I under Packer", and `00`'s one Ubuntu-specific check gates the VMware branch, which Proxmox never takes.
+`00` and `01` run unchanged: both are distro-agnostic on this path.
 
-## Why cloud-init is switched off for the build
+## Decisions
 
-Packer does **not** attach a cloud-init drive to the build VM. `cloud_init = true` adds one only after the finished VM has been converted to a template - `stepFinalizeConfig` in the Proxmox plugin, which runs after `stepConvertToTemplate` - so every clone has the drive and the build never does. Left on, cloud-init would still run its first-boot pass on the build VM, with nothing from Proxmox to read. On Ubuntu, subiquity pins it to the `None` datasource for that first boot; Kali's installer does nothing equivalent, and what Debian's cloud-init then does - probe for other datasources, or apply its own defaults such as a `debian` account - is not something a template should depend on.
+**cloud-init is off for the build.** Packer attaches the cloud-init drive only once the VM is a template, so on the build VM cloud-init would run its first-boot pass with nothing from Proxmox to read. Ubuntu pins it to the `None` datasource; Kali's installer does nothing equivalent, and what Debian's cloud-init would do instead - probe other datasources, or create a `debian` account - is not something a template should depend on. `late_command` writes `/etc/cloud/cloud-init.disabled`; the seal removes it and fails the build if it survived.
 
-The preseed's `late_command` therefore creates `/etc/cloud/cloud-init.disabled`, cloud-init's own off switch. `seal-for-clone.sh` removes it as its last cloud-init step, and fails the build if it somehow survived, since a clone would then never read its drive.
+**The mirror is `kali.download`, not `http.kali.org`.** The redirector hands some requests to HTTPS mirrors, and during the install `/target` has no `ca-certificates`, so apt fails with `certificate verify failed` and the install stops at "Select and install software".
 
-## The mirror is pinned, deliberately
+**The upgrade runs in `00-update-system.sh`, not `pkgsel/upgrade`.** Kali is rolling, so the ISO is only a snapshot. `pkgsel` is all-or-nothing and reports only "Installation step failed"; the same work in a provisioner names its failure in Packer's output and can be retried without reinstalling.
 
-`mirror/http/hostname` is `kali.download`, not the usual `http.kali.org`. The redirector distributes each file across mirrors, and some of them serve HTTPS - three requests for the same `.deb` came back from three different hosts when this was checked. During the install `/target` has no `ca-certificates`, so apt cannot verify any certificate, and a redirect onto an HTTPS mirror fails with `certificate verify failed`.
+**SSH is enabled explicitly.** Kali installs `openssh-server` disabled, so the machine would boot with port 22 closed. `late_command` runs `systemctl enable ssh`. The unit is `ssh.service` on Kali: `systemctl status sshd` reports "could not be found" either way.
 
-The install then stops at "Select and install software", with `pkgsel` exiting 100. `ca-certificates` is in `pkgsel/include` so the installed system can use HTTPS afterwards, but it cannot help during the install - hence the plain-HTTP mirror.
+**The installer's cdrom fstab line goes.** debian-installer writes `/dev/sr0 /media/cdrom0`, and on a clone `/dev/sr0` is the cloud-init drive, which a desktop clone then shows as a mounted "cdrom0". The udisks rule cannot hide an fstab entry, so the seal removes the line. A template built before that change still carries it; rebuild it.
 
-## The preseed, in one pass
-
-`late_command` does what the Ubuntu seeds' `ssh:` and `late-commands` sections do, and is the only place Kali-specific setup lives:
-
-- authorised key for `syselement` and NOPASSWD sudo, validated with `visudo -c`
-- `PasswordAuthentication no`, the same posture as the Ubuntu templates
-- `systemctl enable ssh`, which Kali needs and Ubuntu does not
-- the cloud-init off switch above
-
-Everything else is standard debian-installer: `en_GB` / `it` / `Europe/Rome`, LVM on the whole disk, a network mirror with the cdrom entry disabled, and no `unattended-upgrades`. The user and password hash are the ones every seed in this repository uses.
-
-`kali-linux-default` is the toolset; the ISO's own "Software selection" screen adds a desktop beside it, and `kali-desktop-xfce` is that default. Drop it from `pkgsel/include` for a headless template.
-
-## Why the upgrade is not in the preseed
-
-Kali is rolling, so the ISO is only a snapshot and a fresh template should not start life behind. That upgrade runs in `00-update-system.sh`, not as `pkgsel/upgrade`.
-
-The reason is failure reporting. `pkgsel` is all-or-nothing and says only "Installation step failed" on the console; the cause, such as a TLS error against one mirror, is visible only in `/var/log/syslog` on the installer. The same work in a provisioner names itself in Packer's output, is shellcheck'd and covered by the Bats suite, and can be retried without reinstalling the machine.
-
-`qemu-guest-agent` stays in `pkgsel/include` regardless: Packer needs the agent to learn the VM's address before it can run any provisioner at all.
-
-## Why SSH is enabled explicitly
-
-Kali ships `openssh-server` installed but **disabled**, which is a deliberate posture difference from Debian and from Ubuntu. Putting it in `pkgsel/include` therefore gets the package and nothing listening: the machine boots to a desktop with port 22 closed, and the build sits out `ssh_timeout` having never been able to connect. `late_command` runs `in-target systemctl enable ssh` for that reason.
-
-This cost a build here. It is also easy to misdiagnose, because the unit is `ssh.service` on Debian and Kali - `systemctl status sshd` reports "could not be found" whether or not SSH is actually configured, which looks like a missing package when it is not one.
-
-## The installer's cdrom entry has to go
-
-debian-installer writes an fstab line for the install media:
-
-```
-/dev/sr0        /media/cdrom0   udf,iso9660 user,noauto     0       0
-```
-
-It is stale as soon as the build ends, and on a clone it is actively wrong. Proxmox attaches the cloud-init drive as the only optical device, so `/dev/sr0` now *is* `cidata` - and a desktop clone shows a mounted "cdrom0" containing `user-data`, `network-config` and `vendor-data`. Confirmed on the first Kali clone: `lsblk` reported `sr0 cidata /media/cdrom0`.
-
-The `99-hide-cidata.rules` udev rule does not help. It was present and correct on that clone, and the label really was `cidata`, so udisks was ignoring the device exactly as asked - fstab is simply a different mechanism, and gvfs honours it regardless. `seal-for-clone.sh` removes the line instead. Subiquity writes no such entry, so the Ubuntu templates are unaffected.
-
-That removal landed after template 80200 was built, so it is the one change here that a rebuild is still needed to pick up: a clone from a template built before it will still show `cdrom0`. Rebuilding is the whole fix - nothing has to be done on an existing clone beyond editing its `/etc/fstab` by hand.
+`late_command` also authorizes the key from `ssh_authorized_key`, sets `NOPASSWD` sudo (checked with `visudo -c`) and `PasswordAuthentication no`. Drop `kali-desktop-xfce` from `pkgsel/include` for a headless template.
 
 ## Prior art
 
-Two public Kali preseeds informed this one. Both are worth reading, for opposite reasons.
+- **[badsectorlabs/ludus](https://gitlab.com/badsectorlabs/ludus/-/blob/main/ludus-server/packer/kali/http/kali-preseed.cfg)** reached the same mirror and `pkgsel/upgrade select none` independently, and is where `systemctl enable ssh` came from. It installs a minimal system and provisions with Ansible, partitions without LVM, and hardcodes `/dev/vda`; three of its `late_command` steps lack `in-target` and land in the installer's ramdisk.
+- **[blink-zero/kali-2024.1-preseed](https://github.com/blink-zero/kali-2024.1-preseed)** also moves the package work out of `pkgsel`, but ends its apt commands in `|| true` and keeps the `http.kali.org` redirector, so a failed fetch produces an install that reports success with no toolset. It also sets `pkgsel/include` twice, the second overriding the first.
 
-### badsectorlabs/ludus
+## Cloning
 
-[`ludus-server/packer/kali/http/kali-preseed.cfg`](https://gitlab.com/badsectorlabs/ludus/-/blob/main/ludus-server/packer/kali/http/kali-preseed.cfg) reached two of the same conclusions independently, which is the best evidence available that they are right: its mirror is `kali.download` rather than the redirector, and it sets `pkgsel/upgrade select none`. Its `in-target systemctl enable ssh` is where the fix above came from, after a build here installed `openssh-server` and still could not be reached.
+Use [`deploy/kali.tfvars.example`](../../../deploy/kali.tfvars.example):
 
-It solves a different problem, though, so do not copy its package list. Ludus installs only `qemu-guest-agent openssh-server sudo python3 isc-dhcp-client` and provisions the toolset with Ansible afterwards; this template bakes `kali-linux-default` into the image instead. It also partitions with `partman-auto/method regular` rather than LVM, and hardcodes `grub-installer/bootdev` to `/dev/vda`, which assumes a virtio disk - `default` is used here so the setting does not depend on the controller.
+- `disk_size` of at least 50, the template's own;
+- `TF_VAR_password`: Xfce has no key login, so without one the console cannot be logged into;
+- `os = "kali"`: `deploy/` then refuses `provisioning_steps`, since the `02`/`03` scripts are Ubuntu's.
 
-One thing to watch if you borrow from its `late_command`: the first three commands have no `in-target` prefix, so its sudoers edit and its `apt install` land in the installer's ramdisk rather than the installed system and are gone after the reboot. Only the final `in-target systemctl enable ssh` reaches the machine being built.
-
-### blink-zero/kali-2024.1-preseed
-
-[blink-zero/kali-2024.1-preseed](https://github.com/blink-zero/kali-2024.1-preseed) solves the same problem - an unattended Kali install driven by Packer - and is worth reading, because one of its decisions is right and the way it implements that decision is the thing to avoid.
-
-**What it gets right, and what this template took from it.** It sets `pkgsel/upgrade select none` and moves the heavy package work into `preseed/late_command` rather than leaving it in `pkgsel`. That instinct is correct for exactly the reason in the section above: `pkgsel` is all-or-nothing and reports nothing useful when it fails. This template reaches the same conclusion and puts the work in a Packer provisioner instead, where a failure names itself, the code is linted and tested, and a retry does not mean reinstalling.
-
-**What it does not do is make the install more reliable.** Both apt commands in its `late_command` end in `|| true`, so a failed package fetch produces an install that reports success. Its mirror is `http.kali.org`, in the preseed and again in the `sources.list` its `late_command` writes - the redirector that can hand apt an HTTPS mirror it cannot verify, as described above. That failure mode is not fixed there, only silenced: the result would be a Kali template with no toolset, no error on the console, and nothing in any log to explain it. For an image that gets cloned repeatedly, a silent partial build is worse than a failed one, because it is discovered later and on a clone.
-
-Two smaller things to be aware of if you borrow from it:
-
-- `pkgsel/include` is set twice, in separate sections. The second assignment overrides the first, so the `kali-linux-core` and `kali-desktop-xfce` named earlier are probably never installed by `pkgsel` at all.
-- Its `tasksel` line selects `kde-desktop` while `pkgsel/include` and the `late_command` both ask for `kali-desktop-xfce`.
-
-Read both as evidence about which approaches exist, not as specifications.
-
-## Build
-
-```bash
-cd templates/proxmox/kali
-ssh-add -l                                            # the seed's key must be loaded
-export PKR_VAR_proxmox_api_token_id="automation@pve!deploy"
-export PKR_VAR_proxmox_api_token_secret="..."
-packer init .
-packer validate -var-file=../proxmox.pkrvars.hcl .
-packer build    -var-file=../proxmox.pkrvars.hcl .
-```
-
-That builds from `local:iso/kali-linux-2026.2-installer-amd64.iso`, staged on the node. To have Packer download and check it against Kali's `SHA256SUMS` instead:
-
-```bash
-packer build -var-file=../proxmox.pkrvars.hcl -var 'iso_file=' .
-```
-
-Expect a long build: `kali-linux-default` is large, and `00-update-system.sh` then full-upgrades a rolling release on top of it. The install itself is the shorter half, so most of the wait happens after Packer connects; `ssh_timeout` is 60m to cover the installer side with room to spare.
-
-| Symptom | Cause | Fix |
-| --- | --- | --- |
-| The installer's menu starts by itself before anything is typed | GRUB's timeout beat `boot_wait` | lower `boot_wait` |
-| `c` lands on the firmware splash | OVMF still posting | `-var 'boot_wait=20s'` |
-| d-i stops at a question | an answer the preseed does not carry | read the question on the console; add the `d-i` line |
-| "Waiting for SSH" with nothing reaching the VM | the guest agent is not up, or the role lacks `VM.GuestAgent.Audit` | `-var 'ssh_host=<VM IP>'` |
-
-## Clone
-
-Through [`deploy/`](../../../deploy/README.md), starting from [`deploy/kali.tfvars.example`](../../../deploy/kali.tfvars.example):
-
-```bash
-cd deploy
-cp kali.tfvars.example kali.tfvars
-export PROXMOX_VE_API_TOKEN='automation@pve!deploy=xxxxxxxx-...'
-export TF_VAR_password='...'
-tofu apply -var-file=kali.tfvars
-```
-
-Three settings differ from a server clone, and each one bites if it is missed:
-
-- **`disk_size` must be at least 50.** The template's disk is 50G and Proxmox can grow a cloned disk but never shrink one, so the module's default of 32 fails the apply outright.
-- **`TF_VAR_password` is required**, not optional. The image runs Xfce, and a display manager has no key login; cloud-init locks the account's password unless one is supplied, so a clone without it cannot be logged into at the console at all.
-- **Leave `provisioning_steps` empty.** The `02`/`03` scripts are Ubuntu's and `ubuntu-context.sh` refuses to run elsewhere, which is correct - Kali's tooling comes from its own metapackages, in the image.
-
-## Verify before pushing
-
-```bash
-../../../scripts/check-templates.sh proxmox
-```
+| Symptom | Fix |
+| --- | --- |
+| The installer's menu starts before anything is typed | GRUB's timeout beat `boot_wait`: lower it |
+| `c` lands on the firmware splash | OVMF is still posting: `-var 'boot_wait=20s'` |
+| d-i stops at a question | the preseed lacks that answer; add its `d-i` line |
 
 ## Upstream license
 
