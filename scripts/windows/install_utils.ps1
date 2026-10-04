@@ -8,11 +8,13 @@
 # Docs:
 #   Chocolatey install  https://docs.chocolatey.org/en-us/choco/setup/
 #   UniGetUI releases   https://github.com/Devolutions/UniGetUI/releases
-#   README.md           ../README.md, building and running the box
+#   README.md           ../../deploy/README.md, first-boot provisioning
 #
 # Run:
-#   The Vagrantfile's shell provisioner runs this on the box. By hand, from an
-#   elevated PowerShell (Windows 10 and 11 block scripts by default):
+#   deploy/ hands this to cloudbase-init as user-data on a Windows clone whose
+#   entry sets provisioning_steps = "utils", and the VMware win-srv-2025
+#   Vagrantfile runs it as a shell provisioner. By hand, from an elevated
+#   PowerShell (Windows 10 and 11 block scripts by default):
 #   powershell -NoProfile -ExecutionPolicy Bypass -File .\install_utils.ps1
 
 Set-StrictMode -Version Latest

@@ -37,6 +37,7 @@ Nothing that authenticates to real infrastructure is committed. A value lands in
 | Kind | Where | Committed |
 | --- | --- | --- |
 | API token, SSH password | environment, `PKR_VAR_*` | **never** |
+| `deploy/` token, clone password, state passphrase | environment, `PROXMOX_VE_API_TOKEN` and `TF_VAR_*` | **never** |
 | Node name, storage pools, bridge | `templates/proxmox/proxmox.pkrvars.hcl` | no - only the `.example` |
 | ISO URL, checksum, sizing | the template's `.pkr.hcl` / `.auto.pkrvars.hcl` | yes |
 
@@ -52,6 +53,7 @@ export PKR_VAR_ssh_password="..."
 - The middle row is not secret, but it describes one person's network, so it is not shared either.
 - `.gitignore` excludes `proxmox.pkrvars.hcl` and any `*.local.pkrvars.hcl`, along with `*.tfvars`, `.env`, `*.kdbx` and private keys.
 - Only `proxmox.pkrvars.hcl.example` is tracked.
+- `deploy/` state and saved plans hold the clone password, so they are encrypted with a key derived from `TF_VAR_state_passphrase`, and a plaintext state is refused - see [`deploy/README.md`](deploy/README.md#state-encryption).
 
 A token in the environment cannot be committed by a mistake in a `.gitignore` rule, which is why the split is drawn there rather than at "sensitive files".
 

@@ -39,7 +39,7 @@ Vagrant.configure("2") do |config|
     config.vm.define machine[:name] do |node|
       
       node.vm.provision "shell",
-      path: "vagrant/install_utils.ps1",
+      path: "../../../scripts/windows/install_utils.ps1",
       privileged: true
 
       node.vm.provision "shell",

@@ -8,8 +8,9 @@
 # To bring machines up one at a time instead, keep a file per VM holding a
 # single-entry map and give each its own workspace. Same module either way.
 #
-# THE API TOKEN DOES NOT BELONG HERE:
+# THE API TOKEN AND THE STATE PASSPHRASE DO NOT BELONG HERE:
 #   export PROXMOX_VE_API_TOKEN='automation@pve!deploy=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'
+#   export TF_VAR_state_passphrase='...'   # 16+ characters; encrypts the state
 # Nor does a console password. Servers do not need one - SSH takes the key.
 # DESKTOPS DO: GDM and the Proxmox console have no key login, and cloud-init
 # locks the account when no password is delivered, so a desktop clone created
@@ -50,6 +51,13 @@ vms = {
     full_clone     = false
   }
 
+  # Another network than the template's NIC: a VLAN tag on vmbr0, or a
+  # different bridge. Leave both out and the clone keeps the template's NIC.
+  "srv-04" = {
+    template_vm_id = 80026
+    vlan_id        = 30
+  }
+
   # The workstation: 02 then 03 give the full toolchain, GNOME preferences and
   # shell configuration. Runs in the background for 30-40 minutes after apply
   # returns, then reboots once. disk_size must be >= the template's 64G.
@@ -61,12 +69,11 @@ vms = {
     provisioning_steps = "02,03"
   }
 
-  # Kali carries its toolset in the image. Leave provisioning_steps unset: the
-  # 02/03 scripts are Ubuntu's and ubuntu-context.sh refuses to run on anything
-  # else, so a Kali clone that asks for them gets a first-boot service that
-  # fails and retries every five minutes for good.
+  # Kali carries its toolset in the image; with os = "kali", a
+  # provisioning_steps request is refused at plan time.
   "kali-01" = {
     template_vm_id = 80200
+    os             = "kali"
     cores          = 4
     memory         = 4096
     disk_size      = 50
@@ -75,22 +82,27 @@ vms = {
 
   # Windows: cloudbase-init applies the hostname, account, password and key
   # from the same cloud-init drive, and reboots once. disk_size must be >= the
-  # templates' 64G. Leave provisioning_steps unset - the 02/03 scripts are
-  # Ubuntu's. The console needs TF_VAR_password; Windows has no key login there.
+  # templates' 64G. The console needs TF_VAR_password; Windows has no key
+  # login there.
   "win10-01" = {
     template_vm_id = 80310
+    os             = "windows"
     cores          = 4
     memory         = 4096
     disk_size      = 64
     tags           = ["opentofu", "windows"]
   }
 
+  # "utils" installs Chocolatey, its utilities and UniGetUI at first boot -
+  # scripts/windows/install_utils.ps1, run once by cloudbase-init.
   "win11-01" = {
-    template_vm_id = 80311
-    cores          = 4
-    memory         = 4096
-    disk_size      = 64
-    tags           = ["opentofu", "windows"]
+    template_vm_id     = 80311
+    os                 = "windows"
+    provisioning_steps = "utils"
+    cores              = 4
+    memory             = 4096
+    disk_size          = 64
+    tags               = ["opentofu", "windows"]
   }
 
   # Server keeps the built-in Administrator rather than the shared username,
@@ -98,6 +110,7 @@ vms = {
   # symbols: a simple TF_VAR_password leaves it with a random one.
   "winsrv25-01" = {
     template_vm_id = 80325
+    os             = "windows"
     username       = "Administrator"
     cores          = 4
     memory         = 4096
