@@ -76,6 +76,24 @@ Rules:
 - Do not add a comment merely to replace one you removed.
 - Comment-only changes must not touch code. Verify by stripping comments from both revisions and diffing what is left.
 
+## Documentation
+
+Keep every README and similar document clear, concise and minimal, while preserving the technical information needed to use, understand, maintain or troubleshoot the project. The target is documentation that is compact, technically precise, easy to scan, and structurally predictable across the repository.
+
+- Prefer short, direct explanations over verbose prose.
+- Include technical detail when it is necessary or genuinely useful, but do not explain obvious concepts.
+- Remove redundancy, filler, repetition, and anything that does not help the reader act or understand the system.
+- Use concise examples, commands, configuration snippets and tables where they communicate more efficiently than prose.
+- Keep terminology precise and consistent across the repository.
+- Give READMEs with comparable purposes a similar structure, section order, heading style, formatting and level of detail.
+- Reuse the same naming and documentation patterns for equivalent concepts across components.
+- Do not force identical sections where they are not relevant: consistency should help navigation and comprehension, not create boilerplate.
+- Make each README useful on its own, without duplicating what is better documented centrally.
+- Link to the canonical document rather than keeping a second explanation that can drift out of sync.
+- Preserve important warnings, constraints, prerequisites, edge cases and operational details when simplifying.
+- When editing existing documentation, simplify and normalize it where appropriate rather than only appending new content.
+- Put commands in fenced `bash` blocks, one command per line, with a short comment where it helps. A command is documented in one README; the others link to it.
+
 ## Line Breaks
 
 The two contexts want opposite things, so keep them apart.
