@@ -61,13 +61,13 @@ variable "insecure_skip_tls_verify" {
 # snapshot, and the preseed full-upgrades to current during the install.
 variable "iso" {
   type        = string
-  description = "A URL to the ISO file; Packer downloads it to iso_storage_pool"
+  description = "ISO to download into iso_storage_pool when iso_file is empty"
   default     = "https://cdimage.kali.org/kali-2026.2/kali-linux-2026.2-installer-amd64.iso"
 }
 
 variable "checksum" {
   type        = string
-  description = "The checksum for the ISO file"
+  description = "Where var.iso's checksum comes from: sha256:<hex>, or file:<SHA256SUMS URL>"
   default     = "file:https://cdimage.kali.org/kali-2026.2/SHA256SUMS"
 }
 
@@ -143,7 +143,7 @@ variable "ssh_host" {
 # build wait out the SSH timeout.
 variable "ssh_username" {
   type        = string
-  description = "The username to connect to SSH"
+  description = "Account the seed creates, which Packer logs in as"
   default     = "syselement"
 }
 

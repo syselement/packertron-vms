@@ -42,13 +42,13 @@ variable "vm_disk_size" {
 # .\26100.1742.240906-0331.ge_release_svc_refresh_SERVER_EVAL_x64FRE_en-us.iso
 variable "iso_checksum" {
   type        = string
-  description = "The checksum for the ISO file"
+  description = "Checksum of iso_url: sha256:<hex>, file:<SHA256SUMS URL>, or the bare hex"
   default     = "D0EF4502E350E3C6C53C15B1B3020D38A5DED011BF04998E950720AC8579B23D"
 }
 
 variable "iso_url" {
   type        = string
-  description = "A URL to the ISO file"
+  description = "ISO to install from: a URL, or a path on the build host"
   default     = "https://software-static.download.prss.microsoft.com/dbazure/888969d5-f34g-4e03-ac9d-1f9786c66749/26100.1742.240906-0331.ge_release_svc_refresh_SERVER_EVAL_x64FRE_en-us.iso"
 }
 

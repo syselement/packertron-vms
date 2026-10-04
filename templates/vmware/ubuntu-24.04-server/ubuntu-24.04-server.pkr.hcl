@@ -1,11 +1,11 @@
-# Ubuntu Server 24.04 LTS template for VMware Workstation, built from ISO.
-# Author : Yoann LAMY <https://github.com/ynlamy/packer-ubuntuserver24_04>
-# Licence : GPLv3
+# Ubuntu Server 24.04 LTS for VMware Workstation, installed from the ISO by
+# autoinstall and provisioned at build time with scripts/ubuntu/.
 #
 # Docs:
 #   vmware-iso builder  https://developer.hashicorp.com/packer/integrations/hashicorp/vmware/latest/components/builder/iso
 #   Autoinstall         https://canonical-subiquity.readthedocs-hosted.com/en/latest/reference/autoinstall-reference.html
-#   README.md           build steps and the credential note
+#   Reference           https://github.com/ynlamy/packer-ubuntuserver24_04
+#   README.md           what this build bakes in, and the credential note
 #
 # Run:
 #   packer init .
@@ -24,13 +24,13 @@ packer {
 
 variable "iso" {
   type        = string
-  description = "A URL to the ISO file"
+  description = "Ubuntu Server ISO to download, checked against var.checksum"
   default     = "https://releases.ubuntu.com/noble/ubuntu-24.04.5-live-server-amd64.iso"
 }
 
 variable "checksum" {
   type        = string
-  description = "The checksum for the ISO file"
+  description = "Where var.iso's checksum comes from: sha256:<hex>, or file:<SHA256SUMS URL>"
   # - The codename directory carries SHA256SUMS for whichever point release is
   #   current, so this keeps matching when iso is bumped.
   # - A literal sha256 does not, and packer validate never downloads, so CI
@@ -40,31 +40,32 @@ variable "checksum" {
 
 variable "headless" {
   type        = bool
-  description = "When this value is set to true, the machine will start without a console"
+  description = "Build without opening the VM's console window"
   default     = true
 }
 
 variable "name" {
   type        = string
-  description = "This is the name of the new virtual machine"
-  default     = "vm-ubuntuserver24_04"
+  description = "Name of the VM, and of its disk file"
+  default     = "ubuntu-24.04-server"
 }
 
-# Must match the identity block in http/user-data; a mismatch makes every build wait out the 30m SSH timeout.
+# Must match the identity block in http/user-data; a mismatch makes every
+# build wait out the 30m SSH timeout.
 variable "username" {
   type        = string
-  description = "The username to connect to SSH"
+  description = "Account the seed creates, which Packer logs in as"
   default     = "syselement"
 }
 
 variable "password" {
   type        = string
-  description = "A plaintext password to authenticate with SSH"
+  description = "That account's password, the plaintext of the hash in http/user-data"
   sensitive   = true
   default     = "packer"
 }
 
-source "vmware-iso" "ubuntuserver24_04" {
+source "vmware-iso" "ubuntu" {
   iso_url      = var.iso
   iso_checksum = var.checksum
 
@@ -111,7 +112,7 @@ source "vmware-iso" "ubuntuserver24_04" {
 }
 
 build {
-  sources = ["source.vmware-iso.ubuntuserver24_04"]
+  sources = ["source.vmware-iso.ubuntu"]
 
   # 00 has no library dependencies, so the shell provisioner can upload it on
   # its own.

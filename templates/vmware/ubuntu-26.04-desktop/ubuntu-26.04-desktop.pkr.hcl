@@ -27,13 +27,13 @@ packer {
 
 variable "iso_checksum" {
   type        = string
-  description = "The checksum for the ISO file"
+  description = "Checksum of iso_url: sha256:<hex>, file:<SHA256SUMS URL>, or the bare hex"
   default     = "file:https://releases.ubuntu.com/resolute/SHA256SUMS"
 }
 
 variable "iso_url" {
   type        = string
-  description = "A URL to the ISO file"
+  description = "ISO to install from: a URL, or a path on the build host"
   default     = "https://releases.ubuntu.com/26.04.1/ubuntu-26.04.1-desktop-amd64.iso"
 }
 

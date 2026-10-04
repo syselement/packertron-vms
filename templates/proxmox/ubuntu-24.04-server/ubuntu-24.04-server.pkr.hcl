@@ -58,13 +58,13 @@ variable "insecure_skip_tls_verify" {
 
 variable "iso" {
   type        = string
-  description = "A URL to the ISO file; Packer downloads it to iso_storage_pool"
+  description = "ISO to download into iso_storage_pool when iso_file is empty"
   default     = "https://releases.ubuntu.com/noble/ubuntu-24.04.5-live-server-amd64.iso"
 }
 
 variable "checksum" {
   type        = string
-  description = "The checksum for the ISO file"
+  description = "Where var.iso's checksum comes from: sha256:<hex>, or file:<SHA256SUMS URL>"
   default     = "file:https://releases.ubuntu.com/noble/SHA256SUMS"
 }
 
@@ -145,7 +145,7 @@ variable "ssh_host" {
 
 variable "ssh_username" {
   type        = string
-  description = "The username to connect to SSH"
+  description = "Account the seed creates, which Packer logs in as"
   default     = "syselement"
 }
 

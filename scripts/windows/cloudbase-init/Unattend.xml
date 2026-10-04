@@ -3,13 +3,17 @@
   Sysprep answer file for the Proxmox Windows templates. The template uploads
   it to C:\Windows\Panther\, and 12_sysprep.ps1 passes it to sysprep.
 
-  Based on the Unattend.xml CloudbaseInitSetup_1_1_8_x64.msi ships, with the
-  Windows-client additions the Proxmox documentation lists, and the locale and
-  time zone of the other Windows templates in this repository.
+  Based on the Unattend.xml CloudbaseInitSetup_1_1_8_x64.msi ships, from
+  Cloudbase Solutions' cloudbase-init-installer, used under the Apache License
+  2.0. Changed here: the Windows-client additions the Proxmox documentation
+  lists, and the locale and time zone of the other Windows templates in this
+  repository.
 
   Docs:
     Unattend reference  https://learn.microsoft.com/en-us/windows-hardware/customize/desktop/unattend/
     Proxmox             https://pve.proxmox.com/pve-docs/chapter-qm.html (Cloudbase-Init and Sysprep)
+    Upstream            https://github.com/cloudbase/cloudbase-init-installer/blob/master/CloudbaseInitSetup/Unattend.xml
+    Apache-2.0          https://www.apache.org/licenses/LICENSE-2.0
     WINDOWS.md          ../../../templates/proxmox/WINDOWS.md, the clone-time model
 
   Run: sysprep reads this; it is not meant to be run by hand.
