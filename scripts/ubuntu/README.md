@@ -201,6 +201,20 @@ cloud-init has no include directive, so every seed must carry its own copy of `s
 
 The scripted YAML files embed `firstboot/stub.sh` and the systemd unit, plus a `/etc/packertron/firstboot.conf` naming the target user and the steps to run.
 
+The seeds carry an `@SSH_AUTHORIZED_KEY@` placeholder rather than a key. Render one with yours and publish it as a secret gist; the gist's raw URL is then a NoCloud seed:
+
+```bash
+# render the seed with your public key, beside an empty meta-data
+sed "s|@SSH_AUTHORIZED_KEY@|$(cat ~/.ssh/id_ed25519.pub)|" scripts/ubuntu/autoinstall-server.yaml > user-data
+touch meta-data
+# publish both as one secret gist, and print its URL
+gh gist create user-data meta-data
+# on the installer's kernel line, quoted so GRUB does not end the command at ';':
+#   autoinstall 'ds=nocloud;s=https://gist.githubusercontent.com/<user>/<gist-id>/raw/'
+```
+
+A secret gist is unlisted, not private: anyone with the URL can read it. It holds only a public key and the published password hash, so that is the same exposure as this repository.
+
 - The runner checks out one fixed repository revision and invokes `90-bootstrap-baremetal.sh`.
 - Transient failures are retried.
 - After a successful run the service disables and removes itself.
@@ -241,10 +255,10 @@ Rules that follow from this:
 The autoinstall YAML files and the Packer `http/user-data` files contain **hardcoded credentials**, intentionally, for a single-operator lab:
 
 - the `syselement` account's SHA-512 password hash is the same in every file, and the plaintext (`packer`) is documented alongside it - a published salt plus a published plaintext is a published console password. `allow-pw: false` only disables SSH password authentication; console, TTY and GDM login are unaffected.
-- a fixed ed25519 public key is authorized on every image.
+- no key is committed: each seed carries an `@SSH_AUTHORIZED_KEY@` placeholder, which Packer replaces with `ssh_authorized_key` and a bare-metal install replaces before use - see [Autoinstall YAML files](#autoinstall-yaml-files).
 - `/etc/sudoers.d/99-syselement` grants permanent `NOPASSWD:ALL` and is never removed after bootstrap.
 
-These images are not suitable for a shared or internet-reachable network as shipped. Change the hash (`mkpasswd -m sha-512`), the authorized key and the sudoers rule before building anything that leaves the lab.
+These images are not suitable for a shared or internet-reachable network as shipped. Change the hash (`mkpasswd -m sha-512`) and the sudoers rule before building anything that leaves the lab.
 
 ---
 

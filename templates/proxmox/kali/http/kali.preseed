@@ -83,9 +83,11 @@ d-i finish-install/reboot_in_progress note
 d-i cdrom-detect/eject boolean true
 
 # Kali installs openssh-server disabled, hence the enable. cloud-init is
-# switched off for the build; seal-for-clone.sh turns it back on.
+# switched off for the build; seal-for-clone.sh turns it back on. Packer
+# replaces @SSH_AUTHORIZED_KEY@ with var.ssh_authorized_key when it serves
+# this file.
 d-i preseed/late_command string \
-    in-target sh -c 'install -d -m 0700 -o syselement -g syselement /home/syselement/.ssh && printf "%s\n" "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPA3hxPOnJAjCFoZMz8mcT+fZTy5j0vjLWPGVM2vaA88" > /home/syselement/.ssh/authorized_keys && chown syselement:syselement /home/syselement/.ssh/authorized_keys && chmod 0600 /home/syselement/.ssh/authorized_keys'; \
+    in-target sh -c 'install -d -m 0700 -o syselement -g syselement /home/syselement/.ssh && printf "%s\n" "@SSH_AUTHORIZED_KEY@" > /home/syselement/.ssh/authorized_keys && chown syselement:syselement /home/syselement/.ssh/authorized_keys && chmod 0600 /home/syselement/.ssh/authorized_keys'; \
     in-target sh -c 'printf "syselement ALL=(ALL) NOPASSWD:ALL\n" > /etc/sudoers.d/99-syselement && chmod 0440 /etc/sudoers.d/99-syselement && visudo -c -f /etc/sudoers.d/99-syselement'; \
     in-target sh -c 'printf "PasswordAuthentication no\n" > /etc/ssh/sshd_config.d/50-packertron.conf'; \
     in-target systemctl enable ssh; \

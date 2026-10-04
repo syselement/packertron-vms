@@ -183,6 +183,16 @@ variable "ssh_password" {
   default     = "packer"
 }
 
+# Shared with the Linux templates through ../proxmox.pkrvars.hcl and unused
+# here: the Windows build logs in with ssh_password, and a clone takes its
+# keys from the cloud-init drive. Declared so the shared file sets no
+# undeclared variable.
+variable "ssh_authorized_key" {
+  type        = string
+  description = "Unused by the Windows templates; see the Linux ones"
+  default     = ""
+}
+
 locals {
   # Escaped once here, since the answer file drops it into XML text.
   xml_password = replace(replace(replace(var.ssh_password, "&", "&amp;"), "<", "&lt;"), ">", "&gt;")

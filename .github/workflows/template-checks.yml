@@ -89,18 +89,18 @@ jobs:
 
       - name: Validate
         working-directory: templates/${{ matrix.template }}
-        # The Proxmox builder will not validate without a username and token.
-        # Throwaway values: validate never contacts the API.
+        # Throwaway values for what a build takes from the operator: the
+        # Proxmox builder will not validate without a token, and a seed needs
+        # a key. validate never contacts the API.
         run: |
+          vars=()
           if grep -q 'proxmox-iso' ./*.pkr.hcl; then
-            packer validate \
-              -var 'proxmox_api_token_id=ci@pve!ci' \
-              -var 'proxmox_api_token_secret=ci-not-a-real-secret' \
-              -var 'ssh_password=ci-not-a-real-secret' \
-              .
-          else
-            packer validate .
+            vars+=(-var 'proxmox_api_token_id=ci@pve!ci' -var 'proxmox_api_token_secret=ci-not-a-real-secret' -var 'ssh_password=ci-not-a-real-secret')
           fi
+          if grep -q 'variable "ssh_authorized_key"' ./*.pkr.hcl; then
+            vars+=(-var 'ssh_authorized_key=ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICiOnlyNotARealKeyNotARealKeyNotARealKey ci@example.invalid')
+          fi
+          packer validate "${vars[@]}" .
 
   cloud-init:
     name: cloud-init schema

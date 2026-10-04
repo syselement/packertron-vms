@@ -13,7 +13,7 @@ It follows that:
 
 - Every machine built from this repository starts with the **same** console password.
 - The same seeds grant that user `NOPASSWD: ALL` sudo, permanently.
-- SSH password authentication is disabled (`allow-pw: false`) and a fixed ed25519 public key is authorized, so remote access depends on holding the matching private key - but console and GDM login do not.
+- SSH password authentication is disabled (`allow-pw: false`), and the only authorized key is the one the builder supplies: the seeds carry an `@SSH_AUTHORIZED_KEY@` placeholder, which Packer replaces with `ssh_authorized_key`. No key is committed, so a fork authorizes its own builder's key, not this repository owner's. Remote access depends on holding the matching private key - console and GDM login do not.
 - Because of that, the Proxmox build authenticates through the **SSH agent** (`ssh_agent_auth`), not a password and not a key file. No passphrase-less copy of a personal key has to exist on disk for a build to run.
 
 **Change the password on any machine that will be reachable by anyone else.**

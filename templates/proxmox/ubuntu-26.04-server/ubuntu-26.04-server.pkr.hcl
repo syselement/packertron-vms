@@ -149,6 +149,20 @@ variable "ssh_username" {
   default     = "syselement"
 }
 
+# The public key the seed authorizes for that account. Nothing is committed
+# in its place: set it in ../proxmox.pkrvars.hcl, or export
+# PKR_VAR_ssh_authorized_key. Its comment may hold no quote, dollar sign
+# or backslash, which the seed would have to escape.
+variable "ssh_authorized_key" {
+  type        = string
+  description = "Public key the seed authorizes, as one authorized_keys line"
+
+  validation {
+    condition     = can(regex("^(ssh-ed25519|ssh-rsa|ecdsa-sha2-nistp(256|384|521)|sk-ssh-ed25519@openssh\\.com|sk-ecdsa-sha2-nistp256@openssh\\.com) [A-Za-z0-9+/]+={0,3}( [^'\"\\\\$`]*)?$", var.ssh_authorized_key))
+    error_message = "Set ssh_authorized_key to one public key line, such as the content of ~/.ssh/id_ed25519.pub, with no quote, dollar sign or backslash in its comment."
+  }
+}
+
 # Not used to log in: the seed sets `allow-pw: false`. Only piped into `sudo
 # -S`, which the seed's NOPASSWD sudoers means sudo never reads.
 variable "ssh_password" {
@@ -226,7 +240,12 @@ source "proxmox-iso" "ubuntu-26-04-server" {
   cloud_init              = true
   cloud_init_storage_pool = var.storage_pool
 
-  http_directory    = "${path.root}/http"
+  # Served from memory rather than http/ on disk, so the seed authorizes
+  # var.ssh_authorized_key instead of a key committed to the repository.
+  http_content = {
+    "/user-data" = replace(file("${path.root}/http/user-data"), "@SSH_AUTHORIZED_KEY@", var.ssh_authorized_key)
+    "/meta-data" = file("${path.root}/http/meta-data")
+  }
   http_bind_address = var.http_bind_address
   boot_command = [
     "<esc><wait>",
@@ -237,9 +256,9 @@ source "proxmox-iso" "ubuntu-26-04-server" {
   ]
   boot_wait = var.boot_wait
 
-  # - The seed disables password auth and authorises one ed25519 key, and
-  #   Packer cannot unlock a passphrase-protected key file - so authentication
-  #   goes through the agent.
+  # - The seed disables password auth and authorizes only
+  #   var.ssh_authorized_key, and Packer cannot unlock a passphrase-protected
+  #   key file - so authentication goes through the agent.
   # - `ssh-add -l` must list that key before building.
   ssh_host       = var.ssh_host
   ssh_username   = var.ssh_username

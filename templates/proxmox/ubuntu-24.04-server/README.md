@@ -76,7 +76,7 @@ export PKR_VAR_proxmox_api_token_secret="..."
 ### The build logs in over the SSH agent
 
 - `http/user-data` sets `allow-pw: false`, so subiquity writes `PasswordAuthentication no` and the installed system rejects passwords.
-- The build authenticates with the one ed25519 key the seed authorises, through the agent - Packer's communicator cannot unlock a passphrase-protected key file, and `ssh_private_key_file` fails validation outright on one.
+- The build authenticates with the key the seed authorizes - `ssh_authorized_key` in `../proxmox.pkrvars.hcl` - through the agent: Packer's communicator cannot unlock a passphrase-protected key file, and `ssh_private_key_file` fails validation outright on one.
 
 So before building, the key must be loaded:
 

@@ -40,8 +40,10 @@ autoinstall:
 
   ssh:
     install-server: true
+    # Packer replaces the placeholder with var.ssh_authorized_key when it
+    # serves this file.
     authorized-keys:
-      - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPA3hxPOnJAjCFoZMz8mcT+fZTy5j0vjLWPGVM2vaA88
+      - "@SSH_AUTHORIZED_KEY@"
     allow-pw: false
 
   # Installed on the first boot, not by the installer, so it does not depend

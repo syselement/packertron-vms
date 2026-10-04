@@ -38,6 +38,9 @@ failures=0
 # Empty means every hypervisor; set from the command line to narrow the run.
 HYPERVISOR=""
 
+# A well-formed public key that matches no private key, for validate only.
+readonly CHECK_SSH_KEY="ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIChecksOnlyNotARealKeyNotARealKeyNotARealKey checks@example.invalid"
+
 note() { printf '\n== %s\n' "$*"; }
 pass() { printf '   ok   %s\n' "$*"; }
 fail() {
@@ -112,19 +115,21 @@ check_templates() {
             fail "$directory: packer fmt (run: packer fmt .)"
         fi
 
-        # The Proxmox builder will not validate without a username and token.
-        # Throwaway values: validate never contacts the API.
+        # Throwaway values for what a build takes from the operator: the
+        # Proxmox builder will not validate without a token, and a seed
+        # needs a key. validate never contacts the API.
+        local -a validate_vars=()
         if grep -q 'proxmox-iso' ./*.pkr.hcl 2>/dev/null; then
-            if packer validate \
-                -var 'proxmox_api_token_id=local@pve!local' \
-                -var 'proxmox_api_token_secret=not-a-real-secret' \
-                -var 'ssh_password=not-a-real-secret' \
-                . >/dev/null; then
-                pass "packer validate"
-            else
-                fail "$directory: packer validate"
-            fi
-        elif packer validate . >/dev/null; then
+            validate_vars+=(
+                -var 'proxmox_api_token_id=local@pve!local'
+                -var 'proxmox_api_token_secret=not-a-real-secret'
+                -var 'ssh_password=not-a-real-secret'
+            )
+        fi
+        if grep -q 'variable "ssh_authorized_key"' ./*.pkr.hcl 2>/dev/null; then
+            validate_vars+=(-var "ssh_authorized_key=${CHECK_SSH_KEY}")
+        fi
+        if packer validate "${validate_vars[@]}" . >/dev/null; then
             pass "packer validate"
         else
             fail "$directory: packer validate"
@@ -718,6 +723,14 @@ check_seeds() {
             cloud-init schema --config-file "$file" --annotate 2>&1 | tail -20 >&2 || true
         fi
     done
+
+    # A seed carries the @SSH_AUTHORIZED_KEY@ placeholder, never a key: a
+    # committed key would be authorized on every machine built from a fork.
+    while read -r found; do
+        [[ -n "$found" ]] || continue
+        fail "${found%%:*}: a public key is committed; use @SSH_AUTHORIZED_KEY@ instead"
+    done < <(cd "$REPO_ROOT" && grep -l -E '(ssh-(ed25519|rsa|dss)|ecdsa-sha2-nistp[0-9]+|sk-[a-z0-9-]+@openssh\.com) AAAA' \
+        scripts/ubuntu/autoinstall-*.yaml templates/*/*/http/* 2>/dev/null)
 }
 
 main() {

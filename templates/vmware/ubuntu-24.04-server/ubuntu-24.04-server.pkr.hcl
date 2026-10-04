@@ -58,6 +58,20 @@ variable "username" {
   default     = "syselement"
 }
 
+# The public key the seed authorizes for that account. Nothing is committed
+# in its place: export PKR_VAR_ssh_authorized_key, or pass
+# -var ssh_authorized_key=.... Its comment may hold no quote, dollar sign
+# or backslash, which the seed would have to escape.
+variable "ssh_authorized_key" {
+  type        = string
+  description = "Public key the seed authorizes, as one authorized_keys line"
+
+  validation {
+    condition     = can(regex("^(ssh-ed25519|ssh-rsa|ecdsa-sha2-nistp(256|384|521)|sk-ssh-ed25519@openssh\\.com|sk-ecdsa-sha2-nistp256@openssh\\.com) [A-Za-z0-9+/]+={0,3}( [^'\"\\\\$`]*)?$", var.ssh_authorized_key))
+    error_message = "Set ssh_authorized_key to one public key line, such as the content of ~/.ssh/id_ed25519.pub, with no quote, dollar sign or backslash in its comment."
+  }
+}
+
 variable "password" {
   type        = string
   description = "That account's password, the plaintext of the hash in http/user-data"
@@ -89,7 +103,12 @@ source "vmware-iso" "ubuntu" {
 
   shutdown_command = "echo '${var.password}' | sudo -S systemctl poweroff"
 
-  http_directory = "${path.root}/http"
+  # Served from memory rather than http/ on disk, so the seed authorizes
+  # var.ssh_authorized_key instead of a key committed to the repository.
+  http_content = {
+    "/user-data" = replace(file("${path.root}/http/user-data"), "@SSH_AUTHORIZED_KEY@", var.ssh_authorized_key)
+    "/meta-data" = file("${path.root}/http/meta-data")
+  }
 
   boot_command = [
     "<esc><wait>",
