@@ -6,8 +6,9 @@ Standards for this repository: Packer templates under `templates/`, the guest pr
 
 - Everything in the repository is in play, and everything clears the same bar.
 - `scripts/ubuntu/` is the mature part - a Bats suite, ShellCheck, shfmt - and is checked by `.github/workflows/ubuntu-static-checks.yml`. Treat it as known-good: do not refactor it as a side effect of another task.
-- Packer HCL and cloud-init seeds are checked by `.github/workflows/template-checks.yml`. Run `scripts/check-templates.sh` before committing, which runs those same checks locally, plus the CI-matrix and shell-lint checks CI cannot express itself.
+- Packer HCL, seeds, PowerShell, workflows, YAML and Markdown are checked by `.github/workflows/template-checks.yml`. Run `scripts/check-templates.sh` before committing: it runs every check CI runs, the Ubuntu suite and the secret scan included, and the CI-matrix check CI cannot express itself. `scripts/README.md` lists the scopes.
 - `scripts/install-requirements.sh` reports the host tooling those checks need, and installs it when asked. It reports by default and changes nothing, so it is safe to run during an audit. `scripts/install-requirements.ps1` is the Windows equivalent for the VMware path.
+- `scripts/proxmox/` runs on a Proxmox node and creates users, roles and tokens: everything in [Safety Restrictions](#safety-restrictions) applies, and it is tested only against stubs, never against a real node from here.
 - Keep the guest-provisioning scripts hypervisor-agnostic. VMware, Proxmox and bare metal all run the same `00`/`01`/`02`/`03`, and that is what makes the Proxmox work cheap.
 - Preserve compatibility with the existing `packertron-vms` workflows.
 - Prefer small, reviewable changes over complete rewrites.
@@ -138,6 +139,33 @@ The two contexts want opposite things, so keep them apart.
 - Use descriptive function and variable names.
 - Keep functions focused on one responsibility.
 - Preserve the current formatting style unless a formatting refactor is explicitly requested.
+
+## PowerShell Standards
+
+The Windows scripts run unattended inside a build, half an hour in, where a failure is expensive to reach. What the Windows templates learned:
+
+- Start every script with `Set-StrictMode -Version Latest`, `$ErrorActionPreference = 'Stop'` and `$ProgressPreference = 'SilentlyContinue'`.
+- Hold every script to zero PSScriptAnalyzer findings: `scripts/check-templates.sh powershell`.
+- Do not `Write-Output` inside a function whose return value is used: the message becomes part of that value. Print status from the caller instead.
+- Check `$LASTEXITCODE` after every native command, and accept only documented success codes - name each one, such as `3010` for "installed, reboot required", in a comment.
+- Verify every downloaded installer before running it: a pinned or published SHA-256, and an Authenticode signature from the expected publisher.
+- Client Windows defaults to the `Restricted` execution policy: start PowerShell with `-ExecutionPolicy Bypass` wherever a script launches another.
+- Never reset the network inside a Packer provisioner - the SSH session drops and Packer reports `exit status 2300218`. Driver installs that reset a NIC run at first logon.
+- Generalize inside the last provisioner, with `sysprep /quit`, and refuse a pending reboot first.
+
+## Packer Standards
+
+- Every template sets `required_version` and bounds every plugin below its next major release. A one-number pessimistic constraint such as `~> 1` bounds nothing - the major itself may rise - so write `~> 2.1` or an explicit range. Pin a third-party plugin exactly.
+- Pin every ISO: a literal `sha256:` or the distribution's signed `SHA256SUMS`. Packer skips the check for a staged `iso_file`, so `scripts/proxmox/stage-isos.sh` does it.
+- Secrets come from the environment as `PKR_VAR_*` and are declared `sensitive`. Node settings live in the gitignored `templates/proxmox/proxmox.pkrvars.hcl`; every Proxmox template declares each variable that file sets, so it sets no undeclared one.
+- Commit nothing that belongs to one person in a seed: the SSH key is an `@SSH_AUTHORIZED_KEY@` placeholder that `http_content` replaces from `ssh_authorized_key`.
+- Keep the templates of one family identical except for their values, so diffing two shows only what differs.
+
+## OpenTofu Standards
+
+- Run `tofu fmt`, and commit `.terraform.lock.hcl`: it pins each provider to its checksums.
+- The token, the clone password and the state passphrase come from the environment - `PROXMOX_VE_API_TOKEN`, `TF_VAR_password`, `TF_VAR_state_passphrase` - never a tfvars file. State is encrypted and never committed, with one state per tfvars.
+- Give every new `vms` field an `optional()` default that reproduces the previous behaviour, so existing entries and VMs are unchanged, and reject a combination that cannot work with a `validation` block at plan time.
 
 ## Error Handling
 
