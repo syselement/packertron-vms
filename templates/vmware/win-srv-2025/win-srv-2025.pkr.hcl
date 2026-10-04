@@ -22,6 +22,11 @@ packer {
       source  = "github.com/hashicorp/vagrant"
       version = "~> 1.1"
     }
+    # Pinned exactly: third-party, and it runs as SYSTEM on the build VM.
+    windows-update = {
+      version = "0.18.5"
+      source  = "github.com/rgl/windows-update"
+    }
   }
 }
 
@@ -119,7 +124,9 @@ source "vmware-iso" "winsrv2025" {
 }
 
 
-# Build block
+# The same chain as the Proxmox Windows templates, with VMware Tools in place
+# of the virtio drivers and no cloudbase-init: settings, the update loop, a
+# servicing check, then cleanup and sysprep in the last provisioner.
 build {
   sources = ["source.vmware-iso.winsrv2025"]
 
@@ -129,8 +136,13 @@ build {
     scripts      = ["${path.root}/../../../scripts/windows/01_vmware_tools.ps1"]
   }
 
-  # Copy unattend.xml to the VM for the final sysprep shutdown step in the
-  # packer_shutdown.bat script
+  # Machine-wide settings: Edge, diagnostic data, power plan, password expiry.
+  provisioner "powershell" {
+    scripts = ["${path.root}/../../../scripts/windows/09_system_settings.ps1"]
+  }
+
+  # The answer file 12_sysprep.ps1 generalizes with; its first logon runs the
+  # startup scripts below.
   provisioner "file" {
     source      = "config/unattend.xml"
     destination = "C:/Windows/Panther/unattend.xml"
@@ -152,32 +164,39 @@ build {
     destination = "c:/tmp/startup.ps1"
   }
 
+  # VMware Tools asked for one with REBOOT=R.
   provisioner "windows-restart" {
     restart_timeout = "30m"
   }
 
-  # First round of Windows Updates
-  provisioner "powershell" {
-    scripts = ["${path.root}/../../../scripts/windows/02_win_updates.ps1"]
-  }
-
-  provisioner "windows-restart" {
+  # Installs, restarts and searches again until nothing is left, restarting
+  # again while a reboot is still pending - a cumulative update's second stage
+  # is one. A download that fails is retried, then fails the build.
+  provisioner "windows-update" {
+    filters = [
+      "exclude:$_.Title -like '*Preview*'",
+      # The plugin's own templates exclude the Defender platform update: it can
+      # stay applicable after installing and repeat the loop forever. Defender
+      # updates its platform itself.
+      "exclude:$_.Title -like '*KB5007651*'",
+      "include:$true",
+    ]
     restart_timeout = "30m"
   }
 
-  # Second round of Windows Updates
+  # A last check before sysprep; 12_sysprep.ps1 also refuses a pending reboot.
   provisioner "powershell" {
-    scripts = ["${path.root}/../../../scripts/windows/02_win_updates.ps1"]
+    scripts = ["${path.root}/../../../scripts/windows/10_wait_for_servicing.ps1"]
   }
 
-  provisioner "windows-restart" {
-    restart_timeout = "30m"
-  }
-
-  # Final cleanup before packaging the box
+  # Must run last. The box has no cloudbase-init for sysprep to check for;
+  # shutdown_command then blocks SSH and shuts the generalized image down.
   provisioner "powershell" {
-    pause_before = "1m0s"
-    scripts      = ["${path.root}/../../../scripts/windows/03_cleanup.ps1"]
+    environment_vars = ["PACKERTRON_CLOUDBASE_INIT=false"]
+    scripts = [
+      "${path.root}/../../../scripts/windows/03_cleanup.ps1",
+      "${path.root}/../../../scripts/windows/12_sysprep.ps1"
+    ]
   }
 
   post-processor "vagrant" {
