@@ -5,7 +5,7 @@ Standards for this repository: Packer templates under `templates/`, the guest pr
 ## Scope
 
 - Everything in the repository is in play, and everything clears the same bar.
-- `scripts/ubuntu/` is the mature part - 187 Bats tests, ShellCheck, shfmt - and is checked by `.github/workflows/ubuntu-static-checks.yml`. Treat it as known-good: do not refactor it as a side effect of another task.
+- `scripts/ubuntu/` is the mature part - a Bats suite, ShellCheck, shfmt - and is checked by `.github/workflows/ubuntu-static-checks.yml`. Treat it as known-good: do not refactor it as a side effect of another task.
 - Packer HCL and cloud-init seeds are checked by `.github/workflows/template-checks.yml`. Run `scripts/check-templates.sh` before committing, which runs those same checks locally, plus the CI-matrix and shell-lint checks CI cannot express itself.
 - `scripts/install-requirements.sh` reports the host tooling those checks need, and installs it when asked. It reports by default and changes nothing, so it is safe to run during an audit. `scripts/install-requirements.ps1` is the Windows equivalent for the VMware path.
 - Keep the guest-provisioning scripts hypervisor-agnostic. VMware, Proxmox and bare metal all run the same `00`/`01`/`02`/`03`, and that is what makes the Proxmox work cheap.
@@ -180,7 +180,7 @@ die() {
 
 ## Privilege Handling
 
-- Do not run Codex itself with `sudo`.
+- Do not run the coding agent itself with `sudo`.
 - Do not execute complete provisioning scripts on the development workstation.
 - Validation commands must not modify the host system.
 - Use `sudo` only for commands that require elevated privileges.
@@ -501,7 +501,7 @@ Report findings with:
 - impact
 - recommended fix
 
-## Codex Working Rules
+## Agent Working Rules
 
 - Begin with an audit when the requested scope is broad.
 - Do not modify files during an audit unless explicitly asked.
