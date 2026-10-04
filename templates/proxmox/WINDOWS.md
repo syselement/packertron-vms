@@ -76,7 +76,7 @@ For media that is not an evaluation ISO, set `image_index` to the edition you wa
 
 ## The build
 
-```
+```text
 Windows setup     virtio drivers in WinPE, disk layout, Administrator, one autologon, dark mode, Explorer view
 first logon       00_firstlogon.ps1: virtio-win guest tools (with the QEMU guest agent), RDP, OpenSSH Server
 provisioner       09_system_settings.ps1      Edge first run off, diagnostic data lowest, High performance, password never expires
@@ -137,6 +137,20 @@ Ludus and eaksel/packer-Win2022, the two references this was checked against, bo
 | A provisioner fails with `exit status 2300218` | Packer lost the SSH session mid-script: something in it reset the network |
 | `12_sysprep.ps1` fails | the lines it prints from `setuperr.log`; an AppX package installed for one user is the usual cause |
 | A Server clone ignores the password, and only the SSH key works | Server's complexity rule refused it; see [`win-srv-2025/README.md`](win-srv-2025/README.md) |
+
+## Evaluation period
+
+The templates install evaluation editions, and a clone's evaluation runs for 180 days. Reset it on the clone instead of rebuilding - the remaining rearm count in `/dlv` says how many resets are left:
+
+```bash
+# days left and rearms left
+ssh syselement@<address> 'cscript //nologo C:\Windows\System32\slmgr.vbs /dlv'
+# restart the evaluation clock; it takes effect after the restart
+ssh syselement@<address> 'cscript //nologo C:\Windows\System32\slmgr.vbs /rearm'
+ssh syselement@<address> 'shutdown /r /t 5'
+```
+
+On Server 2025 the account is `Administrator@`.
 
 ## Check a clone after a template change
 
