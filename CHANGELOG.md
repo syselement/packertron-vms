@@ -1,3 +1,12 @@
+# [0.82.0](https://github.com/syselement/packertron-vms/compare/v0.81.0...v0.82.0) (2026-10-04)
+
+
+### Features
+
+* add GitHub CLI support and update Ubuntu ISO references to 24.04.5 ([d05631f](https://github.com/syselement/packertron-vms/commit/d05631fc4c4fd8db7f3a9b314c402ea00f8ebf05))
+
+
+
 # [0.81.0](https://github.com/syselement/packertron-vms/compare/v0.80.0...v0.81.0) (2026-10-03)
 
 
@@ -44,15 +53,6 @@
 ### Features
 
 * enhance deployment documentation and examples for VM provisioning ([283d1ef](https://github.com/syselement/packertron-vms/commit/283d1ef189287fb8067b82ecd2116d6b7a54b4c2))
-
-
-
-# [0.77.0](https://github.com/syselement/packertron-vms/compare/v0.76.0...v0.77.0) (2026-09-23)
-
-
-### Features
-
-* **proxmox:** add task timeout for image conversion in Kali and Ubuntu templates ([d6069fa](https://github.com/syselement/packertron-vms/commit/d6069fad52ec6f6d4f7555d811f3d235421e447c))
 
 
 
