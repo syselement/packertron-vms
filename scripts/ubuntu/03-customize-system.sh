@@ -88,6 +88,7 @@ readonly -a COMMON_PACKAGES=(
     fio
     fontconfig
     gdu
+    gh
     git
     gping
     grc
@@ -569,6 +570,31 @@ validate_openpgp_key() {
     if [[ -n "$expected_fingerprint" && "$fingerprint" != "$expected_fingerprint" ]]; then
         die "unexpected ${description} signing-key fingerprint: ${fingerprint}"
     fi
+}
+
+# Every primary key in a keyring must be one of the expected fingerprints. A
+# vendor keyring can carry several keys across a rotation, and checking only
+# the first one would let any key appended after it sign the repository.
+validate_openpgp_keyring() {
+    local description="$2"
+    local expected
+    local fingerprint
+    local key_file="$1"
+    local -a fingerprints=()
+
+    shift 2
+    mapfile -t fingerprints < <(
+        gpg --batch --show-keys --with-colons "$key_file" 2>/dev/null |
+            awk -F: '$1 == "pub" { primary = 1; next } $1 == "fpr" && primary { print toupper($10); primary = 0 }'
+    )
+    ((${#fingerprints[@]} > 0)) || die "invalid ${description} signing key"
+
+    for fingerprint in "${fingerprints[@]}"; do
+        for expected in "$@"; do
+            [[ "$fingerprint" == "${expected^^}" ]] && continue 2
+        done
+        die "unexpected ${description} signing-key fingerprint: ${fingerprint}"
+    done
 }
 
 dearmor_openpgp_key() {
@@ -3054,6 +3080,12 @@ show_manual_setup_hints() {
     manual_command "labctl auth login"
     manual_line "Documentation: https://github.com/iximiuz/labctl"
 
+    manual_step "$((instruction_number += 1)). GitHub CLI (gh)"
+    manual_line "Sign in to GitHub, then verify the session:"
+    manual_command "gh auth login"
+    manual_command "gh auth status"
+    manual_line "Documentation: https://cli.github.com/manual/gh_auth_login"
+
     if [[ "$UBUNTU_VARIANT" == "desktop" ]]; then
         manual_step "$((instruction_number += 1)). cv4pve-vdi (Proxmox VE VDI client)"
         manual_line "On a Proxmox node, create a dedicated user limited to opening and powering VMs:"
@@ -3159,6 +3191,7 @@ main() {
     info "ensuring common repositories"
     ensure_fastfetch_ppa
     apply_repository_setup ensure_docker_ctop_repository
+    apply_repository_setup ensure_github_cli_repository
     apply_repository_setup ensure_helm_repository
     apply_repository_setup ensure_syncthing_repository
     apply_repository_setup ensure_tailscale_repository

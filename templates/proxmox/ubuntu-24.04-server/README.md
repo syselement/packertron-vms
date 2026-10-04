@@ -6,15 +6,15 @@ Builds an Ubuntu Server 24.04 LTS template on Proxmox VE from the official ISO, 
 
 ## Where the install media comes from
 
-By default the build uses the ISO already staged on the node, under its upstream name - `iso_file` defaults to `local:iso/ubuntu-24.04.4-live-server-amd64.iso`, the same file `var.iso` points at. Nothing is downloaded or uploaded.
+By default the build uses the ISO already staged on the node, under its upstream name - `iso_file` defaults to `local:iso/ubuntu-24.04.5-live-server-amd64.iso`, the same file `var.iso` points at. Nothing is downloaded or uploaded.
 
 **Packer does not check a staged ISO.** The plugin skips `iso_checksum` entirely once `iso_file` is set, so the pinned `SHA256SUMS` only protects the download path. Verify the file when you stage it, once:
 
 ```bash
 # on the node
 cd /var/lib/vz/template/iso
-wget https://releases.ubuntu.com/noble/ubuntu-24.04.4-live-server-amd64.iso
-sha256sum -c <(curl -sL https://releases.ubuntu.com/noble/SHA256SUMS | grep live-server-amd64)
+wget https://releases.ubuntu.com/noble/ubuntu-24.04.5-live-server-amd64.iso
+sha256sum -c <(curl -fsSL https://releases.ubuntu.com/noble/SHA256SUMS | grep -F " *ubuntu-24.04.5-live-server-amd64.iso")
 ```
 
 To let Packer download and verify it instead, pass `-var 'iso_file='`. It then checks the file against the distribution's signed `SHA256SUMS` and uploads it, though the plugin stores it under a SHA1 of the URL rather than its real name, and ignores `iso_target_path`; `iso_download_pve` would fix the name but needs the API token's role to carry `Sys.AccessNetwork`, which is a wider privilege than building a template should require. `iso_file` and `iso_url` are mutually exclusive, and an empty string counts as unset, so setting one switches the build off the other entirely.
