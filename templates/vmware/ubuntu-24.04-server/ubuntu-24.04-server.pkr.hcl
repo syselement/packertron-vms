@@ -16,7 +16,7 @@ packer {
   required_version = ">= 1.12.0"
   required_plugins {
     vmware = {
-      version = ">= 1.0.0"
+      version = "~> 1"
       source  = "github.com/hashicorp/vmware"
     }
   }
@@ -25,7 +25,7 @@ packer {
 variable "iso" {
   type        = string
   description = "A URL to the ISO file"
-  default     = "https://releases.ubuntu.com/noble/ubuntu-24.04.4-live-server-amd64.iso"
+  default     = "https://releases.ubuntu.com/noble/ubuntu-24.04.5-live-server-amd64.iso"
 }
 
 variable "checksum" {

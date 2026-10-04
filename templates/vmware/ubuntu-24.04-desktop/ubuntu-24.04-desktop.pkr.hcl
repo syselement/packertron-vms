@@ -12,6 +12,7 @@
 #   vagrant up
 
 packer {
+  required_version = ">= 1.12.0"
   required_plugins {
     vmware = {
       source  = "github.com/hashicorp/vmware"
@@ -33,13 +34,13 @@ variable "iso_checksum" {
 variable "iso_url" {
   type        = string
   description = "A URL to the ISO file"
-  default     = "https://releases.ubuntu.com/noble/ubuntu-24.04.4-desktop-amd64.iso"
+  default     = "https://releases.ubuntu.com/noble/ubuntu-24.04.5.1-desktop-amd64.iso"
 }
 
 variable "iso_fallback_url" {
   type        = string
   description = "Fallback URL used when iso_url points to a missing local file"
-  default     = "https://releases.ubuntu.com/noble/ubuntu-24.04.4-desktop-amd64.iso"
+  default     = "https://releases.ubuntu.com/noble/ubuntu-24.04.5.1-desktop-amd64.iso"
 }
 
 variable "output_dir" {
