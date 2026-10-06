@@ -2377,7 +2377,9 @@ alias alert='notify-send --urgency=low -i "$([ $? = 0 ] && echo terminal || echo
 '''
 
 if update_scope == "desktop-user":
-    updateos_alias = """alias updateos='sudo sh -c \"apt update && apt -y upgrade && apt -y autoremove && snap refresh && flatpak update -y\" && brew upgrade -y'"""
+    # Each package manager runs even when another fails. Flatpak updates the
+    # system and the user installation separately: root sees only the first.
+    updateos_alias = """alias updateos='sudo sh -c \"apt update && apt -y upgrade && apt -y autoremove\"; sudo snap refresh; sudo flatpak update --system -y; flatpak update --user -y; brew upgrade -y'"""
 elif update_scope == "system":
     updateos_alias = """alias updateos='sudo sh -c \"apt update && apt -y upgrade && apt -y autoremove\"'"""
 else:

@@ -2037,7 +2037,7 @@ ZED_INSTALLER
   configure_bash_for_user "$TARGET_USER"
   configure_bash_for_user root
 
-  grep -Fq 'snap refresh && flatpak update -y" && brew upgrade' "$target_home/.bash_aliases"
+  grep -Fq 'apt -y autoremove"; sudo snap refresh; sudo flatpak update --system -y; flatpak update --user -y; brew upgrade -y' "$target_home/.bash_aliases"
   grep -Fxq "alias vdi='cv4pve-vdi'" "$target_home/.bash_aliases"
   grep -Fq 'export PATH="$PATH:$HOME/.iximiuz/labctl/bin"' "$target_home/.bashrc"
   grep -Fq 'source <(labctl completion bash)' "$target_home/.bashrc"
