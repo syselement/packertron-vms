@@ -747,8 +747,9 @@ install_termix() (
     set -Eeuo pipefail
 
     local app_id="com.karmaa.termix"
+    local bundle_name="termix_linux_flatpak.flatpak"
     local installed_version=""
-    local release_tag release_version
+    local newest_tag release_tag release_version
     local temporary_dir
     local was_installed=false
 
@@ -768,12 +769,32 @@ install_termix() (
     trap 'rm -rf -- "$temporary_dir"' EXIT
 
     info "checking latest Termix GitHub release"
-    fetch_latest_github_release_metadata "Termix-SSH/Termix" "$temporary_dir/release.json" "Termix"
+    fetch_file "https://api.github.com/repos/Termix-SSH/Termix/releases?per_page=10" \
+        "$temporary_dir/releases.json" ||
+        die "failed downloading Termix release metadata"
+    # Termix publishes a release before its CI has uploaded the bundles, so for
+    # a while the newest release has no Flatpak. Take the newest stable release
+    # that has one; a later run picks up the new release once it is complete.
+    # shellcheck disable=SC2016 # $bundle is expanded by jq.
+    jq --arg bundle "$bundle_name" '
+        first(.[] | select(((.draft or .prerelease) | not) and
+            any(.assets[]; .name == $bundle and .state == "uploaded"))) // empty
+    ' "$temporary_dir/releases.json" >"$temporary_dir/release.json" ||
+        die "could not read the Termix release metadata"
+    [[ -s "$temporary_dir/release.json" ]] ||
+        die "no recent stable Termix release has ${bundle_name}"
+    newest_tag="$(
+        jq -r '[.[] | select((.draft or .prerelease) | not)][0].tag_name // empty' \
+            "$temporary_dir/releases.json"
+    )" || die "could not read the Termix release metadata"
     release_tag="$(jq -r '.tag_name // empty' "$temporary_dir/release.json")"
     release_version="${release_tag#release-}"
     release_version="${release_version%-tag}"
     [[ "$release_tag" == release-* && "$release_version" =~ ^[0-9]+(\.[0-9]+)+$ ]] ||
         die "unexpected Termix release tag: ${release_tag:-missing}"
+    if [[ "$newest_tag" != "$release_tag" ]]; then
+        info "Termix ${newest_tag} has no Flatpak bundle yet; using ${release_tag}"
+    fi
 
     if run_as_target_user flatpak info --user "$app_id" >/dev/null 2>&1; then
         was_installed=true
@@ -791,7 +812,7 @@ install_termix() (
     info "downloading Termix Flatpak bundle"
     fetch_github_asset_from_metadata \
         "exact" \
-        "termix_linux_flatpak.flatpak" \
+        "$bundle_name" \
         "$temporary_dir/termix.flatpak" \
         "$temporary_dir/release.json" \
         "Termix Flatpak bundle"

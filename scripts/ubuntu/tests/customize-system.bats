@@ -2981,8 +2981,23 @@ EOF
     "$@"
   }
   fetch_file() {
-    if [[ "$1" == *"/releases/latest" ]]; then
-      printf '{"tag_name":"release-2.6.0-tag","assets":[]}\n' >"$2"
+    if [[ "$1" == *"/releases?per_page="* ]]; then
+      cat >"$2" <<'EOF'
+[
+  {
+    "tag_name": "release-2.6.0-tag",
+    "draft": false,
+    "prerelease": false,
+    "assets": [
+      {
+        "name": "termix_linux_flatpak.flatpak",
+        "state": "uploaded",
+        "browser_download_url": "https://github.com/Termix-SSH/Termix/releases/download/test/termix_linux_flatpak.flatpak"
+      }
+    ]
+  }
+]
+EOF
       return
     fi
     printf 'unexpected Termix bundle download\n' >&2
@@ -3025,18 +3040,23 @@ EOF
     "$@"
   }
   fetch_file() {
-    if [[ "$1" == *"/releases/latest" ]]; then
+    if [[ "$1" == *"/releases?per_page="* ]]; then
       cat >"$2" <<'EOF'
-{
-  "tag_name": "release-2.6.0-tag",
-  "assets": [
-    {
-      "name": "termix_linux_flatpak.flatpak",
-      "browser_download_url": "https://github.com/Termix-SSH/Termix/releases/download/test/termix_linux_flatpak.flatpak",
-      "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-    }
-  ]
-}
+[
+  {
+    "tag_name": "release-2.6.0-tag",
+    "draft": false,
+    "prerelease": false,
+    "assets": [
+      {
+        "name": "termix_linux_flatpak.flatpak",
+        "state": "uploaded",
+        "browser_download_url": "https://github.com/Termix-SSH/Termix/releases/download/test/termix_linux_flatpak.flatpak",
+        "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      }
+    ]
+  }
+]
 EOF
     else
       printf 'test Flatpak bundle\n' >"$2"
@@ -3085,18 +3105,23 @@ EOF
     "$@"
   }
   fetch_file() {
-    if [[ "$1" == *"/releases/latest" ]]; then
+    if [[ "$1" == *"/releases?per_page="* ]]; then
       cat >"$2" <<'EOF'
-{
-  "tag_name": "release-2.6.0-tag",
-  "assets": [
-    {
-      "name": "termix_linux_flatpak.flatpak",
-      "browser_download_url": "https://github.com/Termix-SSH/Termix/releases/download/test/termix_linux_flatpak.flatpak",
-      "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-    }
-  ]
-}
+[
+  {
+    "tag_name": "release-2.6.0-tag",
+    "draft": false,
+    "prerelease": false,
+    "assets": [
+      {
+        "name": "termix_linux_flatpak.flatpak",
+        "state": "uploaded",
+        "browser_download_url": "https://github.com/Termix-SSH/Termix/releases/download/test/termix_linux_flatpak.flatpak",
+        "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      }
+    ]
+  }
+]
 EOF
     else
       printf 'test Flatpak bundle\n' >"$2"
@@ -3112,6 +3137,115 @@ EOF
   [[ "$output" == *"Termix Flatpak 2.6.0 installed for testuser"* ]]
   grep -Fq 'install --user --noninteractive --or-update -y' "$command_record"
   ! grep -Fq -- '--show-ref' "$command_record"
+}
+
+@test "Termix uses the newest release whose Flatpak bundle has finished uploading" {
+  local command_record="$BATS_TEST_TMPDIR/termix-upload-command-record"
+  local installed_marker="$BATS_TEST_TMPDIR/termix-upload-installed"
+
+  ARCH="amd64"
+  TARGET_USER="testuser"
+
+  flatpak() {
+    printf '%s\n' "$*" >>"$command_record"
+    case "$1" in
+      info)
+        [[ -e "$installed_marker" ]] || return 1
+        ;;
+      list)
+        [[ -e "$installed_marker" ]] || return 1
+        printf 'com.karmaa.termix\t2.6.0\n'
+        ;;
+      install)
+        touch "$installed_marker"
+        ;;
+      *)
+        return 2
+        ;;
+    esac
+  }
+  run_as_target_user() {
+    "$@"
+  }
+  fetch_file() {
+    printf '%s\n' "$1" >>"$command_record"
+    if [[ "$1" == *"/releases?per_page="* ]]; then
+      cat >"$2" <<'EOF'
+[
+  {
+    "tag_name": "beta",
+    "draft": false,
+    "prerelease": true,
+    "assets": [
+      {
+        "name": "termix_linux_flatpak.flatpak",
+        "state": "uploaded",
+        "browser_download_url": "https://github.com/Termix-SSH/Termix/releases/download/beta/termix_linux_flatpak.flatpak"
+      }
+    ]
+  },
+  {
+    "tag_name": "release-2.7.0-tag",
+    "draft": false,
+    "prerelease": false,
+    "assets": [
+      {
+        "name": "termix_linux_flatpak.flatpak",
+        "state": "starter",
+        "browser_download_url": "https://github.com/Termix-SSH/Termix/releases/download/release-2.7.0-tag/termix_linux_flatpak.flatpak"
+      }
+    ]
+  },
+  {
+    "tag_name": "release-2.6.0-tag",
+    "draft": false,
+    "prerelease": false,
+    "assets": [
+      {
+        "name": "termix_linux_flatpak.flatpak",
+        "state": "uploaded",
+        "browser_download_url": "https://github.com/Termix-SSH/Termix/releases/download/release-2.6.0-tag/termix_linux_flatpak.flatpak"
+      }
+    ]
+  }
+]
+EOF
+    else
+      printf 'test Flatpak bundle\n' >"$2"
+    fi
+  }
+  verify_github_asset_digest() {
+    return 0
+  }
+
+  run install_termix
+
+  [[ "$status" -eq 0 ]]
+  [[ "$output" == *"Termix release-2.7.0-tag has no Flatpak bundle yet; using release-2.6.0-tag"* ]]
+  [[ "$output" == *"Termix Flatpak 2.6.0 installed for testuser"* ]]
+  grep -Fq 'release-2.6.0-tag/termix_linux_flatpak.flatpak' "$command_record"
+  ! grep -Fq 'release-2.7.0-tag/termix_linux_flatpak.flatpak' "$command_record"
+  ! grep -Fq 'beta/termix_linux_flatpak.flatpak' "$command_record"
+}
+
+@test "Termix fails clearly when no recent release has a Flatpak bundle" {
+  ARCH="amd64"
+  TARGET_USER="testuser"
+
+  flatpak() {
+    return 1
+  }
+  run_as_target_user() {
+    "$@"
+  }
+  fetch_file() {
+    printf '[{"tag_name":"release-2.7.0-tag","draft":false,"prerelease":false,"assets":[]}]\n' >"$2"
+  }
+
+  run install_termix
+
+  [[ "$status" -ne 0 ]]
+  [[ "$output" == *"no recent stable Termix release has termix_linux_flatpak.flatpak"* ]]
 }
 
 @test "current Typora Themeable release repairs directory ownership before skipping download" {
