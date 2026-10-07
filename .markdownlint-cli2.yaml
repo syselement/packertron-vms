@@ -15,6 +15,9 @@ config:
   MD024:
     siblings_only: true
 
+# Skip what git ignores, such as the providers OpenTofu downloads.
+gitignore: true
+
 # Written by the release workflow, not by hand.
 ignores:
   - CHANGELOG.md

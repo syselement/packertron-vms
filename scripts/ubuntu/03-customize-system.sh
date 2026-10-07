@@ -142,6 +142,8 @@ readonly -a KUBERNETES_APT_PACKAGES=(
 
 readonly -a HOMEBREW_PACKAGES=(
     derailed/k9s/k9s
+    markdownlint-cli2
+    nklmilojevic/sofka/sofka
 )
 
 readonly -a DESKTOP_PACKAGES=(

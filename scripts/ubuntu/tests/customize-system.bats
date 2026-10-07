@@ -207,6 +207,8 @@ setup() {
   [[ " ${KUBERNETES_APT_PACKAGES[*]} " == *" helm "* ]]
   [[ " ${KUBERNETES_APT_PACKAGES[*]} " == *" kubectx "* ]]
   [[ " ${HOMEBREW_PACKAGES[*]} " == *" derailed/k9s/k9s "* ]]
+  [[ " ${HOMEBREW_PACKAGES[*]} " == *" markdownlint-cli2 "* ]]
+  [[ " ${HOMEBREW_PACKAGES[*]} " == *" nklmilojevic/sofka/sofka "* ]]
   [[ " ${COMMON_PACKAGES[*]} " == *" syncthing "* ]]
   [[ " ${COMMON_PACKAGES[*]} " == *" tailscale "* ]]
   [[ " ${COMMON_PACKAGES[*]} " != *" rdap "* ]]
