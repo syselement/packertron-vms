@@ -505,6 +505,8 @@ For each task:
 - summarize validation performed
 - disclose assumptions and untested behavior
 - do not commit changes unless explicitly requested
+- keep commit messages concise: a short Conventional Commits subject, and a body only when the reason is not obvious from the diff
+- do not add `Co-Authored-By`, "Generated with" or any other agent or tool attribution to commit messages or pull request descriptions
 - do not push branches or tags unless explicitly requested
 
 ## Review Priorities
