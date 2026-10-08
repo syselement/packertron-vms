@@ -78,6 +78,7 @@ readonly -a COMMON_PACKAGES=(
     bats
     btop
     build-essential
+    cloud-init
     cockpit
     docker-ctop
     duf
@@ -99,6 +100,7 @@ readonly -a COMMON_PACKAGES=(
     ipcalc
     iperf3
     jq
+    libxml2-utils
     lm-sensors
     nano
     net-tools
@@ -128,11 +130,20 @@ readonly -a COMMON_PACKAGES=(
     wget
     whois
     wireguard
+    xorriso
+    yamllint
     zsh
 )
 
 readonly -a RELEASE_OPTIONAL_PACKAGES=(
     rdap
+)
+
+# From the HashiCorp and OpenTofu repositories, which are configured on amd64
+# only.
+readonly -a IAC_APT_PACKAGES=(
+    packer
+    tofu
 )
 
 readonly -a KUBERNETES_APT_PACKAGES=(
@@ -141,9 +152,12 @@ readonly -a KUBERNETES_APT_PACKAGES=(
 )
 
 readonly -a HOMEBREW_PACKAGES=(
+    actionlint
     derailed/k9s/k9s
+    gitleaks
     markdownlint-cli2
     nklmilojevic/sofka/sofka
+    zizmor
 )
 
 readonly -a DESKTOP_PACKAGES=(
@@ -3196,7 +3210,9 @@ main() {
     ensure_fastfetch_ppa
     apply_repository_setup ensure_docker_ctop_repository
     apply_repository_setup ensure_github_cli_repository
+    apply_repository_setup ensure_hashicorp_repository
     apply_repository_setup ensure_helm_repository
+    apply_repository_setup ensure_opentofu_repository
     apply_repository_setup ensure_syncthing_repository
     apply_repository_setup ensure_tailscale_repository
 
@@ -3229,11 +3245,13 @@ main() {
     section "Packages"
     install_package_array "common" "${COMMON_PACKAGES[@]}"
     install_available_package_array "release-optional" "${RELEASE_OPTIONAL_PACKAGES[@]}"
+    install_available_package_array "infrastructure-as-code" "${IAC_APT_PACKAGES[@]}"
     install_package_array "Kubernetes" "${KUBERNETES_APT_PACKAGES[@]}"
     install_kubectl
     configure_cockpit_socket
     configure_syncthing_service
     install_pandoc
+    install_powershell
     if [[ "$UBUNTU_VARIANT" == "desktop" ]]; then
         install_available_package_array "Desktop" "${DESKTOP_PACKAGES[@]}"
         configure_flathub
@@ -3274,6 +3292,7 @@ main() {
         configure_starship_for_user "$account"
     done
     install_tldr_pipx
+    install_psscriptanalyzer_for_user
     configure_git_for_user "$USER_NAME"
     install_homebrew_for_user
     install_homebrew_package_array "managed" "${HOMEBREW_PACKAGES[@]}"

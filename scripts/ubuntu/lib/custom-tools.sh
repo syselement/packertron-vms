@@ -345,6 +345,143 @@ EOF
     [[ "$changed" == false ]] || return "$APT_SOURCES_CHANGED_STATUS"
 )
 
+# The fingerprint is the repository key HashiCorp's security page lists since
+# its 2026 rotation. HashiCorp adds a suite for a new Ubuntu release weeks
+# after it ships; until then the newest LTS suite serves the same packages.
+ensure_hashicorp_repository() (
+    set -Eeuo pipefail
+
+    local changed=false
+    local key_file="${SYSTEM_KEYRING_DIR}/hashicorp-archive-keyring.gpg"
+    # The name HashiCorp's own instructions use, so a hand-made entry is
+    # replaced rather than duplicated.
+    local source_file="${APT_SOURCES_DIR}/hashicorp.list"
+    local suite="$CODENAME"
+    local temporary_dir
+
+    if [[ "$ARCH" != "amd64" ]]; then
+        warn "HashiCorp repository is not configured for ${ARCH}; skipping"
+        return 0
+    fi
+
+    temporary_dir="$(mktemp -d)"
+    trap 'rm -rf -- "$temporary_dir"' EXIT
+
+    fetch_file "https://apt.releases.hashicorp.com/gpg" "$temporary_dir/hashicorp.asc" ||
+        die "failed downloading the HashiCorp repository signing key"
+    dearmor_openpgp_key "$temporary_dir/hashicorp.asc" "$temporary_dir/hashicorp.gpg" "HashiCorp"
+    validate_openpgp_keyring \
+        "$temporary_dir/hashicorp.gpg" \
+        "HashiCorp" \
+        "D55C0D1AC78A8D8126CB631CFC9CA96ACA026560"
+
+    if ! fetch_file \
+        "https://apt.releases.hashicorp.com/dists/${suite}/Release" \
+        "$temporary_dir/Release" 2>/dev/null; then
+        warn "HashiCorp repository has no ${suite} suite yet; using noble"
+        suite="noble"
+    fi
+
+    cat >"$temporary_dir/hashicorp.list" <<EOF
+deb [arch=amd64 signed-by=${key_file}] https://apt.releases.hashicorp.com ${suite} main
+EOF
+    validate_repository_source \
+        "$temporary_dir/hashicorp.list" \
+        "https://apt.releases.hashicorp.com" \
+        "$key_file"
+
+    if write_file_if_changed "$temporary_dir/hashicorp.gpg" "$key_file"; then
+        changed=true
+        ok "installed HashiCorp repository signing key"
+    else
+        info "HashiCorp repository signing key already current"
+    fi
+    if write_file_if_changed "$temporary_dir/hashicorp.list" "$source_file"; then
+        changed=true
+        ok "configured HashiCorp repository"
+    else
+        info "HashiCorp repository already configured"
+    fi
+
+    [[ "$changed" == false ]] || return "$APT_SOURCES_CHANGED_STATUS"
+)
+
+# OpenTofu signs its packages with one key and the repository with another,
+# and publishes no fingerprints: these are the keys its install page served
+# in October 2026. A rotation fails here loudly rather than being trusted.
+ensure_opentofu_repository() (
+    set -Eeuo pipefail
+
+    local changed=false
+    local package_key_file="${SYSTEM_KEYRING_DIR}/opentofu.gpg"
+    local repository_key_file="${SYSTEM_KEYRING_DIR}/opentofu-repo.gpg"
+    # The name OpenTofu's own instructions use, so a hand-made entry is
+    # replaced rather than duplicated.
+    local source_file="${APT_SOURCES_DIR}/opentofu.list"
+    local temporary_dir
+
+    if [[ "$ARCH" != "amd64" ]]; then
+        warn "OpenTofu repository is not configured for ${ARCH}; skipping"
+        return 0
+    fi
+
+    temporary_dir="$(mktemp -d)"
+    trap 'rm -rf -- "$temporary_dir"' EXIT
+
+    # Served already dearmored.
+    fetch_file "https://get.opentofu.org/opentofu.gpg" "$temporary_dir/opentofu.gpg" ||
+        die "failed downloading the OpenTofu package signing key"
+    validate_openpgp_keyring \
+        "$temporary_dir/opentofu.gpg" \
+        "OpenTofu package" \
+        "E3E6E43D84CB852EADB0051D0C0AF313E5FD9F80"
+    fetch_file \
+        "https://packages.opentofu.org/opentofu/tofu/gpgkey" \
+        "$temporary_dir/opentofu-repo.asc" ||
+        die "failed downloading the OpenTofu repository signing key"
+    dearmor_openpgp_key \
+        "$temporary_dir/opentofu-repo.asc" \
+        "$temporary_dir/opentofu-repo.gpg" \
+        "OpenTofu repository"
+    validate_openpgp_keyring \
+        "$temporary_dir/opentofu-repo.gpg" \
+        "OpenTofu repository" \
+        "F4AF70F66EAC4337EEECC97407D3DFCD4C61499F"
+
+    cat >"$temporary_dir/opentofu.list" <<EOF
+deb [arch=amd64 signed-by=${package_key_file},${repository_key_file}] https://packages.opentofu.org/opentofu/tofu/any/ any main
+EOF
+    validate_repository_source \
+        "$temporary_dir/opentofu.list" \
+        "https://packages.opentofu.org/opentofu/tofu/any/" \
+        "$package_key_file"
+    validate_repository_source \
+        "$temporary_dir/opentofu.list" \
+        "https://packages.opentofu.org/opentofu/tofu/any/" \
+        "$repository_key_file"
+
+    if write_file_if_changed "$temporary_dir/opentofu.gpg" "$package_key_file"; then
+        changed=true
+        ok "installed OpenTofu package signing key"
+    else
+        info "OpenTofu package signing key already current"
+    fi
+    if write_file_if_changed "$temporary_dir/opentofu-repo.gpg" "$repository_key_file"; then
+        changed=true
+        ok "installed OpenTofu repository signing key"
+    else
+        info "OpenTofu repository signing key already current"
+    fi
+    if write_file_if_changed "$temporary_dir/opentofu.list" "$source_file"; then
+        changed=true
+        ok "configured OpenTofu repository"
+    else
+        info "OpenTofu repository already configured"
+    fi
+
+    [[ "$changed" == false ]] || return "$APT_SOURCES_CHANGED_STATUS"
+)
+
 ensure_sublime_text_repository() (
     set -Eeuo pipefail
 
@@ -978,6 +1115,22 @@ install_latest_github_debian_package() (
         "${description} package"
     install_debian_package "$temporary_dir/package.deb" "$package_name" "$description"
 )
+
+# Microsoft's APT feed has no suite for a new Ubuntu release for months, and
+# the GitHub release .deb installs on any of them.
+install_powershell() {
+    if [[ "$ARCH" != "amd64" ]]; then
+        warn "PowerShell release installation is not configured for ${ARCH}; skipping"
+        return
+    fi
+
+    # The release also ships powershell-lts_ packages with the same suffix.
+    install_latest_github_debian_package \
+        "PowerShell/PowerShell" \
+        "powershell_{version}-1.deb_amd64.deb" \
+        "powershell" \
+        "PowerShell"
+}
 
 install_balena_etcher() {
     install_latest_github_debian_package \
@@ -2076,4 +2229,28 @@ install_tldr_pipx() {
     grep -Eq '^tldr[[:space:]]' <<<"$installed_packages" ||
         die "tldr installation could not be verified"
     ok "tldr installed via pipx"
+}
+
+# The linter scripts/check-templates.sh runs on the PowerShell scripts. A
+# PowerShell Gallery module, installed for the target user with the
+# PSResourceGet that ships with PowerShell 7.4 and later.
+install_psscriptanalyzer_for_user() {
+    local check_command='if (-not (Get-Module -ListAvailable -Name PSScriptAnalyzer)) { exit 1 }'
+
+    command -v pwsh >/dev/null 2>&1 ||
+        die "pwsh is required to install PSScriptAnalyzer"
+
+    if run_as_target_user pwsh -NoProfile -NonInteractive -Command "$check_command" >/dev/null 2>&1; then
+        info "PSScriptAnalyzer already installed for ${TARGET_USER}, skipping"
+        return
+    fi
+
+    info "installing PSScriptAnalyzer for ${TARGET_USER}"
+    run_quiet_command "PSScriptAnalyzer installation failed" \
+        run_as_target_user pwsh -NoProfile -NonInteractive -Command \
+        "\$ErrorActionPreference = 'Stop'; Install-PSResource -Name PSScriptAnalyzer -Repository PSGallery -Scope CurrentUser -TrustRepository -Quiet" ||
+        die "failed installing PSScriptAnalyzer"
+    run_as_target_user pwsh -NoProfile -NonInteractive -Command "$check_command" >/dev/null 2>&1 ||
+        die "PSScriptAnalyzer installation could not be verified"
+    ok "PSScriptAnalyzer installed for ${TARGET_USER}"
 }

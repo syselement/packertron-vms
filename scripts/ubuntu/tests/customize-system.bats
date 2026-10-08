@@ -209,6 +209,14 @@ setup() {
   [[ " ${HOMEBREW_PACKAGES[*]} " == *" derailed/k9s/k9s "* ]]
   [[ " ${HOMEBREW_PACKAGES[*]} " == *" markdownlint-cli2 "* ]]
   [[ " ${HOMEBREW_PACKAGES[*]} " == *" nklmilojevic/sofka/sofka "* ]]
+  local tool
+  for tool in actionlint gitleaks zizmor; do
+    [[ " ${HOMEBREW_PACKAGES[*]} " == *" ${tool} "* ]]
+  done
+  for tool in cloud-init libxml2-utils xorriso yamllint; do
+    [[ " ${COMMON_PACKAGES[*]} " == *" ${tool} "* ]]
+  done
+  [[ " ${IAC_APT_PACKAGES[*]} " == " packer tofu " ]]
   [[ " ${COMMON_PACKAGES[*]} " == *" syncthing "* ]]
   [[ " ${COMMON_PACKAGES[*]} " == *" tailscale "* ]]
   [[ " ${COMMON_PACKAGES[*]} " != *" rdap "* ]]
@@ -2492,13 +2500,13 @@ FAKE_BREW
       "$@"
   }
 
-  run install_homebrew_package_array "managed" "${HOMEBREW_PACKAGES[@]}"
+  run install_homebrew_package_array "managed" derailed/k9s/k9s
 
   [[ "$status" -eq 0 ]]
   [[ "$output" == *"Homebrew package derailed/k9s/k9s installed"* ]]
   [[ "$(<"$brew_record")" == "derailed/k9s/k9s" ]]
 
-  run install_homebrew_package_array "managed" "${HOMEBREW_PACKAGES[@]}"
+  run install_homebrew_package_array "managed" derailed/k9s/k9s
 
   [[ "$status" -eq 0 ]]
   [[ "$output" == *"Homebrew package derailed/k9s/k9s already installed, skipping"* ]]
@@ -2544,7 +2552,7 @@ FAKE_BREW
       "$@"
   }
 
-  run install_homebrew_package_array "managed" "${HOMEBREW_PACKAGES[@]}"
+  run install_homebrew_package_array "managed" derailed/k9s/k9s
 
   [[ "$status" -eq 0 ]]
   [[ "$output" == *"attempt 1 failed; retrying"* ]]
@@ -3625,6 +3633,157 @@ FAKE_INSTALLER
   [[ "$output" == *"GitHub CLI repository is not configured for arm64; skipping"* ]]
   [[ "$output" != *"downloaded"* ]]
   [[ ! -e "$APT_SOURCES_DIR/github-cli.list" ]]
+}
+
+@test "HashiCorp repository is repeatable and accepts only HashiCorp's published key" {
+  local validation_record="$BATS_TEST_TMPDIR/hashicorp-validation"
+  ARCH="amd64"
+  CODENAME="noble"
+
+  fetch_file() {
+    case "$1" in
+      https://apt.releases.hashicorp.com/gpg) printf 'HashiCorp test key\n' >"$2" ;;
+      https://apt.releases.hashicorp.com/dists/noble/Release) printf 'Suite: noble\n' >"$2" ;;
+      *) return 1 ;;
+    esac
+  }
+  dearmor_openpgp_key() {
+    cp "$1" "$2"
+  }
+  validate_openpgp_keyring() {
+    local IFS='|'
+    printf '%s\n' "${*:2}" >"$validation_record"
+  }
+
+  apply_repository_setup ensure_hashicorp_repository
+  [[ "$APT_SOURCES_CHANGED" == true ]]
+
+  APT_SOURCES_CHANGED=false
+  apply_repository_setup ensure_hashicorp_repository
+
+  [[ "$APT_SOURCES_CHANGED" == false ]]
+  [[ "$(<"$validation_record")" == 'HashiCorp|D55C0D1AC78A8D8126CB631CFC9CA96ACA026560' ]]
+  grep -Fqx \
+    "deb [arch=amd64 signed-by=${SYSTEM_KEYRING_DIR}/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com noble main" \
+    "$APT_SOURCES_DIR/hashicorp.list"
+}
+
+@test "HashiCorp repository falls back to noble before its suite for a new release exists" {
+  ARCH="amd64"
+  CODENAME="futurename"
+  printf 'deb [arch=amd64 signed-by=/etc/apt/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com futurename main\n' \
+    >"$APT_SOURCES_DIR/hashicorp.list"
+
+  fetch_file() {
+    [[ "$1" == https://apt.releases.hashicorp.com/gpg ]] || return 1
+    printf 'HashiCorp test key\n' >"$2"
+  }
+  dearmor_openpgp_key() {
+    cp "$1" "$2"
+  }
+  validate_openpgp_keyring() {
+    return 0
+  }
+
+  run apply_repository_setup ensure_hashicorp_repository
+
+  [[ "$status" -eq 0 ]]
+  [[ "$output" == *"HashiCorp repository has no futurename suite yet; using noble"* ]]
+  [[ "$(grep -c 'apt.releases.hashicorp.com' "$APT_SOURCES_DIR/hashicorp.list")" -eq 1 ]]
+  grep -Fq "signed-by=${SYSTEM_KEYRING_DIR}/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com noble main" \
+    "$APT_SOURCES_DIR/hashicorp.list"
+}
+
+@test "OpenTofu repository is repeatable and pins both of its keys" {
+  local validation_record="$BATS_TEST_TMPDIR/opentofu-validation"
+  ARCH="amd64"
+
+  fetch_file() {
+    case "$1" in
+      https://get.opentofu.org/opentofu.gpg) printf 'OpenTofu package key\n' >"$2" ;;
+      https://packages.opentofu.org/opentofu/tofu/gpgkey) printf 'OpenTofu repository key\n' >"$2" ;;
+      *) return 1 ;;
+    esac
+  }
+  dearmor_openpgp_key() {
+    cp "$1" "$2"
+  }
+  validate_openpgp_keyring() {
+    local IFS='|'
+    printf '%s\n' "${*:2}" >>"$validation_record"
+  }
+
+  apply_repository_setup ensure_opentofu_repository
+  [[ "$APT_SOURCES_CHANGED" == true ]]
+
+  APT_SOURCES_CHANGED=false
+  rm -f "$validation_record"
+  apply_repository_setup ensure_opentofu_repository
+
+  [[ "$APT_SOURCES_CHANGED" == false ]]
+  grep -Fqx 'OpenTofu package|E3E6E43D84CB852EADB0051D0C0AF313E5FD9F80' "$validation_record"
+  grep -Fqx 'OpenTofu repository|F4AF70F66EAC4337EEECC97407D3DFCD4C61499F' "$validation_record"
+  grep -Fqx \
+    "deb [arch=amd64 signed-by=${SYSTEM_KEYRING_DIR}/opentofu.gpg,${SYSTEM_KEYRING_DIR}/opentofu-repo.gpg] https://packages.opentofu.org/opentofu/tofu/any/ any main" \
+    "$APT_SOURCES_DIR/opentofu.list"
+}
+
+@test "HashiCorp and OpenTofu repositories are skipped on a non-amd64 architecture" {
+  ARCH="arm64"
+
+  fetch_file() {
+    printf 'downloaded\n' >&2
+    return 1
+  }
+
+  run apply_repository_setup ensure_hashicorp_repository
+  [[ "$status" -eq 0 ]]
+  [[ "$output" == *"HashiCorp repository is not configured for arm64; skipping"* ]]
+  run apply_repository_setup ensure_opentofu_repository
+  [[ "$status" -eq 0 ]]
+  [[ "$output" == *"OpenTofu repository is not configured for arm64; skipping"* ]]
+  [[ ! -e "$APT_SOURCES_DIR/hashicorp.list" && ! -e "$APT_SOURCES_DIR/opentofu.list" ]]
+}
+
+@test "PowerShell installs the stable amd64 release package, not the LTS one" {
+  local record="$BATS_TEST_TMPDIR/powershell-record"
+  ARCH="amd64"
+
+  install_latest_github_debian_package() {
+    printf '%s|' "$@" >"$record"
+  }
+
+  install_powershell
+
+  [[ "$(<"$record")" == 'PowerShell/PowerShell|powershell_{version}-1.deb_amd64.deb|powershell|PowerShell|' ]]
+}
+
+@test "PSScriptAnalyzer is installed once for the target user" {
+  local installed_marker="$BATS_TEST_TMPDIR/psscriptanalyzer-installed"
+  local command_record="$BATS_TEST_TMPDIR/pwsh-record"
+  TARGET_USER="testuser"
+
+  pwsh() {
+    printf '%s\n' "$*" >>"$command_record"
+    case "$*" in
+      *Install-PSResource*) touch "$installed_marker" ;;
+      *Get-Module*) [[ -e "$installed_marker" ]] ;;
+      *) return 2 ;;
+    esac
+  }
+  run_as_target_user() {
+    "$@"
+  }
+
+  run install_psscriptanalyzer_for_user
+  [[ "$status" -eq 0 ]]
+  [[ "$output" == *"PSScriptAnalyzer installed for testuser"* ]]
+  grep -Fq 'Install-PSResource -Name PSScriptAnalyzer -Repository PSGallery -Scope CurrentUser' "$command_record"
+
+  run install_psscriptanalyzer_for_user
+  [[ "$status" -eq 0 ]]
+  [[ "$output" == *"PSScriptAnalyzer already installed for testuser, skipping"* ]]
+  [[ "$(grep -c 'Install-PSResource' "$command_record")" -eq 1 ]]
 }
 
 @test "Typora repository removes its obsolete key and is repeatable" {

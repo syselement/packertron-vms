@@ -39,6 +39,8 @@ git config core.hooksPath .githooks         # optional: the fast ones before eac
 
 A linter the Ubuntu archive does not package - pwsh, actionlint, zizmor, markdownlint-cli2, gitleaks - is skipped where missing, and `install-requirements.sh` says where to get it. CI installs pinned versions and sets `CHECKS_REQUIRE_TOOLS=1`, which turns a missing tool into a failure.
 
+A machine provisioned by [`ubuntu/03-customize-system.sh`](ubuntu/README.md) already has every tool above.
+
 CI installs the latest Packer and OpenTofu on every run, so keep the local ones current too - `install-requirements.sh install` takes Packer from HashiCorp's APT repository.
 
 ## Pins
