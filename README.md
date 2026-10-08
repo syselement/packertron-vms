@@ -4,7 +4,7 @@
 
 [![syselement - packertron-vms](https://img.shields.io/static/v1?label=syselement&message=packertron-vms&color=blue&logo=github)](https://github.com/syselement/packertron-vms) [![stars - packertron-vms](https://img.shields.io/github/stars/syselement/packertron-vms?style=social)](https://github.com/syselement/packertron-vms) [![forks - packertron-vms](https://img.shields.io/github/forks/syselement/packertron-vms?style=social)](https://github.com/syselement/packertron-vms) [![License](https://img.shields.io/badge/License-MIT-orange)](#-license "Go to license section")
 
-[![Packer](https://img.shields.io/badge/Packer->=1.12.0-brightgreen?logo=packer)](https://developer.hashicorp.com/packer "Go to Packer homepage") [![OpenTofu](https://img.shields.io/badge/OpenTofu->=1.8.0-brightgreen?logo=opentofu)](https://opentofu.org "Go to OpenTofu homepage") [![Vagrant](https://img.shields.io/badge/Vagrant->=2.4.3-brightgreen?logo=vagrant)](https://developer.hashicorp.com/vagrant "Go to Vagrant homepage")
+[![Packer](https://img.shields.io/badge/Packer->=1.12.0-brightgreen?logo=packer)](https://developer.hashicorp.com/packer "Go to Packer homepage") [![OpenTofu](https://img.shields.io/badge/OpenTofu->=1.6.0-brightgreen?logo=opentofu)](https://opentofu.org "Go to OpenTofu homepage") [![Vagrant](https://img.shields.io/badge/Vagrant->=2.4.3-brightgreen?logo=vagrant)](https://developer.hashicorp.com/vagrant "Go to Vagrant homepage")
 
 Packer builds thin Proxmox VE templates from installer ISOs - Ubuntu, Kali and Windows - and OpenTofu clones them into VMs that provision themselves at first boot only when asked. The same Ubuntu provisioning scripts run on VMware Workstation images and on bare metal.
 
@@ -30,7 +30,7 @@ For VMware Workstation and Vagrant, start at [templates/vmware/README.md](templa
 | [templates/proxmox/LINUX.md](templates/proxmox/LINUX.md) | the Ubuntu and Kali templates: seed, SSH key, sealing |
 | [templates/proxmox/WINDOWS.md](templates/proxmox/WINDOWS.md) | the Windows templates: build chain, cloudbase-init, evaluation period |
 | [templates/vmware/README.md](templates/vmware/README.md) | VMware Workstation and Vagrant |
-| [deploy/README.md](deploy/README.md) | OpenTofu: VMs from templates, first-boot provisioning, state encryption |
+| [deploy/README.md](deploy/README.md) | OpenTofu: VMs from templates, first-boot provisioning, state |
 | [scripts/README.md](scripts/README.md) | the scripts and every check |
 | [scripts/ubuntu/README.md](scripts/ubuntu/README.md) | the Ubuntu provisioning chain, bare metal and autoinstall |
 | [SECURITY.md](SECURITY.md) | the credential model - read it before putting a VM on a network |

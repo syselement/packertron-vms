@@ -164,7 +164,7 @@ The Windows scripts run unattended inside a build, half an hour in, where a fail
 ## OpenTofu Standards
 
 - Run `tofu fmt`, and commit `.terraform.lock.hcl`: it pins each provider to its checksums.
-- The token, the clone password and the state passphrase come from the environment - `PROXMOX_VE_API_TOKEN`, `TF_VAR_password`, `TF_VAR_state_passphrase` - never a tfvars file. State is encrypted and never committed, with one state per tfvars.
+- The token and the clone password come from the environment - `PROXMOX_VE_API_TOKEN`, `TF_VAR_password` - never a tfvars file. State holds the password in plaintext and is never committed, with one state per tfvars.
 - Give every new `vms` field an `optional()` default that reproduces the previous behaviour, so existing entries and VMs are unchanged, and reject a combination that cannot work with a `validation` block at plan time.
 
 ## Error Handling

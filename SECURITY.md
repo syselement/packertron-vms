@@ -53,7 +53,7 @@ export PKR_VAR_ssh_password="..."
 - The middle row is not secret, but it describes one person's network, so it is not shared either.
 - `.gitignore` excludes `proxmox.pkrvars.hcl` and any `*.local.pkrvars.hcl`, along with `*.tfvars`, `.env`, `*.kdbx` and private keys.
 - Only `proxmox.pkrvars.hcl.example` is tracked.
-- `deploy/` state and saved plans hold the clone password, so they are encrypted with a key derived from `TF_VAR_state_passphrase`, and a plaintext state is refused - see [`deploy/README.md`](deploy/README.md#state-encryption).
+- `deploy/` state holds the clone password in plaintext: it is gitignored, and stays on the machine that applies, readable only by its owner - see [`deploy/README.md`](deploy/README.md#state).
 
 A token in the environment cannot be committed by a mistake in a `.gitignore` rule, which is why the split is drawn there rather than at "sensitive files".
 

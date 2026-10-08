@@ -3,12 +3,10 @@
 #   cp kali.tfvars.example kali-01.tfvars       # *.tfvars is gitignored
 #   tofu workspace new kali-01                  # its own state, beside the others
 #   export PROXMOX_VE_API_TOKEN='automation@pve!deploy=xxxxxxxx-...'
-#   export TF_VAR_state_passphrase='...'        # 16+ characters; encrypts the state
 #   export TF_VAR_password='...'                # REQUIRED: Xfce has no key login
 #   tofu apply -var-file=kali-01.tfvars
 #
-# THE API TOKEN DOES NOT BELONG HERE, and neither do the passphrase and the
-# password.
+# THE API TOKEN DOES NOT BELONG HERE, and neither does the password.
 
 proxmox_endpoint = "https://proxmox.example.lan:8006/" # no /api2/json, unlike Packer
 proxmox_node     = "pve"

@@ -6,7 +6,6 @@
 # THE API TOKEN DOES NOT BELONG HERE. It comes from the environment:
 #
 #   export PROXMOX_VE_API_TOKEN='automation@pve!deploy=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'
-#   export TF_VAR_state_passphrase='...'   # 16+ characters; encrypts the state
 #
 # See ../SECURITY.md. lab.tfvars.example carries the whole lab in one map;
 # this file is the smallest thing that works.

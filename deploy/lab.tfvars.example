@@ -8,9 +8,8 @@
 # To bring machines up one at a time instead, keep a file per VM holding a
 # single-entry map and give each its own workspace. Same module either way.
 #
-# THE API TOKEN AND THE STATE PASSPHRASE DO NOT BELONG HERE:
+# THE API TOKEN DOES NOT BELONG HERE:
 #   export PROXMOX_VE_API_TOKEN='automation@pve!deploy=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'
-#   export TF_VAR_state_passphrase='...'   # 16+ characters; encrypts the state
 # Nor does a console password. Servers do not need one - SSH takes the key.
 # DESKTOPS DO: GDM and the Proxmox console have no key login, and cloud-init
 # locks the account when no password is delivered, so a desktop clone created

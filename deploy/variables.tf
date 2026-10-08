@@ -125,11 +125,3 @@ variable "snippet_datastore_id" {
   description = "Storage holding the first-boot snippets. Must have the \"snippets\" content type enabled."
   default     = "local"
 }
-
-# Encrypts the state and saved plans. Read from the environment, never a file:
-#   export TF_VAR_state_passphrase='...'   # 16 characters or more
-variable "state_passphrase" {
-  type        = string
-  description = "Passphrase the state and plan encryption key is derived from"
-  sensitive   = true
-}

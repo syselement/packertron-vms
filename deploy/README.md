@@ -9,7 +9,6 @@ It is deliberately the smallest useful layer - a flat map, no composition, no re
 | What | Where it comes from |
 | --- | --- |
 | API token | `PROXMOX_VE_API_TOKEN`, from the environment - see [Dedicated role](../templates/proxmox/README.md#dedicated-role) |
-| State passphrase | `TF_VAR_state_passphrase`, from the environment, 16 characters or more |
 | Endpoint, node, storage, keys | a `*.tfvars` of your own, gitignored - start from an `.example` |
 | Templates | built by [`templates/proxmox/`](../templates/proxmox/README.md) - IDs below |
 | First-boot provisioning only | root SSH to the node, and a storage with the `snippets` content type |
@@ -20,7 +19,6 @@ It is deliberately the smallest useful layer - a flat map, no composition, no re
 cd deploy
 cp deploy.tfvars.example srv-01.tfvars          # *.tfvars is gitignored
 export PROXMOX_VE_API_TOKEN='automation@pve!deploy=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'
-export TF_VAR_state_passphrase='...'            # encrypts the state and saved plans
 tofu init
 tofu workspace new srv-01                       # one state per tfvars
 tofu apply -var-file=srv-01.tfvars
@@ -97,32 +95,14 @@ pvesm set local --content backup,iso,vztmpl,snippets   # on the node; --content 
 
 To avoid SSH, place an Ubuntu snippet on the node by hand and name it with `vendor_data_file_id` (generate it with `tofu console` and `local.firstboot_vendor_data`), or leave `provisioning_steps` empty and run [`90-bootstrap-baremetal.sh`](../scripts/ubuntu/README.md) on the VM yourself.
 
-## State encryption
+## State
 
-The state and saved plans hold the clone password and the node layout, so the module encrypts both with a key derived from `TF_VAR_state_passphrase` (OpenTofu 1.8 or later). A plaintext state is refused rather than read.
-
-A state written before encryption is migrated once per workspace, by one apply with an unencrypted fallback:
+The state holds the clone password in plaintext. Git ignores it; keep it on this machine, readable only by you:
 
 ```bash
-export TF_ENCRYPTION='method "unencrypted" "migration" {}
-state {
-  method = method.aes_gcm.state
-  fallback {
-    method = method.unencrypted.migration
-  }
-}
-plan {
-  method = method.aes_gcm.state
-  fallback {
-    method = method.unencrypted.migration
-  }
-}'
-tofu workspace select lab && tofu apply -var-file=lab.tfvars    # repeat per workspace
-unset TF_ENCRYPTION
-for f in terraform.tfstate* terraform.tfstate.d/*/terraform.tfstate*; do jq -e 'has("encrypted_data")' "$f" >/dev/null || echo "plaintext: $f"; done
+chmod 700 terraform.tfstate.d
+chmod 600 terraform.tfstate* terraform.tfstate.d/*/terraform.tfstate*
 ```
-
-The last line lists any state still in plaintext. A `.backup` written before the migration stays plaintext until the next change overwrites it - delete it once the workspace's apply has succeeded. Losing the passphrase loses the state, not the VMs: they can be imported again.
 
 ## What this does not do
 
