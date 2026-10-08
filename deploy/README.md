@@ -77,7 +77,7 @@ export TF_VAR_password='...'
 | --- | --- | --- | --- |
 | `ubuntu` | `"02"` | baseline and developer tooling | `sudo tail -f /var/log/packertron-bootstrap.log` |
 | `ubuntu` | `"02,03"` | the full toolchain, GNOME and shell configuration; reboots when done | same |
-| `windows` | `"utils"` | [`install_utils.ps1`](../scripts/windows/install_utils.ps1): Chocolatey, its utilities, UniGetUI | `C:\Program Files\Cloudbase Solutions\Cloudbase-Init\log\cloudbase-init.log` |
+| `windows` | `"utils"` | [`install_utils.ps1`](../scripts/windows/install_utils.ps1): winget, its utilities and UniGetUI, and Chocolatey | `C:\Program Files\Cloudbase Solutions\Cloudbase-Init\log\cloudbase-init.log` |
 | `kali` | - | nothing: Kali carries its toolset in the image | |
 
 Any other combination fails at plan time.

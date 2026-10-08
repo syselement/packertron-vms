@@ -1,13 +1,15 @@
-# Install Chocolatey, a few utilities through it, and the latest UniGetUI, on
-# Windows 10, Windows 11 or Windows Server 2025.
+# Install a few utilities and UniGetUI through winget, and Chocolatey for tools
+# winget does not carry, on Windows 10, Windows 11 or Windows Server 2025.
 #
-# Both installers are downloaded to a file and run only once their Authenticode
-# signature checks out as their publisher's; UniGetUI's must also match the
-# SHA-256 digest GitHub publishes for the release asset.
+# winget checks each installer against the SHA-256 in its manifest, and the
+# App Installer packages that carry winget are signed MSIX that Windows checks.
+# The Chocolatey installer runs only once its Authenticode signature checks
+# out as its publisher's.
 #
 # Docs:
+#   winget install      https://learn.microsoft.com/en-us/windows/package-manager/winget/install
+#   WinGet.Client       https://www.powershellgallery.com/packages/Microsoft.WinGet.Client
 #   Chocolatey install  https://docs.chocolatey.org/en-us/choco/setup/
-#   UniGetUI releases   https://github.com/Devolutions/UniGetUI/releases
 #   README.md           ../../deploy/README.md, first-boot provisioning
 #
 # Run:
@@ -21,18 +23,24 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 
-$InstallerUrl = 'https://community.chocolatey.org/install.ps1'
-$Utilities = @(
-    '7zip'
-    'brave'
-    'firefox'
-    'notepadplusplus.install'
-    'powershell-core'
-    'sublimetext4'
+# The official winget-pkgs IDs.
+$WingetPackages = @(
+    '7zip.7zip'
+    'Brave.Brave'
+    'Devolutions.UniGetUI'
+    'Microsoft.PowerShell'
+    'Mozilla.Firefox'
+    'Notepad++.Notepad++'
+    'SublimeHQ.SublimeText.4'
 )
-$UniGetUiRepository = 'Devolutions/UniGetUI'
-# The installer's Inno Setup AppId, from UniGetUI.iss.
-$UniGetUiUninstallKey = '{889610CC-4337-4BDB-AC3B-4F21806C0BDE}_is1'
+# Microsoft.PowerShell lists its MSIX first, and an MSIX installed by SYSTEM
+# is not registered for anyone else; the MSI installs for every user.
+$WingetInstallerTypes = @{
+    'Microsoft.PowerShell' = 'wix'
+}
+# Chocolatey IDs, for a tool winget does not carry. None needs it yet.
+$ChocolateyPackages = @()
+$ChocolateyInstallerUrl = 'https://community.chocolatey.org/install.ps1'
 
 function Write-Step {
     param([string]$Message)
@@ -63,7 +71,7 @@ function Install-Chocolatey {
     Write-Step 'Installing Chocolatey'
     $installer = Join-Path ([System.IO.Path]::GetTempPath()) 'chocolatey-install.ps1'
     try {
-        Invoke-WebRequest -Uri $InstallerUrl -OutFile $installer -UseBasicParsing
+        Invoke-WebRequest -Uri $ChocolateyInstallerUrl -OutFile $installer -UseBasicParsing
 
         Assert-Signer -Path $installer -Organization 'Chocolatey Software, Inc'
 
@@ -77,92 +85,81 @@ function Install-Chocolatey {
     $env:Path = [System.Environment]::GetEnvironmentVariable('Path', 'Machine')
 }
 
-# 2026.3.0 and 2026.3.0.0 are the same release: the tag has three parts, the
-# installer stamps four. $null when the text is not a version.
-function ConvertTo-FullVersion {
-    param([string]$Text)
-
-    $parsed = $null
-    if (-not [version]::TryParse($Text, [ref]$parsed)) {
-        return $null
+# Microsoft's documented bootstrap: the WinGet.Client module installs App
+# Installer and its dependencies for every user, or repairs an outdated one,
+# which a Windows 10 template carries.
+function Install-Winget {
+    Write-Step 'Installing winget'
+    if (-not (Get-PackageProvider -ListAvailable -Name NuGet -ErrorAction SilentlyContinue)) {
+        Install-PackageProvider -Name NuGet -MinimumVersion 2.8.5.201 -Force | Out-Null
     }
-    [version]::new($parsed.Major, $parsed.Minor, [math]::Max($parsed.Build, 0), [math]::Max($parsed.Revision, 0))
-}
-
-function Get-UniGetUiInstalledVersion {
-    foreach ($root in 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall',
-        'HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall',
-        'HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall') {
-        $key = Join-Path $root $UniGetUiUninstallKey
-        if (Test-Path -LiteralPath $key) {
-            return (Get-ItemProperty -LiteralPath $key).PSObject.Properties['DisplayVersion'].Value
-        }
+    if (-not (Get-Module -ListAvailable -Name Microsoft.WinGet.Client)) {
+        Install-Module -Name Microsoft.WinGet.Client -Repository PSGallery -Scope AllUsers -Force
+    }
+    Import-Module -Name Microsoft.WinGet.Client
+    Repair-WinGetPackageManager -AllUsers -Latest | Out-Null
+    # -AllUsers provisions App Installer for the next logon. An administrator
+    # in this session, such as Vagrant's, needs it registered now as well.
+    if (-not [System.Security.Principal.WindowsIdentity]::GetCurrent().IsSystem) {
+        Repair-WinGetPackageManager -Latest | Out-Null
     }
 }
 
-function Install-UniGetUi {
-    $assetName = 'UniGetUI.Installer.x64.exe'
-
-    $release = Invoke-RestMethod -UseBasicParsing -Uri "https://api.github.com/repos/$UniGetUiRepository/releases/latest"
-    $version = $release.tag_name -replace '^v', ''
-    $wanted = ConvertTo-FullVersion $version
-    if (-not $wanted) {
-        throw "unexpected UniGetUI release tag: $($release.tag_name)"
+function Get-WingetPath {
+    $command = Get-Command -Name 'winget.exe' -ErrorAction SilentlyContinue
+    if ($command) {
+        return $command.Source
     }
-    if ((ConvertTo-FullVersion (Get-UniGetUiInstalledVersion)) -eq $wanted) {
-        Write-Step "UniGetUI $version is already installed"
-        return
+    # SYSTEM, which cloudbase-init runs as, has no app execution alias for
+    # winget; the executable sits in the App Installer package directory.
+    $candidate = Get-ChildItem -Path "$env:ProgramFiles\WindowsApps\Microsoft.DesktopAppInstaller_*_x64__8wekyb3d8bbwe\winget.exe" -ErrorAction SilentlyContinue |
+        Sort-Object -Property { [version]($_.Directory.Name -split '_')[1] } |
+        Select-Object -Last 1
+    if (-not $candidate) {
+        throw 'winget.exe was not found after installing App Installer'
     }
+    $candidate.FullName
+}
 
-    $asset = @($release.assets | Where-Object { $_.name -eq $assetName })
-    if ($asset.Count -ne 1) {
-        throw "UniGetUI $($release.tag_name) has no single $assetName asset"
+# Installs, or upgrades when a newer version is out.
+function Install-WingetPackage {
+    param([string]$Winget, [string]$Id)
+
+    $arguments = @(
+        'install', '--id', $Id, '--exact', '--source', 'winget', '--scope', 'machine',
+        '--silent', '--disable-interactivity', '--accept-package-agreements', '--accept-source-agreements'
+    )
+    if ($WingetInstallerTypes.ContainsKey($Id)) {
+        $arguments += @('--installer-type', $WingetInstallerTypes[$Id])
     }
-    # Read through PSObject: strict mode throws on a property the API left out.
-    $digest = $asset[0].PSObject.Properties['digest']
-    if (-not $digest -or $digest.Value -notmatch '^sha256:([0-9a-fA-F]{64})$') {
-        throw "GitHub published no SHA-256 digest for $assetName; refusing to install UniGetUI $($release.tag_name)"
-    }
-    $expectedHash = $Matches[1]
-
-    Write-Step "Installing UniGetUI $version"
-    $installer = Join-Path ([System.IO.Path]::GetTempPath()) $assetName
-    try {
-        Invoke-WebRequest -Uri $asset[0].browser_download_url -OutFile $installer -UseBasicParsing
-        $actualHash = (Get-FileHash -LiteralPath $installer -Algorithm SHA256).Hash
-        if ($actualHash -ne $expectedHash) {
-            throw "$assetName SHA-256 is $actualHash, GitHub published $expectedHash"
-        }
-        Assert-Signer -Path $installer -Organization 'Devolutions Inc'
-
-        # /ALLUSERS: the installer defaults to a per-user install.
-        $process = Start-Process -FilePath $installer -Wait -PassThru -ArgumentList @(
-            '/SP-', '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/ALLUSERS', '/NoAutoStart'
-        )
-        # 100: installed, but adding UniGetUI to PATH failed.
-        if ($process.ExitCode -eq 100) {
-            Write-Warning 'UniGetUI installed, but its PATH entry could not be added'
-        } elseif ($process.ExitCode -ne 0) {
-            throw "UniGetUI installer failed with exit code $($process.ExitCode)"
-        }
-    } finally {
-        Remove-Item -LiteralPath $installer -Force -ErrorAction SilentlyContinue
+    & $Winget @arguments
+    # 0x8A15002B: installed, no newer version. 0x8A150061: already installed.
+    # 0x8A150109: installed, reboot required to finish.
+    if ($LASTEXITCODE -notin 0, -1978335189, -1978335135, -1978334967) {
+        throw ('winget install {0} failed with exit code 0x{1:X8}' -f $Id, $LASTEXITCODE)
     }
 }
 
-# Windows PowerShell 5.1 may still default to TLS 1.0, which both download
-# sites refuse.
+# Windows PowerShell 5.1 may still default to TLS 1.0, which the PowerShell
+# Gallery and Chocolatey refuse.
 [System.Net.ServicePointManager]::SecurityProtocol =
     [System.Net.ServicePointManager]::SecurityProtocol -bor [System.Net.SecurityProtocolType]::Tls12
 
-Install-Chocolatey
-
-Write-Step 'Installing utilities'
-& choco install -y --limit-output --no-progress @Utilities
-# 1641 and 3010: installed, reboot required or already started.
-if ($LASTEXITCODE -notin 0, 1641, 3010) {
-    throw "choco install failed with exit code $LASTEXITCODE"
+Install-Winget
+$winget = Get-WingetPath
+foreach ($id in $WingetPackages) {
+    Write-Step "Installing $id"
+    Install-WingetPackage -Winget $winget -Id $id
 }
 
-Install-UniGetUi
+Install-Chocolatey
+if ($ChocolateyPackages.Count -gt 0) {
+    Write-Step 'Installing Chocolatey packages'
+    & choco install -y --limit-output --no-progress @ChocolateyPackages
+    # 1641 and 3010: installed, reboot required or already started.
+    if ($LASTEXITCODE -notin 0, 1641, 3010) {
+        throw "choco install failed with exit code $LASTEXITCODE"
+    }
+}
+
 Write-Step 'Utilities installation complete'
