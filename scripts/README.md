@@ -63,6 +63,6 @@ It compares each ISO, virtio-win, cloudbase-init, the Packer plugins, the OpenTo
 | `03_cleanup.ps1`, `12_sysprep.ps1` | both builds, last | clears caches, then generalizes; refuses a pending reboot |
 | `packer_shutdown.bat` | VMware build | blocks SSH, shuts the generalized image down |
 | `04_startup.cmd`, `04_startup.ps1` | VMware box, first boot | per-user settings, opens SSH again |
-| `install_utils.ps1` | `deploy/` first boot, VMware Vagrant | winget and its utilities, UniGetUI among them, then Chocolatey for tools winget lacks |
+| `install_utils.ps1` | `deploy/` first boot, VMware Vagrant | winget, then its utilities, UniGetUI, PowerShell 7 and the TightVNC server among them, then Chocolatey for tools winget lacks |
 
 The order and the reasons are in [templates/proxmox/WINDOWS.md](../templates/proxmox/WINDOWS.md#the-build).

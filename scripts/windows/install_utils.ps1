@@ -1,14 +1,20 @@
 # Install a few utilities and UniGetUI through winget, and Chocolatey for tools
 # winget does not carry, on Windows 10, Windows 11 or Windows Server 2025.
 #
-# winget checks each installer against the SHA-256 in its manifest, and the
-# App Installer packages that carry winget are signed MSIX that Windows checks.
-# The Chocolatey installer runs only once its Authenticode signature checks
-# out as its publisher's.
+# cloudbase-init runs this as SYSTEM, which has no winget command and which
+# winget's PowerShell module does not support (microsoft/winget-cli#3935). So
+# this installs App Installer, which carries winget.exe, for every account,
+# with the Visual C++ runtime winget needs as SYSTEM, and runs winget.exe from
+# its package directory.
+#
+# Every download is checked before it runs: App Installer against the SHA-256
+# GitHub publishes, the Visual C++ and Chocolatey installers against their
+# publisher's signature, and each winget package against the SHA-256 in its
+# manifest.
 #
 # Docs:
 #   winget install      https://learn.microsoft.com/en-us/windows/package-manager/winget/install
-#   WinGet.Client       https://www.powershellgallery.com/packages/Microsoft.WinGet.Client
+#   winget releases     https://github.com/microsoft/winget-cli/releases
 #   Chocolatey install  https://docs.chocolatey.org/en-us/choco/setup/
 #   README.md           ../../deploy/README.md, first-boot provisioning
 #
@@ -28,13 +34,18 @@ $WingetPackages = @(
     '7zip.7zip'
     'Brave.Brave'
     'Devolutions.UniGetUI'
+    # The viewer and the server, which runs as a service with a firewall
+    # exception for port 5900 and no password until one is set in its
+    # service configuration. SECURITY.md has the warning.
+    'GlavSoft.TightVNC'
     'Microsoft.PowerShell'
     'Mozilla.Firefox'
     'Notepad++.Notepad++'
     'SublimeHQ.SublimeText.4'
+    'WireGuard.WireGuard'
 )
-# Microsoft.PowerShell lists its MSIX first, and an MSIX installed by SYSTEM
-# is not registered for anyone else; the MSI installs for every user.
+# Microsoft.PowerShell lists its MSIX first, and SYSTEM cannot install an
+# MSIX for anyone else; the MSI installs for every user.
 $WingetInstallerTypes = @{
     'Microsoft.PowerShell' = 'wix'
 }
@@ -85,43 +96,141 @@ function Install-Chocolatey {
     $env:Path = [System.Environment]::GetEnvironmentVariable('Path', 'Machine')
 }
 
-# Microsoft's documented bootstrap: the WinGet.Client module installs App
-# Installer and its dependencies for every user, or repairs an outdated one,
-# which a Windows 10 template carries.
-function Install-Winget {
-    Write-Step 'Installing winget'
-    if (-not (Get-PackageProvider -ListAvailable -Name NuGet -ErrorAction SilentlyContinue)) {
-        Install-PackageProvider -Name NuGet -MinimumVersion 2.8.5.201 -Force | Out-Null
+# Downloads the release asset with this name, or the one this pattern matches,
+# and checks it against the SHA-256 GitHub publishes for it.
+function Save-GitHubAsset {
+    param($Release, [string]$Pattern, [string]$Directory)
+
+    $asset = @($Release.assets | Where-Object { $_.name -like $Pattern })
+    if ($asset.Count -ne 1) {
+        throw "$($Release.html_url) has no single asset matching $Pattern"
     }
-    if (-not (Get-Module -ListAvailable -Name Microsoft.WinGet.Client)) {
-        Install-Module -Name Microsoft.WinGet.Client -Repository PSGallery -Scope AllUsers -Force
+    # Read through PSObject: strict mode throws on a property the API left out.
+    $digest = $asset[0].PSObject.Properties['digest']
+    if (-not $digest -or $digest.Value -notmatch '^sha256:([0-9a-fA-F]{64})$') {
+        throw "GitHub published no SHA-256 digest for $($asset[0].name); refusing to use it"
     }
-    Import-Module -Name Microsoft.WinGet.Client
-    Repair-WinGetPackageManager -AllUsers -Latest | Out-Null
-    # -AllUsers provisions App Installer for the next logon. An administrator
-    # in this session, such as Vagrant's, needs it registered now as well.
-    if (-not [System.Security.Principal.WindowsIdentity]::GetCurrent().IsSystem) {
-        Repair-WinGetPackageManager -Latest | Out-Null
+    $expectedHash = $Matches[1]
+
+    $path = Join-Path $Directory $asset[0].name
+    Invoke-WebRequest -Uri $asset[0].browser_download_url -OutFile $path -UseBasicParsing
+    $actualHash = (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash
+    if ($actualHash -ne $expectedHash) {
+        throw "$($asset[0].name) SHA-256 is $actualHash, GitHub published $expectedHash"
+    }
+    $path
+}
+
+function Get-TemporaryDirectory {
+    $path = Join-Path ([System.IO.Path]::GetTempPath()) ([System.IO.Path]::GetRandomFileName())
+    (New-Item -ItemType Directory -Path $path).FullName
+}
+
+# winget run as SYSTEM needs this runtime, which an evaluation image may lack.
+# Microsoft publishes no checksum for the redistributable, so its signature is
+# the check.
+function Install-VCRuntime {
+    $key = Get-ItemProperty -LiteralPath 'HKLM:\SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\X64' -ErrorAction SilentlyContinue
+    if ($key -and $key.PSObject.Properties['Installed'] -and $key.Installed -eq 1) {
+        Write-Step "Visual C++ runtime $($key.Version) is already installed"
+        return
+    }
+
+    Write-Step 'Installing the Visual C++ runtime'
+    $directory = Get-TemporaryDirectory
+    try {
+        $installer = Join-Path $directory 'vc_redist.x64.exe'
+        Invoke-WebRequest -Uri 'https://aka.ms/vs/17/release/vc_redist.x64.exe' -OutFile $installer -UseBasicParsing
+        Assert-Signer -Path $installer -Organization 'Microsoft Corporation'
+        $process = Start-Process -FilePath $installer -Wait -PassThru -ArgumentList @('/install', '/quiet', '/norestart')
+        # 1638: a newer version is already installed. 1641 and 3010: installed,
+        # reboot required or already started.
+        if ($process.ExitCode -notin 0, 1638, 1641, 3010) {
+            throw "Visual C++ runtime installer failed with exit code $($process.ExitCode)"
+        }
+    } finally {
+        Remove-Item -LiteralPath $directory -Recurse -Force -ErrorAction SilentlyContinue
     }
 }
 
+# The app execution alias for an administrator; for SYSTEM, which has none,
+# the newest winget.exe in the App Installer package directories. $null when
+# App Installer is missing.
 function Get-WingetPath {
-    $command = Get-Command -Name 'winget.exe' -ErrorAction SilentlyContinue
-    if ($command) {
-        return $command.Source
+    $alias = Get-Command -Name 'winget.exe' -ErrorAction SilentlyContinue
+    if ($alias) {
+        return $alias.Source
     }
-    # SYSTEM, which cloudbase-init runs as, has no app execution alias for
-    # winget; the executable sits in the App Installer package directory.
-    $candidate = Get-ChildItem -Path "$env:ProgramFiles\WindowsApps\Microsoft.DesktopAppInstaller_*_x64__8wekyb3d8bbwe\winget.exe" -ErrorAction SilentlyContinue |
-        Sort-Object -Property { [version]($_.Directory.Name -split '_')[1] } |
+    $packaged = Resolve-Path -Path "$env:ProgramFiles\WindowsApps\Microsoft.DesktopAppInstaller_*_x64__8wekyb3d8bbwe\winget.exe" -ErrorAction SilentlyContinue |
+        Sort-Object -Property { [version]($_.Path -split '_')[1] } |
         Select-Object -Last 1
-    if (-not $candidate) {
-        throw 'winget.exe was not found after installing App Installer'
+    if ($packaged) {
+        $packaged.Path
     }
-    $candidate.FullName
 }
 
-# Installs, or upgrades when a newer version is out.
+# "v1.29.380" from winget --version. $null when winget is missing, or too old
+# to run as this account.
+function Get-WingetVersion {
+    $winget = Get-WingetPath
+    if (-not $winget) {
+        return $null
+    }
+    try {
+        $text = & $winget --version
+    } catch {
+        return $null
+    }
+    $parsed = $null
+    if ($LASTEXITCODE -eq 0 -and [version]::TryParse(("$text".Trim() -replace '^v', ''), [ref]$parsed)) {
+        $parsed
+    }
+}
+
+# Provisions App Installer, which carries winget, with its x64 dependencies,
+# for every account and every later one; a Windows 10 template carries an old
+# one. The bundle is signed MSIX, which Windows checks as it adds it.
+function Install-AppInstaller {
+    $release = Invoke-RestMethod -UseBasicParsing -Uri 'https://api.github.com/repos/microsoft/winget-cli/releases/latest'
+    $wanted = [version]($release.tag_name -replace '^v', '')
+    $installed = Get-WingetVersion
+    if ($installed -and $installed -ge $wanted) {
+        Write-Step "winget $installed is already installed"
+        return
+    }
+
+    Write-Step "Installing winget $wanted"
+    $directory = Get-TemporaryDirectory
+    try {
+        $bundle = Save-GitHubAsset -Release $release -Pattern 'Microsoft.DesktopAppInstaller_8wekyb3d8bbwe.msixbundle' -Directory $directory
+        $license = Save-GitHubAsset -Release $release -Pattern '*_License1.xml' -Directory $directory
+        $dependencies = Save-GitHubAsset -Release $release -Pattern 'DesktopAppInstaller_Dependencies.zip' -Directory $directory
+        Expand-Archive -LiteralPath $dependencies -DestinationPath (Join-Path $directory 'dependencies')
+        $x64 = @(Get-ChildItem -Path (Join-Path $directory 'dependencies\x64') -Filter '*.appx' | ForEach-Object { $_.FullName })
+        if ($x64.Count -eq 0) {
+            throw "DesktopAppInstaller_Dependencies.zip of $($release.tag_name) has no x64 packages"
+        }
+
+        try {
+            Add-AppxProvisionedPackage -Online -PackagePath $bundle -DependencyPackagePath $x64 -LicensePath $license | Out-Null
+        } catch {
+            # 0x80073D06: a newer version is already installed.
+            if ($_.Exception.HResult -ne -2147009274) {
+                throw
+            }
+        }
+    } finally {
+        Remove-Item -LiteralPath $directory -Recurse -Force -ErrorAction SilentlyContinue
+    }
+
+    # A provisioned package reaches an account at its next logon. An
+    # administrator running this, such as Vagrant's, needs it now.
+    if (-not [System.Security.Principal.WindowsIdentity]::GetCurrent().IsSystem) {
+        Add-AppxPackage -RegisterByFamilyName -MainPackage 'Microsoft.DesktopAppInstaller_8wekyb3d8bbwe'
+    }
+}
+
+# Installs, upgrades when a newer version is out, or leaves a current one.
 function Install-WingetPackage {
     param([string]$Winget, [string]$Id)
 
@@ -140,13 +249,17 @@ function Install-WingetPackage {
     }
 }
 
-# Windows PowerShell 5.1 may still default to TLS 1.0, which the PowerShell
-# Gallery and Chocolatey refuse.
+# Windows PowerShell 5.1 may still default to TLS 1.0, which GitHub and
+# Chocolatey refuse.
 [System.Net.ServicePointManager]::SecurityProtocol =
     [System.Net.ServicePointManager]::SecurityProtocol -bor [System.Net.SecurityProtocolType]::Tls12
 
-Install-Winget
+Install-VCRuntime
+Install-AppInstaller
 $winget = Get-WingetPath
+if (-not $winget) {
+    throw 'winget.exe was not found after installing App Installer'
+}
 foreach ($id in $WingetPackages) {
     Write-Step "Installing $id"
     Install-WingetPackage -Winget $winget -Id $id

@@ -28,6 +28,8 @@ It is not meant to reach a clone. Sysprep generalizes the image, and on the clon
 
 That depends on cloudbase-init running. **Until it has, assume a clone may still accept the build password for `Administrator` over SSH and RDP** - so do not put one on a network anyone else can reach before confirming it configured itself, and treat the build password as public like the Linux one.
 
+A clone provisioned with `provisioning_steps = "utils"`, and the VMware `win-srv-2025` box, also run a TightVNC server, as a service with a firewall exception for port 5900, and **with no password until you set one** in TightVNC's service configuration. Set it, or stop the service, before the clone reaches a network anyone else can reach.
+
 The clone's own password is exposed differently. Proxmox writes a Windows VM's password to its cloud-init drive in plain text, and the drive stays attached, so any local user can read it. Change it after the first login, or remove it from the drive with `qm set <vmid> --delete cipassword` and `qm cloudinit update <vmid>`.
 
 ## Credentials belong in the environment
