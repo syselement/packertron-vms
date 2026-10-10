@@ -1,12 +1,17 @@
 # packertron-vms
 
-> **Lab VMs from installer ISOs, with Packer, OpenTofu and Vagrant** - Proxmox VE first, VMware Workstation alongside.
+> **Automated VM deployment with Packer, OpenTofu and Vagrant** - Proxmox VE first, VMware Workstation alongside.
 
 [![syselement - packertron-vms](https://img.shields.io/static/v1?label=syselement&message=packertron-vms&color=blue&logo=github)](https://github.com/syselement/packertron-vms) [![stars - packertron-vms](https://img.shields.io/github/stars/syselement/packertron-vms?style=social)](https://github.com/syselement/packertron-vms) [![forks - packertron-vms](https://img.shields.io/github/forks/syselement/packertron-vms?style=social)](https://github.com/syselement/packertron-vms) [![License](https://img.shields.io/badge/License-MIT-orange)](#-license "Go to license section")
 
 [![Packer](https://img.shields.io/badge/Packer->=1.12.0-brightgreen?logo=packer)](https://developer.hashicorp.com/packer "Go to Packer homepage") [![OpenTofu](https://img.shields.io/badge/OpenTofu->=1.6.0-brightgreen?logo=opentofu)](https://opentofu.org "Go to OpenTofu homepage") [![Vagrant](https://img.shields.io/badge/Vagrant->=2.4.3-brightgreen?logo=vagrant)](https://developer.hashicorp.com/vagrant "Go to Vagrant homepage")
 
-Packer builds thin Proxmox VE templates from installer ISOs - Ubuntu, Kali and Windows - and OpenTofu clones them into VMs that provision themselves at first boot only when asked. The same Ubuntu provisioning scripts run on VMware Workstation images and on bare metal.
+`packertron-vms` is a **collection of templates for automated VM deployment**, designed for home lab environments and testing setups.
+
+- **Packer** builds the templates from the official installer ISOs: Ubuntu, Kali and Windows on Proxmox VE, Ubuntu and Windows Server on VMware Workstation.
+- **OpenTofu** turns the Proxmox templates into VMs, and the provisioning scripts install and configure the tools on top, on a VM or on a bare-metal Ubuntu or Windows install.
+
+---
 
 ## 🚀 Quick start - Proxmox VE
 
@@ -20,6 +25,8 @@ Packer builds thin Proxmox VE templates from installer ISOs - Ubuntu, Kali and W
 | 6 | Provision them at first boot, or a bare-metal install | [deploy/README.md](deploy/README.md#first-boot-provisioning), [scripts/ubuntu/README.md](scripts/ubuntu/README.md) |
 
 For VMware Workstation and Vagrant, start at [templates/vmware/README.md](templates/vmware/README.md).
+
+---
 
 ## 📚 Documentation
 
@@ -36,6 +43,8 @@ For VMware Workstation and Vagrant, start at [templates/vmware/README.md](templa
 | [SECURITY.md](SECURITY.md) | the credential model - read it before putting a VM on a network |
 | [AGENTS.md](AGENTS.md) | the repository's standards |
 
+---
+
 ## 📁 Layout
 
 ```text
@@ -51,6 +60,8 @@ packertron-vms/
 └── .github/workflows/  CI, releases, and the weekly pin check
 ```
 
+---
+
 ## 🗺️ Roadmap
 
 - [x] Proxmox templates from ISO - Ubuntu Server 24.04 and 26.04, Ubuntu Desktop 26.04, Kali, Windows 10, 11 and Server 2025, all built and cloned
@@ -61,10 +72,16 @@ packertron-vms/
 - [ ] Proxmox LXC containers through OpenTofu - Packer's Proxmox plugin builds only VMs
 - [ ] Ansible for advanced provisioning
 
+---
+
 ## 📜 License
 
 Released under the [MIT License](LICENSE) by [@syselement](https://github.com/syselement). Code adapted from other projects carries its upstream notice beside it: the Kali and Windows Proxmox READMEs, and the cloudbase-init configuration files.
 
+---
+
 ## 🤝 Contributing
 
 Pull requests are welcome. Follow [AGENTS.md](AGENTS.md), and run `scripts/check-templates.sh` before pushing.
+
+---
