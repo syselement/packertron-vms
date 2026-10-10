@@ -63,6 +63,42 @@ It compares each ISO, virtio-win, cloudbase-init, the Packer plugins, the OpenTo
 | `03_cleanup.ps1`, `12_sysprep.ps1` | both builds, last | clears caches, then generalizes; refuses a pending reboot |
 | `packer_shutdown.bat` | VMware build | blocks SSH, shuts the generalized image down |
 | `04_startup.cmd`, `04_startup.ps1` | VMware box, first boot | per-user settings, opens SSH again |
-| `install_utils.ps1` | `deploy/` first boot, VMware Vagrant | winget, then its utilities, UniGetUI, PowerShell 7 and the TightVNC server among them, then Chocolatey for tools winget lacks |
+| `install_utils.ps1` | `deploy/` first boot, VMware Vagrant, bare metal | winget, then its utilities, UniGetUI, PowerShell 7 and the TightVNC server among them, then Chocolatey for tools winget lacks, and a Public Desktop shortcut to WinUtil |
+| `setup-windows.ps1`, `baremetal/autounattend.xml` | a real machine, from a USB stick | the templates' settings, a taskbar without search, Task View, news, Meet Now and pins, RDP and OpenSSH Server on request, then `install_utils.ps1` - [below](#bare-metal) |
 
 The order and the reasons are in [templates/proxmox/WINDOWS.md](../templates/proxmox/WINDOWS.md#the-build).
+
+### Bare metal
+
+To install Windows 10 or 11 on a real machine with the same settings and utilities, write the Microsoft ISO to a USB stick, copy three files beside it, and boot from it. Setup runs on its own and installs Windows 10 Pro with Microsoft's generic key, unactivated until you enter a real one. **It wipes disk 0 without asking: disconnect every other disk first.** OOBE still asks for the local account, so the stick holds no password.
+
+**From Windows**, write the ISO with [Rufus](https://rufus.ie) and untick its "Customize Windows installation" options, which write their own `autounattend.xml`. Then copy `windows/baremetal/autounattend.xml`, `windows/setup-windows.ps1` and `windows/install_utils.ps1` to the root of the stick.
+
+**From Ubuntu**, build the stick by hand: one FAT32 partition, which every UEFI firmware boots, with `install.wim` split under FAT32's 4 GB file limit - Setup reads the `.swm` parts as one image.
+
+```bash
+sudo apt-get install wimtools                       # wimlib-imagex, which splits install.wim
+lsblk                                               # find the stick; DEV below is erased whole
+ISO=~/Downloads/Win11_25H2_English_x64.iso
+DEV=/dev/sdX
+sudo umount "$DEV"?* || true                        # the desktop automounts the stick; "not mounted" is fine
+sudo wipefs -a "$DEV"
+sudo parted -s "$DEV" mklabel gpt mkpart WINUSB fat32 1MiB 100%
+sudo mkfs.vfat -F 32 -n WINUSB "${DEV}1"
+mkdir -p /tmp/winiso /tmp/winusb
+sudo mount -o loop,ro "$ISO" /tmp/winiso
+sudo mount "${DEV}1" /tmp/winusb
+sudo rsync -r --info=progress2 --exclude sources/install.wim /tmp/winiso/ /tmp/winusb/
+sudo wimlib-imagex split /tmp/winiso/sources/install.wim /tmp/winusb/sources/install.swm 3800   # skip when the ISO has install.esd instead
+sudo cp scripts/windows/baremetal/autounattend.xml scripts/windows/setup-windows.ps1 scripts/windows/install_utils.ps1 /tmp/winusb/
+sudo umount /tmp/winusb /tmp/winiso                 # waits until the stick is written
+```
+
+Boot the machine from the stick in UEFI mode, install, log in, open PowerShell as administrator, and run the script from the stick:
+
+```bash
+powershell -NoProfile -ExecutionPolicy Bypass -File D:\setup-windows.ps1                       # D: is the stick
+powershell -NoProfile -ExecutionPolicy Bypass -File D:\setup-windows.ps1 -EnableRemoteAccess   # also RDP, and SSH on private networks
+```
+
+It needs the network, and it installs the TightVNC server along with the rest - set its password, as [SECURITY.md](../SECURITY.md#windows) says. Run Windows Update afterwards.
