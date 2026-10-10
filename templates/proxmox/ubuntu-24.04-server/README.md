@@ -11,3 +11,5 @@ Ubuntu Server 24.04 LTS from the official ISO, installed by the autoinstall seed
 | Checksum | `SHA256SUMS` in `releases.ubuntu.com/noble`, which follows each point release |
 | `cores` / `memory` / `disk_size` | 2 / 2048 / 30G |
 | `ssh_timeout` | 30m |
+
+---

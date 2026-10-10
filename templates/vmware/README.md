@@ -10,6 +10,8 @@ Packer builds each template in VMware Workstation; the desktops and Windows Serv
 | [`ubuntu-26.04-desktop`](ubuntu-26.04-desktop/README.md) | Vagrant box | as 24.04 | **unverified** - see its README |
 | [`win-srv-2025`](win-srv-2025/README.md) | Vagrant box | the [Proxmox Windows chain](../proxmox/WINDOWS.md#the-build), then `install_utils.ps1` through Vagrant | |
 
+---
+
 ## Requirements
 
 - **VMware Workstation Pro 17 or later**, from [Broadcom's download portal](https://support.broadcom.com/group/ecx/productdownloads?subfamily=VMware%20Workstation%20Pro&freeDownloads=true) - it needs an account, so no script installs it.
@@ -35,6 +37,8 @@ if (-not $props.InstallPath64) { Set-ItemProperty -Path $dst -Name "InstallPath6
 Get-Service vagrant-vmware-utility   # should be Running
 ```
 
+---
+
 ## Build
 
 The Linux seeds authorize your public key, which comes from the environment - nothing is committed in its place:
@@ -47,6 +51,8 @@ packer build .                                                       # -debug fo
 ```
 
 Each template takes its ISO from a URL, or from a local path in its `.auto.pkrvars.hcl` (`C:/ISO/...`) when that file exists, and checks it against the pinned checksum either way. The seeds' console password is the published one for `packer` - see [SECURITY.md](../../SECURITY.md).
+
+---
 
 ## Use a box
 
@@ -65,6 +71,8 @@ Without Vagrant, extract the box and open its `.vmx` in Workstation (File > Open
 mkdir tmp && tar -xf output/<box>.box -C tmp
 ```
 
+---
+
 ## When the build stops
 
 | Symptom | Look at |
@@ -74,8 +82,12 @@ mkdir tmp && tar -xf output/<box>.box -C tmp
 | ISO checksum mismatch | the local ISO in `.auto.pkrvars.hcl` is another release than the checksum names |
 | Vagrant cannot drive VMware | `vagrant plugin repair`, and the `vagrant-vmware-utility` service |
 
+---
+
 ## Verify
 
 ```bash
 scripts/check-templates.sh vmware   # fmt, validate and the seeds of these templates
 ```
+
+---

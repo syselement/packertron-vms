@@ -10,3 +10,5 @@ Ubuntu Server 26.04 LTS for VMware Workstation, installed by the autoinstall see
 | Provisioning | as [24.04](../ubuntu-24.04-server/README.md) |
 
 The same build as [24.04](../ubuntu-24.04-server/README.md), for 26.04.
+
+---

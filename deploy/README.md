@@ -4,6 +4,8 @@ One OpenTofu module that clones Packer-built templates, configures them through 
 
 It is deliberately the smallest useful layer - a flat map, no composition, no remote state. Fleet-wide homelab infrastructure belongs in its own repository, which can consume this one as a module by git ref.
 
+---
+
 ## Requirements
 
 | What | Where it comes from |
@@ -12,6 +14,8 @@ It is deliberately the smallest useful layer - a flat map, no composition, no re
 | Endpoint, node, storage, keys | a `*.tfvars` of your own, gitignored - start from an `.example` |
 | Templates | built by [`templates/proxmox/`](../templates/proxmox/README.md) - IDs below |
 | First-boot provisioning only | root SSH to the node, and a storage with the `snippets` content type |
+
+---
 
 ## Usage
 
@@ -32,6 +36,8 @@ tofu output ipv4_addresses                      # empty until the guest agent st
 | `deploy.tfvars.example` | the smallest thing that works: node settings and one server |
 | `lab.tfvars.example` | the whole lab: static address, linked clone, VLAN, workstation, Kali, Windows 10, 11 and Server 2025 |
 | `kali.tfvars.example` | Kali alone, with the settings it needs |
+
+---
 
 ## The `vms` map
 
@@ -58,6 +64,8 @@ The key is the VM's name and hostname - Windows truncates a hostname past 15 cha
 | Kali | 80200 | `kali` | 50 |
 | Windows 10 / 11 / Server 2025 | 80310 / 80311 / 80325 | `windows` | 64 |
 
+---
+
 ## Console access
 
 cloud-init locks the account's password when it gets none, so by default a clone is reachable only by SSH key - the right posture for a server. Pass a password through the environment when one is needed:
@@ -68,6 +76,8 @@ export TF_VAR_password='...'
 
 - **Desktops and Kali need one.** GDM, Xfce and the Proxmox console have no key login, so a desktop created without one cannot be logged into. cloud-init applies it on the first boot only; for a clone already created without one, SSH in with the key and run `sudo passwd <user>`.
 - **Windows needs one for the console.** Server 2025 refuses a password without three of upper case, lower case, digits and symbols, and keeps a random one. Proxmox writes a Windows password to the cloud-init drive in plain text - see [`WINDOWS.md`](../templates/proxmox/WINDOWS.md#how-a-clone-configures-itself).
+
+---
 
 ## First-boot provisioning
 
@@ -95,6 +105,8 @@ pvesm set local --content backup,iso,vztmpl,snippets   # on the node; --content 
 
 To avoid SSH, place an Ubuntu snippet on the node by hand and name it with `vendor_data_file_id` (generate it with `tofu console` and `local.firstboot_vendor_data`), or leave `provisioning_steps` empty and run [`90-bootstrap-baremetal.sh`](../scripts/ubuntu/README.md) on the VM yourself.
 
+---
+
 ## State
 
 The state holds the clone password in plaintext. Git ignores it; keep it on this machine, readable only by you:
@@ -104,7 +116,11 @@ chmod 700 terraform.tfstate.d
 chmod 600 terraform.tfstate* terraform.tfstate.d/*/terraform.tfstate*
 ```
 
+---
+
 ## What this does not do
 
 - No LXC: Packer cannot build a Proxmox container template, so containers are not part of this pipeline.
 - No fleet management, inventory or DNS - that is the separate homelab repository's job.
+
+---

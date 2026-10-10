@@ -23,3 +23,5 @@ qm set <vmid> --cipassword 'Lab-Passw0rd!'   # on the node; applied at the next 
 ```
 
 The new password gives the cloud-init drive a new identity, so cloudbase-init applies it as a new instance.
+
+---

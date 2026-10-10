@@ -22,6 +22,8 @@ Adapted from [mttaggart/seclab](https://github.com/mttaggart/seclab) (`Packer/ka
 
 `00` and `01` run unchanged: both are distro-agnostic on this path.
 
+---
+
 ## Decisions
 
 **cloud-init is off for the build.** Packer attaches the cloud-init drive only once the VM is a template, so on the build VM cloud-init would run its first-boot pass with nothing from Proxmox to read. Ubuntu pins it to the `None` datasource; Kali's installer does nothing equivalent, and what Debian's cloud-init would do instead - probe other datasources, or create a `debian` account - is not something a template should depend on. `late_command` writes `/etc/cloud/cloud-init.disabled`; the seal removes it and fails the build if it survived.
@@ -36,10 +38,14 @@ Adapted from [mttaggart/seclab](https://github.com/mttaggart/seclab) (`Packer/ka
 
 `late_command` also authorizes the key from `ssh_authorized_key`, sets `NOPASSWD` sudo (checked with `visudo -c`) and `PasswordAuthentication no`. Drop `kali-desktop-xfce` from `pkgsel/include` for a headless template.
 
+---
+
 ## Prior art
 
 - **[badsectorlabs/ludus](https://gitlab.com/badsectorlabs/ludus/-/blob/main/ludus-server/packer/kali/http/kali-preseed.cfg)** reached the same mirror and `pkgsel/upgrade select none` independently, and is where `systemctl enable ssh` came from. It installs a minimal system and provisions with Ansible, partitions without LVM, and hardcodes `/dev/vda`; three of its `late_command` steps lack `in-target` and land in the installer's ramdisk.
 - **[blink-zero/kali-2024.1-preseed](https://github.com/blink-zero/kali-2024.1-preseed)** also moves the package work out of `pkgsel`, but ends its apt commands in `|| true` and keeps the `http.kali.org` redirector, so a failed fetch produces an install that reports success with no toolset. It also sets `pkgsel/include` twice, the second overriding the first.
+
+---
 
 ## Cloning
 
@@ -54,6 +60,8 @@ Use [`deploy/kali.tfvars.example`](../../../deploy/kali.tfvars.example):
 | The installer's menu starts before anything is typed | GRUB's timeout beat `boot_wait`: lower it |
 | `c` lands on the firmware splash | OVMF is still posting: `-var 'boot_wait=20s'` |
 | d-i stops at a question | the preseed lacks that answer; add its `d-i` line |
+
+---
 
 ## Upstream license
 
@@ -82,3 +90,5 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
+
+---

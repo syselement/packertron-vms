@@ -7,6 +7,8 @@ One directory per template, grouped by hypervisor: `<hypervisor>/<os>`. That pai
 | Proxmox VE - the primary target | Ubuntu Server 24.04 and 26.04, Ubuntu Desktop 26.04, Kali, Windows 10, 11 and Server 2025 | thin templates, cloned by [`deploy/`](../deploy/README.md) | [proxmox/README.md](proxmox/README.md) |
 | VMware Workstation | Ubuntu Server and Desktop 24.04 and 26.04, Windows Server 2025 | VMs and Vagrant boxes, provisioned when built or by Vagrant | [vmware/README.md](vmware/README.md) |
 
+---
+
 ## Inside a template directory
 
 | Path | Holds |
@@ -20,6 +22,8 @@ One directory per template, grouped by hypervisor: `<hypervisor>/<os>`. That pai
 
 Templates reach the shared provisioners through `${path.root}/../../../scripts/`.
 
+---
+
 ## Where a value goes
 
 | Value | Where | Committed |
@@ -31,8 +35,12 @@ Templates reach the shared provisioners through `${path.root}/../../../scripts/`
 
 Build output, `packer_cache/` and `.vagrant/` are generated and gitignored. See [SECURITY.md](../SECURITY.md) for the credential model.
 
+---
+
 ## Verify
 
 ```bash
 scripts/check-templates.sh packer seeds   # every template: fmt, validate, and its seed
 ```
+
+---

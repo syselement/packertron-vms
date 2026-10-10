@@ -53,8 +53,6 @@ Updates the base system and installs a minimal baseline required for the VM itse
 
 Use this during a VM template build. Bare-metal provisioning intentionally skips it because guest agents are not applicable there.
 
----
-
 ### `01-cleanup-system.sh`
 
 Seals a VM template so clones start clean. It:
@@ -76,8 +74,6 @@ The machine-id truncation and the cloud-init clean are fatal on failure, deliber
 Run it last in a template build, after every other provisioning step.
 
 `90-bootstrap-baremetal.sh` never calls it.
-
----
 
 ### `02-provision-system.sh`
 
@@ -114,8 +110,6 @@ Group membership is granted after the service is up, not before. A `usermod -aG`
 
 This script can be used by itself when only system provisioning is required.
 
----
-
 ### `03-customize-system.sh`
 
 Installs common user tooling on both variants and applies the Desktop layer only when Ubuntu Desktop is detected. It:
@@ -148,8 +142,6 @@ Desktop packages are installed with an availability check rather than a hard fai
 
 On Server, Syncthing's user unit is enabled by linking it into the target user's `default.target.wants`, but it only starts once that user logs in - systemd does not run a user manager for an account with no session. Lingering is deliberately not enabled; start it by hand, or enable `loginctl enable-linger`, if the service is wanted on a headless host.
 
----
-
 ### `90-bootstrap-baremetal.sh`
 
 Orchestrates first-boot provisioning for autoinstall and bare-metal systems. It:
@@ -179,8 +171,6 @@ It deliberately skips `00` (guest agents do not apply to bare metal) and `01` (t
 
 An unrecognised step fails the run rather than being skipped. Silently provisioning less than was asked for is the failure that gets noticed last, and the usual cause is a typo in a deployment's `firstboot.conf`.
 
----
-
 ### `firstboot/`
 
 The per-VM provisioning runner, as three files rather than text inside a YAML seed:
@@ -194,8 +184,6 @@ The per-VM provisioning runner, as three files rather than text inside a YAML se
 cloud-init has no include directive, so every seed must carry its own copy of `stub.sh` and the unit inline. [`scripts/sync-firstboot.sh`](../sync-firstboot.sh) writes those copies and `--check` fails CI when one has drifted; the OpenTofu layer reads the same files directly with `file()`, so it has no copy to drift.
 
 `run.sh` is executed from a copy in `/run` rather than from the checkout, because it moves that checkout between revisions and Bash re-reads a script file as it executes.
-
----
 
 ### Autoinstall YAML files
 
@@ -350,6 +338,8 @@ The repeated APT metadata refreshes in the update and provisioning phases are in
 Each script must remain independently executable and cannot assume a previous phase completed successfully.
 
 `02` and `03` therefore both run `dist-upgrade` unconditionally, including when `90` invokes them back to back.
+
+---
 
 ## Validation
 

@@ -15,3 +15,5 @@ Windows 10 Enterprise. Shared Windows behaviour is in [WINDOWS.md](../WINDOWS.md
 | Account on a clone | `Administrator`, renamed to `syselement` |
 
 Windows 10 needs neither Secure Boot nor a TPM, but the template keeps both so the three Windows templates stay identical everywhere else. Other Windows 10 media works with `-var 'iso_file=local:iso/<name>.iso'`, `image_index` set to the edition you want, and `product_key` if it needs one.
+
+---

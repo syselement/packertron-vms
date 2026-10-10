@@ -13,3 +13,5 @@ Ubuntu Server 26.04 LTS from the official ISO, installed by the autoinstall seed
 | `ssh_timeout` | 30m |
 
 The same template as [24.04](../ubuntu-24.04-server/README.md), with the release changed.
+
+---

@@ -12,3 +12,5 @@ Written with [ynlamy/packer-ubuntuserver24_04](https://github.com/ynlamy/packer-
 | Provisioning | `00-update-system.sh`, then the whole `scripts/ubuntu/` tree staged for `02-provision-system.sh`, then `01-cleanup-system.sh` last |
 
 A fat image: everything is baked in at build time, the opposite of the thin [Proxmox template](../../proxmox/ubuntu-24.04-server/README.md). cloud-init stays pinned, and the SSH host keys are kept, so treat a VM built from it as one machine, not an image to clone - see [SECURITY.md](../../../SECURITY.md).
+
+---

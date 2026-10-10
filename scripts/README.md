@@ -12,6 +12,8 @@ The provisioners the templates run, the node and repository tooling, and the che
 | [`install-requirements.sh`](install-requirements.sh), [`.ps1`](install-requirements.ps1) | the host tooling, reported or installed; Linux and Windows | [below](#checks) |
 | [`sync-firstboot.sh`](sync-firstboot.sh) | re-embeds `ubuntu/firstboot/` into every seed that carries it | [ubuntu/README.md](ubuntu/README.md#firstboot) |
 
+---
+
 ## Checks
 
 ```bash
@@ -32,7 +34,7 @@ git config core.hooksPath .githooks         # optional: the fast ones before eac
 | `ubuntu` | the `ubuntu/` lint and Bats suite, as `ubuntu-static-checks.yml` runs them |
 | `bats` | the other Bats suites, such as `proxmox/tests/` |
 | `tofu` | `tofu fmt` and `validate` on `deploy/` |
-| `docs`, `markdown`, `links` | one sentence per line, markdownlint, and every relative link and anchor |
+| `docs`, `markdown`, `links` | one sentence per line and a `---` rule before each `##` heading, markdownlint, and every relative link and anchor |
 | `yaml`, `workflows` | yamllint, and actionlint and zizmor on the workflows |
 | `matrix`, `firstboot` | the CI matrix matches the templates on disk; the seeds embed the current first-boot files |
 | `secrets` | gitleaks on the git history |
@@ -43,6 +45,8 @@ A machine provisioned by [`ubuntu/03-customize-system.sh`](ubuntu/README.md) alr
 
 CI installs the latest Packer and OpenTofu on every run, so keep the local ones current too - `install-requirements.sh install` takes Packer from HashiCorp's APT repository.
 
+---
+
 ## Pins
 
 ```bash
@@ -50,6 +54,8 @@ GH_TOKEN="$(gh auth token)" scripts/check-pins.sh   # the token lifts GitHub's a
 ```
 
 It compares each ISO, virtio-win, cloudbase-init, the Packer plugins, the OpenTofu provider and the CI linters with their latest upstream release. The Watch pins workflow runs it every Monday and keeps one issue open while anything is behind.
+
+---
 
 ## Windows
 
@@ -102,3 +108,5 @@ powershell -NoProfile -ExecutionPolicy Bypass -File D:\setup-windows.ps1 -Enable
 ```
 
 It needs the network, and it installs the TightVNC server along with the rest - set its password, as [SECURITY.md](../SECURITY.md#windows) says. Run Windows Update afterwards.
+
+---

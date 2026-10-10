@@ -14,3 +14,5 @@ Windows Server 2025 Standard with the Desktop Experience for VMware Workstation,
 The build installs from `config/autounattend.xml` on a floppy, adds VMware Tools, then runs the Proxmox chain: `09_system_settings.ps1`, the `rgl/windows-update` loop, `10_wait_for_servicing.ps1`, then `03_cleanup.ps1` and `12_sysprep.ps1` with `config/unattend.xml`. There is no cloudbase-init here, which `12_sysprep.ps1` is told with `PACKERTRON_CLOUDBASE_INIT=false`. The shutdown command, [`packer_shutdown.bat`](../../../scripts/windows/packer_shutdown.bat), blocks inbound SSH and shuts the generalized image down; on the box's first boot, `04_startup.ps1` opens SSH again once that boot has finished.
 
 The [`Vagrantfile`](Vagrantfile) defines one machine, `win2025srv01` (2 vCPUs, 4 GB, NAT), runs [`install_utils.ps1`](../../../scripts/windows/install_utils.ps1) on it - winget, its utilities and UniGetUI, and Chocolatey - and renames it.
+
+---

@@ -269,6 +269,38 @@ check_docs() {
     done < <(printf '%s\n' "$found")
 }
 
+# AGENTS.md: a --- rule before every ## heading and at the end of the file,
+# and nowhere else.
+check_rules() {
+    local relative found
+
+    note "Markdown rules before each ## heading"
+
+    found="$(
+        while read -r relative; do
+            [[ -n "$relative" ]] || continue
+            awk -v file="$relative" '
+                /^[[:space:]]*(```|~~~)/ { fence = !fence; next }
+                fence { next }
+                /^[[:space:]]*$/ { next }
+                /^## / && last != "---" { printf "%s:%d: no --- rule before this heading\n", file, NR }
+                last == "---" && !/^## / { printf "%s:%d: a --- rule may only precede a ## heading or end the file\n", file, lastnr }
+                { last = $0; lastnr = NR }
+                END { if (last != "---") printf "%s:%d: no --- rule at the end of the file\n", file, NR }
+            ' "$REPO_ROOT/$relative"
+        done < <(cd "$REPO_ROOT" && git ls-files '*.md' | grep -v '^CHANGELOG.md$')
+    )"
+
+    if [[ -z "$found" ]]; then
+        pass "every ## heading has its rule, and every file ends with one"
+        return
+    fi
+    while read -r location; do
+        [[ -n "$location" ]] || continue
+        fail "$location"
+    done < <(printf '%s\n' "$found")
+}
+
 # The deploy/ module reads the first-boot files with file(), so a rename there
 # breaks it in a way nothing else here would catch.
 check_tofu() {
@@ -757,6 +789,7 @@ main() {
                 check_shell
                 check_powershell
                 check_docs
+                check_rules
                 check_markdown
                 check_links
                 check_yaml
@@ -778,7 +811,10 @@ main() {
             tofu) check_tofu ;;
             matrix) check_matrix ;;
             shell) check_shell ;;
-            docs) check_docs ;;
+            docs)
+                check_docs
+                check_rules
+                ;;
             markdown) check_markdown ;;
             links) check_links ;;
             yaml) check_yaml ;;

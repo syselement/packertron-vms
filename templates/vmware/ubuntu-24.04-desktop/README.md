@@ -15,3 +15,5 @@ The [`Vagrantfile`](Vagrantfile) defines two machines from the box, with the sam
 | --- | --- |
 | `base` | the box as built |
 | `provisioned` | `02-provision-system.sh` then `03-customize-system.sh`, on its first `vagrant up` - the workstation layer |
+
+---

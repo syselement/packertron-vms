@@ -7,6 +7,8 @@ What the Ubuntu and Kali templates share: the build, the seed and its key, and h
 | [`ubuntu-24.04-server`](ubuntu-24.04-server/README.md), [`ubuntu-26.04-server`](ubuntu-26.04-server/README.md), [`ubuntu-26.04-desktop`](ubuntu-26.04-desktop/README.md) | subiquity, `http/user-data` (autoinstall) | cloud-init, `nocloud` drive |
 | [`kali`](kali/README.md) | debian-installer, `http/kali.preseed` | cloud-init, `nocloud` drive |
 
+---
+
 ## The build
 
 ```text
@@ -24,6 +26,8 @@ builder        shuts the VM down and converts it to a template
 
 **The display is `qxl`**, so the Proxmox console offers SPICE as well as noVNC.
 
+---
+
 ## The seed and the SSH key
 
 Every seed authorizes one public key, and no key is committed: the seed carries an `@SSH_AUTHORIZED_KEY@` placeholder, and the template serves it with `http_content`, replaced by `ssh_authorized_key` from `../proxmox.pkrvars.hcl`. A build with no key fails validation, and `scripts/check-templates.sh seeds` fails if a real key is ever committed to a seed.
@@ -39,6 +43,8 @@ Without it the build reaches the installed system, fails every authentication, a
 
 `ssh_password` is never used to log in. It is piped to `sudo -S`, which the seed's `NOPASSWD` sudoers rule means sudo never reads. The seed's password hash is the published one for `packer` - see [SECURITY.md](../../SECURITY.md).
 
+---
+
 ## The guest agent arrives on the first boot
 
 The Ubuntu seeds install `qemu-guest-agent` from their `user-data:` section, on the first boot of the installed system, not from autoinstall's `packages:`:
@@ -47,6 +53,8 @@ The Ubuntu seeds install `qemu-guest-agent` from their `user-data:` section, on 
 - `00-update-system.sh` is too late: Packer needs the agent to learn the address before it can run any provisioner.
 
 The unit is static and normally started by a udev rule that fired before the package existed, so `runcmd` starts it. Kali installs it from the network mirror, through `pkgsel/include`.
+
+---
 
 ## Sealing for clones
 
@@ -64,6 +72,8 @@ The unit is static and normally started by a udev rule that fired before the pac
 
 **Why subiquity's cloud-init files go at the end, not in the seed.** Subiquity pins cloud-init to its own seed and disables its networking. Left in place, a clone ignores the drive Proxmox attaches and applies no hostname, user, key or network. Deleting them in the seed's `late-commands` looks equivalent and is not: `99-installer.cfg` is what applies the seed's `ssh:` section on the first boot, and writing `99-pve.cfg` before that boot drops the `None` datasource that carries it - either way the build hangs on "Waiting for SSH". `01`'s `cloud-init clean` removes them after the first boot, and the seal checks.
 
+---
+
 ## When the build stops
 
 | Symptom | Look at |
@@ -71,3 +81,5 @@ The unit is static and normally started by a udev rule that fired before the pac
 | "Waiting for SSH", and the VM's console shows a login prompt | `ssh-add -l`: the agent does not hold the key `ssh_authorized_key` names |
 | The installer stops at a question | the seed lacks that answer; it is on the console |
 | A clone has no hostname, user or address | cloud-init stayed pinned; the seal should have failed the build - check that it ran |
+
+---

@@ -15,3 +15,5 @@ Ubuntu Desktop 26.04 LTS from the official desktop ISO, installed by the autoins
 | `ssh_timeout` | 60m - the desktop install fetches language packs and takes far longer than the server one |
 
 **Still thin.** It installs the desktop base and the guest agent, nothing else, so one template serves a plain desktop VM and a full workstation: the workstation asks for `02,03` when it is cloned. A clone needs a console password - see [`deploy/`](../../../deploy/README.md#console-access).
+
+---

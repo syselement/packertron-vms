@@ -14,6 +14,8 @@ Packer builds each template on a Proxmox VE node from its installer ISO, and [`d
 
 Every template is thin: the base OS, the guest agent, and the agent that configures a clone from its cloud-init drive. A clone that needs more asks for it at first boot - see [`deploy/`](../../deploy/README.md#first-boot-provisioning).
 
+---
+
 ## From a bare node to a VM
 
 ```mermaid
@@ -79,6 +81,8 @@ Packer refuses a `vm_id` that already exists, so remove the previous template fi
 
 [`deploy/README.md`](../../deploy/README.md) clones a template into a VM with OpenTofu.
 
+---
+
 ## Dedicated role
 
 `prepare-node.sh` gives `automation@pve` this role at `/`, with a token whose privilege separation is off - a separated token starts with no privileges and every call it makes is denied. It is a practical role for building templates and cloning them, not a proven minimum; when something returns `403`, add the one missing privilege rather than switching to `Administrator`.
@@ -95,6 +99,8 @@ Packer refuses a `vm_id` that already exists, so remove the previous template fi
 
 `prepare-node.sh` sets the role back to exactly this list on every run, and prints any difference first.
 
+---
+
 ## When the build stops
 
 | Symptom | Look at |
@@ -106,8 +112,12 @@ Packer refuses a `vm_id` that already exists, so remove the previous template fi
 
 Family-specific failures are in [LINUX.md](LINUX.md) and [WINDOWS.md](WINDOWS.md#when-the-build-stops).
 
+---
+
 ## Verify
 
 ```bash
 scripts/check-templates.sh proxmox   # fmt, validate and the seeds of these templates
 ```
+
+---

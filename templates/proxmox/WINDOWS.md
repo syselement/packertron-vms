@@ -26,11 +26,15 @@ Everything else - firmware, TPM, disk, the build chain, the scripts - is identic
 | Clone configured by | cloud-init, `nocloud` drive | cloudbase-init, `configdrive2` drive |
 | `cores` / `memory` / `disk_size` | 2-4 / 2048-8192 / 30-64G | 4 / 4096 / 64G - Windows 11's minimums |
 
+---
+
 ## Media and tools
 
 - **The Windows ISO**, staged on the node under Microsoft's own filename and checked by [`stage-isos.sh`](../../scripts/proxmox/stage-isos.sh) against the SHA-256 each template pins. For media that is not an evaluation ISO, set `image_index` to the edition you want - `wiminfo sources/install.wim` lists them - and `product_key` if it needs one.
 - **virtio-win 0.1.302**, which Packer downloads and checks against a pinned SHA-256 - Fedora publishes none, so it was computed when the version was pinned. Set `virtio_iso_file` to use a copy already on the node.
 - **`xorriso` on the workstation.** Packer writes the answer file to a CD image locally before uploading it; `scripts/install-requirements.sh install` installs it.
+
+---
 
 ## The build
 
@@ -53,6 +57,8 @@ builder           shuts the VM down and converts it to a template
 **sysprep runs inside the last provisioner**, with `/quit`, and checks for `Sysprep_succeeded.tag`: a failed generalize is reported by name with the tail of `setuperr.log`, not as a build that times out. `proxmox-iso` then shuts the VM down itself - and the VMware Server box generalizes the same way. Hibernation goes off first: a clone resuming from a Fast Startup image would skip the specialize pass cloudbase-init runs in.
 
 **SSH, not WinRM.** The references this was checked against use WinRM over TLS with verification switched off; Windows ships OpenSSH Server, which needs no certificate, no HTTPS listener and no bypass.
+
+---
 
 ## How a clone configures itself
 
@@ -77,6 +83,8 @@ The first boot reboots once, for the hostname. Login does not work until it has.
 
 Two settings in `scripts/windows/cloudbase-init/` are deliberate rather than defaults. The plugin list omits both WinRM plugins, which would otherwise open an HTTPS WinRM listener on every clone. And `11_cloudbase_init.ps1` comments out the `Match Group administrators` block in `sshd_config`: cloudbase-init writes keys to the account's own `authorized_keys`, which stock OpenSSH ignores for administrators, so without it the keys would never work.
 
+---
+
 ## When the build stops
 
 | Symptom | Look at |
@@ -89,6 +97,8 @@ Two settings in `scripts/windows/cloudbase-init/` are deliberate rather than def
 | A provisioner fails with `exit status 2300218` | Packer lost the SSH session mid-script: something in it reset the network |
 | `12_sysprep.ps1` fails | the lines it prints from `setuperr.log`; an AppX package installed for one user is the usual cause |
 | A Server clone ignores the password, and only the SSH key works | Server's complexity rule refused it; see [`win-srv-2025/README.md`](win-srv-2025/README.md) |
+
+---
 
 ## Evaluation period
 
@@ -103,6 +113,8 @@ ssh syselement@<address> 'shutdown /r /t 5'
 ```
 
 On Server 2025 the account is `Administrator@`.
+
+---
 
 ## Check a clone after a template change
 
@@ -124,6 +136,8 @@ qm start 9311
 - [ ] A second clone has a different hostname and a different SID - `whoami /user`
 
 If cloudbase-init does not apply the drive, stop there: `deploy/` configures a Windows clone only through it.
+
+---
 
 ## Upstream license
 
@@ -152,3 +166,5 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
+
+---

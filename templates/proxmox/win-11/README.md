@@ -15,3 +15,5 @@ Windows 11 Enterprise. Shared Windows behaviour is in [WINDOWS.md](../WINDOWS.md
 | Account on a clone | `Administrator`, renamed to `syselement` |
 
 Windows 11 needs Secure Boot, a TPM 2.0, 4 GB of memory and a 64 GB disk, and the template has exactly that. It would also encrypt `C:` on its own, which sysprep refuses; the answer file switches that off.
+
+---

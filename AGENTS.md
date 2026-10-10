@@ -2,6 +2,8 @@
 
 Standards for this repository: Packer templates under `templates/`, the guest provisioning scripts under `scripts/`, Vagrantfiles, CI workflows and repo-wide files.
 
+---
+
 ## Scope
 
 - Everything in the repository is in play, and everything clears the same bar.
@@ -15,6 +17,8 @@ Standards for this repository: Packer templates under `templates/`, the guest pr
 - Preserve existing behavior unless the requested task explicitly changes it.
 - Do not rename or move scripts without explicit approval.
 
+---
+
 ## Target Systems
 
 - Everything is built for x86_64 (amd64) only: templates, VMs, installers and downloaded assets. Do not add ARM (`arm64`, `aarch64`, `armhf`) code paths; an installer meets any other architecture with a warning and a skip, not a failure.
@@ -24,6 +28,8 @@ Standards for this repository: Packer templates under `templates/`, the guest pr
 - Do not assume an interactive shell, graphical session, or logged-in desktop user.
 - Account for execution by Packer, cloud-init, autoinstall, Vagrant, or manual provisioning.
 - Do not add support for other distributions unless explicitly requested.
+
+---
 
 ## Existing Script Order
 
@@ -36,6 +42,8 @@ Preserve the intended execution order of `scripts/ubuntu/`:
 5. `90-bootstrap-baremetal.sh`, where applicable
 
 Do not introduce hidden dependencies between scripts. If one script depends on another, document the dependency clearly.
+
+---
 
 ## File Headers
 
@@ -68,6 +76,8 @@ Rules:
 - **Add a `STATUS:` line** directly under `Purpose` when a file does not work yet, saying concretely why.
 - Two constraints override placement: `#cloud-config` must stay the first line of a seed, and a file-wide `# shellcheck disable=` directive must stay before the first command. Build the header around them.
 
+---
+
 ## Comments
 
 - Explain **why**, not what the code already says. Delete a comment that restates its line.
@@ -76,6 +86,8 @@ Rules:
 - Cross-file explanations belong in the relevant `README.md`, referenced once from the header, not repeated in each file that touches the subject.
 - Do not add a comment merely to replace one you removed.
 - Comment-only changes must not touch code. Verify by stripping comments from both revisions and diffing what is left.
+
+---
 
 ## Documentation
 
@@ -94,6 +106,9 @@ Keep every README and similar document clear, concise and minimal, while preserv
 - Preserve important warnings, constraints, prerequisites, edge cases and operational details when simplifying.
 - When editing existing documentation, simplify and normalize it where appropriate rather than only appending new content.
 - Put commands in fenced `bash` blocks, one command per line, with a short comment where it helps. A command is documented in one README; the others link to it.
+- Put a `---` horizontal rule, with a blank line on each side, before every `##` heading and once more at the end of the file. Never put one before a `###` or deeper heading, or anywhere else. `scripts/check-templates.sh docs` enforces it.
+
+---
 
 ## Line Breaks
 
@@ -113,6 +128,8 @@ The two contexts want opposite things, so keep them apart.
 - Wrap on the width, not mid-thought: fill the line before starting a new one.
 - Do not carry the Markdown rule into a comment, and do not carry this one into Markdown.
 - Never leave a single word alone on the last line. Pull it up onto the line before, even if that runs a few columns past 79 - one orphaned word reads worse than one slightly long line.
+
+---
 
 ## Bash Standards
 
@@ -140,6 +157,8 @@ The two contexts want opposite things, so keep them apart.
 - Keep functions focused on one responsibility.
 - Preserve the current formatting style unless a formatting refactor is explicitly requested.
 
+---
+
 ## PowerShell Standards
 
 The Windows scripts run unattended inside a build, half an hour in, where a failure is expensive to reach. What the Windows templates learned:
@@ -153,6 +172,8 @@ The Windows scripts run unattended inside a build, half an hour in, where a fail
 - Never reset the network inside a Packer provisioner - the SSH session drops and Packer reports `exit status 2300218`. Driver installs that reset a NIC run at first logon.
 - Generalize inside the last provisioner, with `sysprep /quit`, and refuse a pending reboot first.
 
+---
+
 ## Packer Standards
 
 - Every template sets `required_version` and bounds every plugin below its next major release. A one-number pessimistic constraint such as `~> 1` bounds nothing - the major itself may rise - so write `~> 2.1` or an explicit range. Pin a third-party plugin exactly.
@@ -161,11 +182,15 @@ The Windows scripts run unattended inside a build, half an hour in, where a fail
 - Commit nothing that belongs to one person in a seed: the SSH key is an `@SSH_AUTHORIZED_KEY@` placeholder that `http_content` replaces from `ssh_authorized_key`.
 - Keep the templates of one family identical except for their values, so diffing two shows only what differs.
 
+---
+
 ## OpenTofu Standards
 
 - Run `tofu fmt`, and commit `.terraform.lock.hcl`: it pins each provider to its checksums.
 - The token and the clone password come from the environment - `PROXMOX_VE_API_TOKEN`, `TF_VAR_password` - never a tfvars file. State holds the password in plaintext and is never committed, with one state per tfvars.
 - Give every new `vms` field an `optional()` default that reproduces the previous behaviour, so existing entries and VMs are unchanged, and reject a combination that cannot work with a `validation` block at plan time.
+
+---
 
 ## Error Handling
 
@@ -192,6 +217,8 @@ die() {
 }
 ```
 
+---
+
 ## Idempotency
 
 - Scripts must be safe to run repeatedly.
@@ -205,6 +232,8 @@ die() {
 - Avoid unnecessary package-manager refreshes inside individual functions.
 - Do not reinstall software that is already correctly installed.
 - Avoid enabling or restarting services when their state does not need to change.
+
+---
 
 ## Privilege Handling
 
@@ -223,6 +252,8 @@ die() {
 - Do not assume that `$HOME` belongs to the intended desktop user while running under `sudo`.
 - Resolve the target non-root user explicitly when necessary.
 - Do not write user-owned files as root without correcting ownership.
+
+---
 
 ## Safety Restrictions
 
@@ -247,6 +278,8 @@ Do not perform or introduce any of the following without explicit approval:
 - replacing system configuration files wholesale
 
 Warn clearly before adding destructive or difficult-to-reverse operations.
+
+---
 
 ## Package Management
 
@@ -298,6 +331,8 @@ install_apt_packages() {
 }
 ```
 
+---
+
 ## Downloads and External Installers
 
 - Do not use unverified `curl | bash` or `wget | sh` patterns.
@@ -328,6 +363,8 @@ curl \
     "$download_url"
 ```
 
+---
+
 ## Desktop and Server Detection
 
 - Detect Ubuntu using `/etc/os-release`.
@@ -345,6 +382,8 @@ ubuntu-desktop
 ubuntu-server
 unsupported
 ```
+
+---
 
 ## Files and Configuration
 
@@ -368,6 +407,8 @@ Example managed block:
 - Do not create backups repeatedly on every run.
 - Validate generated configuration before activating it when a validation command exists.
 
+---
+
 ## Services and systemd
 
 - Check whether a unit exists before enabling or starting it.
@@ -379,6 +420,8 @@ Example managed block:
 - Do not mask, disable, or replace system services without explicit approval.
 - Report service changes that require VM-level validation.
 
+---
+
 ## User Configuration
 
 - Determine the intended non-root user explicitly.
@@ -389,6 +432,8 @@ Example managed block:
 - Do not overwrite existing user configuration without preserving or merging it.
 - GNOME and desktop-session configuration may require execution in the user's graphical session; do not pretend such changes were validated when no session was available.
 
+---
+
 ## Secrets
 
 - Never add passwords, tokens, API keys, private keys, recovery codes, or credentials to the repository.
@@ -398,6 +443,8 @@ Example managed block:
 - Use placeholders in examples.
 - Apply restrictive permissions to sensitive files.
 - Flag any existing secret-like material discovered during review.
+
+---
 
 ## Logging and Output
 
@@ -422,6 +469,8 @@ log_error() {
     printf '[ERROR] %s\n' "$*" >&2
 }
 ```
+
+---
 
 ## Testing and Validation
 
@@ -459,6 +508,8 @@ Do not run commands during validation that:
 
 Mock system-changing commands in tests where possible.
 
+---
+
 ## VM Testing
 
 Use a disposable Ubuntu VM for integration testing involving:
@@ -492,6 +543,8 @@ After VM testing:
 - inspect package-manager state
 - revert the snapshot when required
 
+---
+
 ## Change Management
 
 For each task:
@@ -508,6 +561,8 @@ For each task:
 - write commit messages as a short Conventional Commits subject and a body of a few lines saying what changed and why: neither a bare subject nor a long essay
 - do not add `Co-Authored-By`, "Generated with" or any other agent or tool attribution to commit messages or pull request descriptions
 - do not push branches or tags unless explicitly requested
+
+---
 
 ## Review Priorities
 
@@ -531,6 +586,8 @@ Report findings with:
 - impact
 - recommended fix
 
+---
+
 ## Agent Working Rules
 
 - Begin with an audit when the requested scope is broad.
@@ -548,3 +605,5 @@ Report findings with:
   4. validation results
   5. remaining risks
   6. VM tests still required
+
+---
