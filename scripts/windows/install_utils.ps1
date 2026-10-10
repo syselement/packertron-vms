@@ -41,6 +41,7 @@ $WingetPackages = @(
     'Microsoft.PowerShell'
     'Mozilla.Firefox'
     'Notepad++.Notepad++'
+    'REALiX.HWiNFO'
     'SublimeHQ.SublimeText.4'
     'WireGuard.WireGuard'
 )
@@ -249,6 +250,22 @@ function Install-WingetPackage {
     }
 }
 
+# A Public Desktop shortcut that starts Chris Titus Tech's WinUtil, the
+# debloat tool, in an elevated PowerShell. Nothing runs here: it is fetched
+# and run only when someone opens the shortcut and accepts the UAC prompt -
+# whatever that URL serves then, unverified, as WinUtil's own instructions
+# have it.
+function Install-WinUtilShortcut {
+    $path = Join-Path ([Environment]::GetFolderPath('CommonDesktopDirectory')) 'WinUtil (debloat).lnk'
+    $powershell = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
+    $shortcut = (New-Object -ComObject WScript.Shell).CreateShortcut($path)
+    $shortcut.TargetPath = $powershell
+    $shortcut.Arguments = '-NoProfile -Command "Start-Process powershell.exe -Verb RunAs -ArgumentList ''-NoProfile -ExecutionPolicy Bypass -Command irm https://christitus.com/win | iex''"'
+    $shortcut.IconLocation = "$powershell,0"
+    $shortcut.Description = 'Run Chris Titus Tech WinUtil as administrator'
+    $shortcut.Save()
+}
+
 # Windows PowerShell 5.1 may still default to TLS 1.0, which GitHub and
 # Chocolatey refuse.
 [System.Net.ServicePointManager]::SecurityProtocol =
@@ -274,5 +291,8 @@ if ($ChocolateyPackages.Count -gt 0) {
         throw "choco install failed with exit code $LASTEXITCODE"
     }
 }
+
+Write-Step 'Adding the WinUtil shortcut to the Public Desktop'
+Install-WinUtilShortcut
 
 Write-Step 'Utilities installation complete'
