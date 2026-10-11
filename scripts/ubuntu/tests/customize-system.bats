@@ -2995,7 +2995,7 @@ EOF
       cat >"$2" <<'EOF'
 [
   {
-    "tag_name": "release-2.6.0-tag",
+    "tag_name": "v2.6.0",
     "draft": false,
     "prerelease": false,
     "assets": [
@@ -3054,7 +3054,7 @@ EOF
       cat >"$2" <<'EOF'
 [
   {
-    "tag_name": "release-2.6.0-tag",
+    "tag_name": "v2.6.0",
     "draft": false,
     "prerelease": false,
     "assets": [
@@ -3119,7 +3119,7 @@ EOF
       cat >"$2" <<'EOF'
 [
   {
-    "tag_name": "release-2.6.0-tag",
+    "tag_name": "v2.6.0",
     "draft": false,
     "prerelease": false,
     "assets": [
@@ -3195,26 +3195,26 @@ EOF
     ]
   },
   {
-    "tag_name": "release-2.7.0-tag",
+    "tag_name": "v2.7.0",
     "draft": false,
     "prerelease": false,
     "assets": [
       {
         "name": "termix_linux_flatpak.flatpak",
         "state": "starter",
-        "browser_download_url": "https://github.com/Termix-SSH/Termix/releases/download/release-2.7.0-tag/termix_linux_flatpak.flatpak"
+        "browser_download_url": "https://github.com/Termix-SSH/Termix/releases/download/v2.7.0/termix_linux_flatpak.flatpak"
       }
     ]
   },
   {
-    "tag_name": "release-2.6.0-tag",
+    "tag_name": "v2.6.0",
     "draft": false,
     "prerelease": false,
     "assets": [
       {
         "name": "termix_linux_flatpak.flatpak",
         "state": "uploaded",
-        "browser_download_url": "https://github.com/Termix-SSH/Termix/releases/download/release-2.6.0-tag/termix_linux_flatpak.flatpak"
+        "browser_download_url": "https://github.com/Termix-SSH/Termix/releases/download/v2.6.0/termix_linux_flatpak.flatpak"
       }
     ]
   }
@@ -3231,11 +3231,71 @@ EOF
   run install_termix
 
   [[ "$status" -eq 0 ]]
-  [[ "$output" == *"Termix release-2.7.0-tag has no Flatpak bundle yet; using release-2.6.0-tag"* ]]
+  [[ "$output" == *"Termix v2.7.0 has no Flatpak bundle yet; using v2.6.0"* ]]
   [[ "$output" == *"Termix Flatpak 2.6.0 installed for testuser"* ]]
-  grep -Fq 'release-2.6.0-tag/termix_linux_flatpak.flatpak' "$command_record"
-  ! grep -Fq 'release-2.7.0-tag/termix_linux_flatpak.flatpak' "$command_record"
+  grep -Fq 'v2.6.0/termix_linux_flatpak.flatpak' "$command_record"
+  ! grep -Fq 'v2.7.0/termix_linux_flatpak.flatpak' "$command_record"
   ! grep -Fq 'beta/termix_linux_flatpak.flatpak' "$command_record"
+}
+
+@test "Termix skips the SDK releases in its repository" {
+  local command_record="$BATS_TEST_TMPDIR/termix-calver-record"
+  local version_file="$BATS_TEST_TMPDIR/termix-calver-version"
+
+  ARCH="amd64"
+  TARGET_USER="testuser"
+  printf '2.9.2\n' >"$version_file"
+
+  flatpak() {
+    case "$1" in
+      info) ;;
+      list) printf 'com.karmaa.termix\t%s\n' "$(<"$version_file")" ;;
+      install) printf '26.10.0\n' >"$version_file" ;;
+      *) return 2 ;;
+    esac
+  }
+  run_as_target_user() {
+    "$@"
+  }
+  fetch_file() {
+    printf '%s\n' "$1" >>"$command_record"
+    if [[ "$1" == *"/releases?per_page="* ]]; then
+      cat >"$2" <<'EOF'
+[
+  {
+    "tag_name": "sdk-v1.0.5",
+    "draft": false,
+    "prerelease": false,
+    "assets": []
+  },
+  {
+    "tag_name": "v26.10.0",
+    "draft": false,
+    "prerelease": false,
+    "assets": [
+      {
+        "name": "termix_linux_flatpak.flatpak",
+        "state": "uploaded",
+        "browser_download_url": "https://github.com/Termix-SSH/Termix/releases/download/v26.10.0/termix_linux_flatpak.flatpak"
+      }
+    ]
+  }
+]
+EOF
+    else
+      printf 'test Flatpak bundle\n' >"$2"
+    fi
+  }
+  verify_github_asset_digest() {
+    return 0
+  }
+
+  run install_termix
+
+  [[ "$status" -eq 0 ]]
+  [[ "$output" == *"updating Termix Flatpak from 2.9.2 to 26.10.0 for testuser"* ]]
+  [[ "$output" != *"has no Flatpak bundle yet"* ]]
+  grep -Fq 'v26.10.0/termix_linux_flatpak.flatpak' "$command_record"
 }
 
 @test "Termix fails clearly when no recent release has a Flatpak bundle" {
@@ -3249,7 +3309,7 @@ EOF
     "$@"
   }
   fetch_file() {
-    printf '[{"tag_name":"release-2.7.0-tag","draft":false,"prerelease":false,"assets":[]}]\n' >"$2"
+    printf '[{"tag_name":"v2.7.0","draft":false,"prerelease":false,"assets":[]}]\n' >"$2"
   }
 
   run install_termix

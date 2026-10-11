@@ -885,6 +885,7 @@ install_termix() (
 
     local app_id="com.karmaa.termix"
     local bundle_name="termix_linux_flatpak.flatpak"
+    local app_tag_pattern='^v[0-9]+(\.[0-9]+)+$'
     local installed_version=""
     local newest_tag release_tag release_version
     local temporary_dir
@@ -910,25 +911,25 @@ install_termix() (
         "$temporary_dir/releases.json" ||
         die "failed downloading Termix release metadata"
     # Termix publishes a release before its CI has uploaded the bundles, so for
-    # a while the newest release has no Flatpak. Take the newest stable release
-    # that has one; a later run picks up the new release once it is complete.
-    # shellcheck disable=SC2016 # $bundle is expanded by jq.
-    jq --arg bundle "$bundle_name" '
-        first(.[] | select(((.draft or .prerelease) | not) and
+    # a while the newest release has no Flatpak. Take the newest stable app
+    # release that has one; a later run picks up the new release once it is
+    # complete. The sdk-v* releases in the same repository carry no app.
+    # shellcheck disable=SC2016 # $app and $bundle are expanded by jq.
+    jq --arg app "$app_tag_pattern" --arg bundle "$bundle_name" '
+        first(.[] | select(((.draft or .prerelease) | not) and (.tag_name | test($app)) and
             any(.assets[]; .name == $bundle and .state == "uploaded"))) // empty
     ' "$temporary_dir/releases.json" >"$temporary_dir/release.json" ||
         die "could not read the Termix release metadata"
     [[ -s "$temporary_dir/release.json" ]] ||
         die "no recent stable Termix release has ${bundle_name}"
+    # shellcheck disable=SC2016 # $app is expanded by jq.
     newest_tag="$(
-        jq -r '[.[] | select((.draft or .prerelease) | not)][0].tag_name // empty' \
-            "$temporary_dir/releases.json"
+        jq -r --arg app "$app_tag_pattern" '
+            [.[] | select(((.draft or .prerelease) | not) and (.tag_name | test($app)))][0].tag_name // empty
+        ' "$temporary_dir/releases.json"
     )" || die "could not read the Termix release metadata"
     release_tag="$(jq -r '.tag_name // empty' "$temporary_dir/release.json")"
-    release_version="${release_tag#release-}"
-    release_version="${release_version%-tag}"
-    [[ "$release_tag" == release-* && "$release_version" =~ ^[0-9]+(\.[0-9]+)+$ ]] ||
-        die "unexpected Termix release tag: ${release_tag:-missing}"
+    release_version="${release_tag#v}"
     if [[ "$newest_tag" != "$release_tag" ]]; then
         info "Termix ${newest_tag} has no Flatpak bundle yet; using ${release_tag}"
     fi
