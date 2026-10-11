@@ -1,3 +1,12 @@
+## [1.0.2](https://github.com/syselement/packertron-vms/compare/v1.0.1...v1.0.2) (2026-10-11)
+
+
+### Bug Fixes
+
+* **deploy:** bump the bpg/proxmox provider to 0.116 ([d56d3a2](https://github.com/syselement/packertron-vms/commit/d56d3a20705c256862937057dba0a63fb43ef4cb)), closes [#58](https://github.com/syselement/packertron-vms/issues/58)
+
+
+
 ## [1.0.1](https://github.com/syselement/packertron-vms/compare/v1.0.0...v1.0.1) (2026-10-11)
 
 
