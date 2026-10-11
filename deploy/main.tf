@@ -121,6 +121,15 @@ resource "proxmox_virtual_environment_file" "firstboot" {
     data      = local.firstboot_vendor_data[each.key]
     file_name = "${each.key}-firstboot.yaml"
   }
+
+  # A snippet is read once, when its VM is created. Its content is ignored
+  # afterwards: replacing the file replaces the VM, so otherwise every edit to
+  # the scripts it embeds would recreate every VM that asked for them. Turning
+  # provisioning on or off still adds or removes the file, and the VM with it.
+  # README.md says how to roll a script change out.
+  lifecycle {
+    ignore_changes = [source_raw[0].data]
+  }
 }
 
 resource "proxmox_virtual_environment_file" "firstboot_windows" {
@@ -133,6 +142,15 @@ resource "proxmox_virtual_environment_file" "firstboot_windows" {
   source_raw {
     data      = local.windows_user_data[each.key]
     file_name = "${each.key}-firstboot-windows.txt"
+  }
+
+  # A snippet is read once, when its VM is created. Its content is ignored
+  # afterwards: replacing the file replaces the VM, so otherwise every edit to
+  # the scripts it embeds would recreate every VM that asked for them. Turning
+  # provisioning on or off still adds or removes the file, and the VM with it.
+  # README.md says how to roll a script change out.
+  lifecycle {
+    ignore_changes = [source_raw[0].data]
   }
 }
 

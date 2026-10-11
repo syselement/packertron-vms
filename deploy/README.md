@@ -95,7 +95,16 @@ Any other combination fails at plan time.
 - **Ubuntu** clones get a cloud-config as **vendor-data**, which cloud-init merges with the user-data Proxmox generates (hostname, account, keys, network); user-data would replace it, and the clone would come up with no account. It installs `git` and the [`packertron-firstboot`](../scripts/ubuntu/README.md#firstboot) service, which runs the steps from a fresh checkout, so a VM created a year from now gets the current scripts. `sudo tail -f /var/log/packertron-firstboot.log` shows the checkout itself.
 - **Windows** clones get **user-data**, the only kind cloudbase-init reads: a cloud-config part with the hostname, then the script, run once as LocalSystem. The password and keys still come from the `meta_data.json` Proxmox generates. The script is embedded at apply time from this checkout, not fetched on the clone.
 
-**Provisioning is decided when the VM is created.** Changing `provisioning_steps` on an existing VM replaces the VM: the provider recreates a VM whose user-data or vendor-data snippet changes. On Windows the script is embedded when you apply, so editing `install_utils.ps1` and applying again rewrites the snippet in place, and at its next boot the clone counts as a new instance: cloudbase-init runs the script again and sets the password again - to `TF_VAR_password`, or a random one, discarding one set inside Windows.
+**Provisioning is decided when the VM is created.** Turning `provisioning_steps` on or off for an existing VM replaces it, because its snippet is added or removed. Anything else that changes a snippet afterwards - other steps, `username`, `provisioning_repo_branch`, or an edit to a script it embeds (`scripts/ubuntu/firstboot/`, `install_utils.ps1`) - is ignored: existing VMs keep the snippet they were created with, and only new VMs get the change.
+
+To roll a change out to an existing VM, recreate it - everything on its disk is lost:
+
+```bash
+tofu plan  -var-file=lab.tfvars -replace='proxmox_virtual_environment_file.firstboot_windows["win10-01"]'   # Ubuntu: proxmox_virtual_environment_file.firstboot["srv-01"]
+tofu apply -var-file=lab.tfvars -replace='proxmox_virtual_environment_file.firstboot_windows["win10-01"]'
+```
+
+Replacing the snippet uploads the current one, and the VM is recreated with it. An Ubuntu VM can instead run the newer scripts in place, without recreating it - `90-bootstrap-baremetal.sh`, as [Manual provisioning](../scripts/ubuntu/README.md#manual-provisioning) shows.
 
 **The snippet goes over SSH.** Proxmox has no API for writing snippets, so the provider uploads them as root over SSH (`providers.tf`), and only when an entry asks for provisioning. The storage named by `snippet_datastore_id` must carry the `snippets` content type, which `local` does not by default:
 
