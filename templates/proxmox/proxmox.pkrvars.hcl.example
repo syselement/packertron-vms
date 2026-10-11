@@ -26,5 +26,9 @@ storage_pool     = "local-lvm"
 # Needs DHCP and outbound access: the installer fetches packages.
 network_bridge = "vmbr0"
 
+# The public key the Linux seeds authorize: the one `ssh-add -l` lists, since
+# Packer logs in through the agent. Not secret, but yours, so it stays here.
+ssh_authorized_key = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIexampleexampleexampleexampleexample you@workstation"
+
 # Leave false. Set it to true only for a node presenting a self-signed certificate that you have deliberately chosen to accept.
 insecure_skip_tls_verify = false

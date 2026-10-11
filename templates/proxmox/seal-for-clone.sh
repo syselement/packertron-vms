@@ -15,8 +15,7 @@
 # Docs:
 #   cloud-init      https://cloudinit.readthedocs.io/en/latest/
 #   Proxmox cloning https://pve.proxmox.com/wiki/VM_Templates_and_Clones
-#   README.md       ../ubuntu-24.04-server/README.md, "What the build does
-#                   before the template is sealed"
+#   LINUX.md        what each step prevents, and why the seal is not in 01
 #
 # Run:
 #   Packer invokes this as a provisioner; it is not meant to be run by hand.
@@ -30,12 +29,15 @@ die() {
     exit 1
 }
 
-# Overridable only so the check and the rule below can run against a fixture.
+# Overridable only so the tests can run every step against a fixture.
 CLOUD_CFG_DIR="${CLOUD_CFG_DIR:-/etc/cloud/cloud.cfg.d}"
 CLOUD_DISABLED_FILE="${CLOUD_DISABLED_FILE:-/etc/cloud/cloud-init.disabled}"
 UDEV_RULES_DIR="${UDEV_RULES_DIR:-/etc/udev/rules.d}"
 FSTAB_FILE="${FSTAB_FILE:-/etc/fstab}"
+SSH_HOST_KEY_DIR="${SSH_HOST_KEY_DIR:-/etc/ssh}"
+RANDOM_SEED_FILE="${RANDOM_SEED_FILE:-/var/lib/systemd/random-seed}"
 readonly CLOUD_CFG_DIR CLOUD_DISABLED_FILE UDEV_RULES_DIR FSTAB_FILE
+readonly SSH_HOST_KEY_DIR RANDOM_SEED_FILE
 
 # Written here, not at install time. Setting datasource_list before the first
 # boot drops None from it, and None is the datasource that carries subiquity's
@@ -146,14 +148,14 @@ RULE
 # had also never run: cloud-init always got there first.
 remove_host_keys() {
     log "remove SSH host keys"
-    rm -f /etc/ssh/ssh_host_* || die "failed removing SSH host keys"
+    rm -f "$SSH_HOST_KEY_DIR"/ssh_host_* || die "failed removing SSH host keys"
 }
 
 # systemd credits this to the entropy pool at boot and recreates it. Shipping
 # one means every clone starts from the same seed.
 remove_random_seed() {
     log "remove systemd random seed"
-    rm -f /var/lib/systemd/random-seed || die "failed removing random seed"
+    rm -f "$RANDOM_SEED_FILE" || die "failed removing random seed"
 }
 
 main() {

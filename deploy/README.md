@@ -1,125 +1,126 @@
 # deploy - Proxmox template to running VM
 
-One OpenTofu module that clones Packer-built templates, configures them through cloud-init, and boots them. Optionally it also tells a clone to provision itself at first boot.
+One OpenTofu module that clones Packer-built templates, configures them through cloud-init, boots them, and optionally tells each one to provision itself at first boot. VMs are entries in a `vms` map: one entry brings up one machine, a whole-lab map brings up all of them from one apply.
 
-VMs are described in a `vms` map, one entry per machine, and the module creates one VM per entry. A tfvars holding a single entry brings up one machine; a tfvars holding the whole lab brings up all of them from one apply.
+It is deliberately the smallest useful layer - a flat map, no composition, no remote state. Fleet-wide homelab infrastructure belongs in its own repository, which can consume this one as a module by git ref.
 
-This is deliberately the smallest useful layer: a flat map of VMs, no composition, no remote state, no modules of its own. Fleet-wide homelab infrastructure belongs in a separate repository, which can consume this one as a module by git ref. What lives here is the last step of this repository's own pipeline: **ISO to template to VM**.
+---
 
-## What it needs
+## Requirements
 
-| Thing | Where it comes from |
+| What | Where it comes from |
 | --- | --- |
-| API token | `PROXMOX_VE_API_TOKEN` in the environment, never a file |
-| Endpoint, node, storage | `deploy.tfvars`, which is gitignored |
-| Which templates to clone | `vms.<name>.template_vm_id` - `80024`/`80026` server, `80126` desktop, `80200` Kali |
-| First-boot files | read directly from `../scripts/ubuntu/firstboot/` |
+| API token | `PROXMOX_VE_API_TOKEN`, from the environment - see [Dedicated role](../templates/proxmox/README.md#dedicated-role) |
+| Endpoint, node, storage, keys | a `*.tfvars` of your own, gitignored - start from an `.example` |
+| Templates | built by [`templates/proxmox/`](../templates/proxmox/README.md) - IDs below |
+| First-boot provisioning only | root SSH to the node, and a storage with the `snippets` content type |
 
-The token needs the privileges to clone, configure and start a VM. It does **not** need `Sys.AccessNetwork`.
+---
 
 ## Usage
 
 ```bash
 cd deploy
-cp deploy.tfvars.example deploy.tfvars
-$EDITOR deploy.tfvars
-
+cp deploy.tfvars.example srv-01.tfvars          # *.tfvars is gitignored
 export PROXMOX_VE_API_TOKEN='automation@pve!deploy=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'
 tofu init
-tofu plan  -var-file=deploy.tfvars
-tofu apply -var-file=deploy.tfvars
+tofu workspace new srv-01                       # one state per tfvars
+tofu apply -var-file=srv-01.tfvars
+tofu output ipv4_addresses                      # empty until the guest agent starts
 ```
 
-Only `template_vm_id` is required per entry. Everything else falls back to a plain 2 core / 2048 MB / 32 GB server on DHCP, so the smallest useful VM is three lines:
+**One state per tfvars.** Applying a single-VM file in the workspace of a whole-lab file destroys every VM the lab file created and the single one does not mention. Give each tfvars its own workspace.
 
-```hcl
-vms = {
-  "srv-01" = { template_vm_id = 80026 }
-}
-```
+| Example | Holds |
+| --- | --- |
+| `deploy.tfvars.example` | the smallest thing that works: node settings and one server |
+| `lab.tfvars.example` | the whole lab: static address, linked clone, VLAN, workstation, Kali, Windows 10, 11 and Server 2025 |
+| `kali.tfvars.example` | Kali alone, with the settings it needs |
 
-`disk_size` must be at least the template's own size - Proxmox can grow a cloned disk but never shrink one - so the desktop needs `64` and Kali `50`.
+---
 
-To bring up several machines from one map, put them all in one file and give it its own workspace:
+## The `vms` map
 
-```bash
-tofu workspace new lab 2>/dev/null || tofu workspace select lab
-tofu plan  -var-file=lab.tfvars     # one VM per entry, plus a snippet per provisioned VM
-tofu apply -var-file=lab.tfvars
+The key is the VM's name and hostname - Windows truncates a hostname past 15 characters. Only `template_vm_id` is required; the rest falls back to a 2 core, 2048 MB, 32 GB clone on DHCP.
 
-tofu output ipv4_addresses          # keyed by VM name; empty until the guest agent starts
-```
+| Field | Default | Notes |
+| --- | --- | --- |
+| `template_vm_id` | - | the template to clone |
+| `os` | `"ubuntu"` | `ubuntu`, `kali` or `windows`; decides what `provisioning_steps` accepts |
+| `cores`, `memory`, `disk_size` | 2, 2048, 32 | `disk_size` must be at least the template's: Proxmox grows a cloned disk but never shrinks one |
+| `full_clone` | `true` | a linked clone is faster and smaller, but keeps the template undeletable |
+| `bridge`, `vlan_id` | unset | set either for another network; unset, the clone keeps the template's NIC (virtio on `vmbr0`) |
+| `ipv4_address`, `ipv4_gateway` | `"dhcp"` | a static address needs both, as `192.168.1.201/24` and `192.168.1.1` |
+| `username` | `var.username` | Server 2025 keeps `Administrator` |
+| `vm_id` | next free | |
+| `tags` | `["opentofu"]` | |
+| `provisioning_steps` | `""` | see [First-boot provisioning](#first-boot-provisioning) |
+| `vendor_data_file_id` | `""` | an existing snippet instead of the uploaded one - Ubuntu only |
 
-**One state per tfvars.** A file listing the whole lab and a file listing one VM are both valid, but they must not share a workspace: applying the single-VM file in the lab's workspace destroys everything the lab file created and the map no longer mentions. Give each its own with `tofu workspace new <name>`.
+| Template | `template_vm_id` | `os` | Minimum `disk_size` |
+| --- | --- | --- | --- |
+| Ubuntu Server 24.04 / 26.04 | 80024 / 80026 | `ubuntu` | 32 |
+| Ubuntu Desktop 26.04 | 80126 | `ubuntu` | 64 |
+| Kali | 80200 | `kali` | 50 |
+| Windows 10 / 11 / Server 2025 | 80310 / 80311 / 80325 | `windows` | 64 |
+
+---
 
 ## Console access
 
-cloud-init locks the account's password whenever it configures a user without one, so by default a clone is reachable **only by SSH key** - `packer`, the template's password, stops working on the console. For a server that is the intended posture. Pass a password through the environment rather than a file when one is wanted:
+cloud-init locks the account's password when it gets none, so by default a clone is reachable only by SSH key - the right posture for a server. Pass a password through the environment when one is needed:
 
 ```bash
 export TF_VAR_password='...'
-tofu apply -var-file=deploy.tfvars
 ```
 
-**Windows clones need one for the console too**, and Windows Server refuses a password that lacks three of upper case, lower case, digits and symbols - a simple one leaves the account with a random password. A Server entry sets `username = "Administrator"`, since cloudbase-init keeps that account there.
+- **Desktops and Kali need one.** GDM, Xfce and the Proxmox console have no key login, so a desktop created without one cannot be logged into. cloud-init applies it on the first boot only; for a clone already created without one, SSH in with the key and run `sudo passwd <user>`.
+- **Windows needs one for the console.** Server 2025 refuses a password without three of upper case, lower case, digits and symbols, and keeps a random one. Proxmox writes a Windows password to the cloud-init drive in plain text - see [`WINDOWS.md`](../templates/proxmox/WINDOWS.md#how-a-clone-configures-itself).
 
-**For a desktop clone this is required, not optional.** GDM and the Proxmox console have no key login, so a desktop created without a password cannot be logged into at all. cloud-init applies the password on the instance's first boot only, so exporting it afterwards and re-applying does not unlock an existing VM - for that, SSH in with the key and run `sudo passwd syselement`.
+---
 
-## Example profiles
+## First-boot provisioning
 
-| File | Holds |
-| --- | --- |
-| `deploy.tfvars.example` | the smallest thing that works: node settings and one server |
-| `lab.tfvars.example` | the whole lab in one map - static address, linked clone, workstation, Kali, Windows 10, 11 and Server 2025 |
-| `kali.tfvars.example` | the Kali template alone, with the settings it needs that the others do not |
+`provisioning_steps` is empty by default: the clone boots as exactly the template, and nothing is fetched or uploaded. Setting it is per VM, so one entry can ask for the full toolchain while the rest stay bare.
 
-## Provisioning is opt-in, and that is the whole design
+| `os` | `provisioning_steps` | The clone runs | Follow it |
+| --- | --- | --- | --- |
+| `ubuntu` | `"02"` | baseline and developer tooling | `sudo tail -f /var/log/packertron-bootstrap.log` |
+| `ubuntu` | `"02,03"` | the full toolchain, GNOME and shell configuration; reboots when done | same |
+| `windows` | `"utils"` | [`install_utils.ps1`](../scripts/windows/install_utils.ps1): winget, its utilities and UniGetUI, and Chocolatey | `C:\Program Files\Cloudbase Solutions\Cloudbase-Init\log\cloudbase-init.log` |
+| `kali` | - | nothing: Kali carries its toolset in the image | |
 
-`provisioning_steps` is empty by default, and an empty value means the clone boots and does nothing: no repository is fetched, no snippet is uploaded, nothing is installed. That is what keeps one thin template usable for a throwaway server and for a full workstation. It is set per VM, so one entry in the map can ask for the full toolchain while the rest stay bare.
+Any other combination fails at plan time.
 
-Set it to ask for more:
+- **Ubuntu** clones get a cloud-config as **vendor-data**, which cloud-init merges with the user-data Proxmox generates (hostname, account, keys, network); user-data would replace it, and the clone would come up with no account. It installs `git` and the [`packertron-firstboot`](../scripts/ubuntu/README.md#firstboot) service, which runs the steps from a fresh checkout, so a VM created a year from now gets the current scripts. `sudo tail -f /var/log/packertron-firstboot.log` shows the checkout itself.
+- **Windows** clones get **user-data**, the only kind cloudbase-init reads: a cloud-config part with the hostname, then the script, run once as LocalSystem. The password and keys still come from the `meta_data.json` Proxmox generates. The script is embedded at apply time from this checkout, not fetched on the clone.
 
-| Value | Result |
-| --- | --- |
-| `""` | nothing. The clone is exactly the template |
-| `"02"` | baseline and developer tooling |
-| `"02,03"` | the full toolchain, GNOME preferences and shell configuration - a desktop clone that matches the bare-metal machine |
+**Provisioning is decided when the VM is created.** Changing `provisioning_steps` on an existing VM replaces the VM: the provider recreates a VM whose user-data or vendor-data snippet changes. On Windows the script is embedded when you apply, so editing `install_utils.ps1` and applying again rewrites the snippet in place, and at its next boot the clone counts as a new instance: cloudbase-init runs the script again and sets the password again - to `TF_VAR_password`, or a random one, discarding one set inside Windows.
 
-**Not on Kali.** Those scripts are Ubuntu's, and `ubuntu-context.sh` refuses to run on anything else - a Kali clone that asks for them gets a `packertron-firstboot.service` that fails and retries every five minutes forever. Kali carries its toolset in the image instead.
-
-The steps are the scripts in [`../scripts/ubuntu/`](../scripts/ubuntu/), run on the clone by the same `packertron-firstboot` service the autoinstall seeds use. They run from a fresh checkout of the repository, so a VM created a year from now gets the current scripts rather than whatever was current when its template was baked.
-
-Provisioning runs in the background and finishes long after `tofu apply` returns. Follow it on the VM:
+**The snippet goes over SSH.** Proxmox has no API for writing snippets, so the provider uploads them as root over SSH (`providers.tf`), and only when an entry asks for provisioning. The storage named by `snippet_datastore_id` must carry the `snippets` content type, which `local` does not by default:
 
 ```bash
-sudo tail -f /var/log/packertron-firstboot.log     # fetching the repository
-sudo tail -f /var/log/packertron-bootstrap.log     # the steps themselves
+pvesm set local --content backup,iso,vztmpl,snippets   # on the node; --content replaces the list, so keep what was there
 ```
 
-`03` reboots the machine when it finishes.
+To avoid SSH, place an Ubuntu snippet on the node by hand and name it with `vendor_data_file_id` (generate it with `tofu console` and `local.firstboot_vendor_data`), or leave `provisioning_steps` empty and run [`90-bootstrap-baremetal.sh`](../scripts/ubuntu/README.md) on the VM yourself.
 
-## The one awkward requirement: SSH to the node
+---
 
-Proxmox has no API for writing snippets, so the provider uploads the first-boot vendor-data over SSH. That is why `providers.tf` carries an `ssh` block, and it applies **only** when `provisioning_steps` is non-empty - a plain clone never touches it.
+## State
 
-Two ways to avoid it, if SSH access to the node is not something you want to grant:
-
-1. Place the snippet on the node once by hand and name it with `vendor_data_file_id`, for example `vendor_data_file_id = "local:snippets/firstboot.yaml"`. Generate its content with `tofu console` and `local.firstboot_vendor_data`, or write the three files by hand.
-2. Leave `provisioning_steps` empty and run `90-bootstrap-baremetal.sh` on the VM yourself afterwards.
-
-The storage named by `snippet_datastore_id` must also have the **snippets** content type enabled. `local` does not by default; the provider then warns and the upload fails with `tee: /var/lib/vz/snippets/...: No such file or directory`. Enable it once on the node:
+The state holds the clone password in plaintext. Git ignores it; keep it on this machine, readable only by you:
 
 ```bash
-pvesm set local --content backup,iso,vztmpl,snippets   # --content replaces the list; keep what was there
+chmod 700 terraform.tfstate.d
+chmod 600 terraform.tfstate* terraform.tfstate.d/*/terraform.tfstate*
 ```
 
-Or under Datacenter -> Storage -> `local` -> Edit -> Content. Destroying a VM removes its snippet through the API, which is why the token's role needs `Datastore.Allocate`.
-
-## Why vendor-data and not user-data
-
-Proxmox generates the cloud-init user-data that carries the hostname, account, SSH keys and network configuration. Supplying our own user-data replaces all of it, and the clone comes up with no account and no address. The first-boot files go in vendor-data instead, which cloud-init merges alongside what Proxmox generated rather than in place of it.
+---
 
 ## What this does not do
 
-- No LXC. Packer cannot build a Proxmox LXC template - the plugin has `iso` and `clone` builders and nothing else - so containers are not part of this pipeline.
-- No fleet management, inventory, DNS, or multi-VM composition. That is the separate homelab repository's job.
+- No LXC: Packer cannot build a Proxmox container template, so containers are not part of this pipeline.
+- No fleet management, inventory or DNS - that is the separate homelab repository's job.
+
+---

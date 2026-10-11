@@ -4,9 +4,9 @@
 # One resource per entry in var.vms, so a tfvars holding one entry brings up one
 # VM and a tfvars holding the whole lab brings up all of them from one apply.
 #
-# The first-boot files are read straight from scripts/ubuntu/firstboot/ rather
-# than copied here, so this layer cannot drift from the autoinstall seeds that
-# embed the same files.
+# The first-boot files are read straight from scripts/ rather than copied here,
+# so this layer cannot drift from the autoinstall seeds that embed the same
+# Ubuntu files, or from the Windows script the VMware box runs.
 #
 # Docs:
 #   vm resource    https://registry.terraform.io/providers/bpg/proxmox/latest/docs/resources/virtual_environment_vm
@@ -22,7 +22,12 @@ locals {
   # needs one uploaded. Everything else clones and boots untouched.
   provisioned = {
     for name, vm in var.vms : name => vm
-    if vm.provisioning_steps != "" && vm.vendor_data_file_id == ""
+    if vm.os == "ubuntu" && vm.provisioning_steps != "" && vm.vendor_data_file_id == ""
+  }
+
+  windows_provisioned = {
+    for name, vm in var.vms : name => vm
+    if vm.os == "windows" && vm.provisioning_steps != ""
   }
 
   firstboot_conf = {
@@ -76,6 +81,33 @@ locals {
       ]
     })}"
   }
+
+  # user-data, not vendor-data: cloudbase-init reads only the former. It
+  # replaces the cloud-config Proxmox would write, whose hostname line is where
+  # cloudbase-init takes the clone's name from, so the first part restores
+  # that line. The password and keys stay in the meta_data.json Proxmox still
+  # generates. The script part runs once, as LocalSystem, through 64-bit
+  # PowerShell - cloudbase-init picks the interpreter from the .ps1 name.
+  windows_user_data = {
+    for name in keys(local.windows_provisioned) : name => join("\n", [
+      "Content-Type: multipart/mixed; boundary=\"packertron-firstboot\"",
+      "MIME-Version: 1.0",
+      "",
+      "--packertron-firstboot",
+      "Content-Type: text/cloud-config; charset=\"us-ascii\"",
+      "",
+      "#cloud-config",
+      "hostname: ${split(".", name)[0]}",
+      "",
+      "--packertron-firstboot",
+      "Content-Type: text/x-shellscript; charset=\"us-ascii\"",
+      "Content-Disposition: attachment; filename=\"install_utils.ps1\"",
+      "",
+      file("${path.module}/../scripts/windows/install_utils.ps1"),
+      "--packertron-firstboot--",
+      "",
+    ])
+  }
 }
 
 resource "proxmox_virtual_environment_file" "firstboot" {
@@ -88,6 +120,19 @@ resource "proxmox_virtual_environment_file" "firstboot" {
   source_raw {
     data      = local.firstboot_vendor_data[each.key]
     file_name = "${each.key}-firstboot.yaml"
+  }
+}
+
+resource "proxmox_virtual_environment_file" "firstboot_windows" {
+  for_each = local.windows_provisioned
+
+  content_type = "snippets"
+  datastore_id = var.snippet_datastore_id
+  node_name    = var.proxmox_node
+
+  source_raw {
+    data      = local.windows_user_data[each.key]
+    file_name = "${each.key}-firstboot-windows.txt"
   }
 }
 
@@ -134,6 +179,19 @@ resource "proxmox_virtual_environment_vm" "this" {
     ssd          = true
   }
 
+  # Without this block the clone keeps the template's NIC: virtio on vmbr0,
+  # firewall off. Naming a bridge or a VLAN makes the provider own the whole
+  # device, so model and firewall are restated to match the templates.
+  dynamic "network_device" {
+    for_each = each.value.bridge == null && each.value.vlan_id == null ? [] : [1]
+    content {
+      bridge   = coalesce(each.value.bridge, "vmbr0")
+      vlan_id  = each.value.vlan_id
+      model    = "virtio"
+      firewall = false
+    }
+  }
+
   agent {
     enabled = true
   }
@@ -160,6 +218,12 @@ resource "proxmox_virtual_environment_vm" "this" {
       contains(keys(local.provisioned), each.key)
       ? proxmox_virtual_environment_file.firstboot[each.key].id
       : (each.value.vendor_data_file_id == "" ? null : each.value.vendor_data_file_id)
+    )
+
+    user_data_file_id = (
+      contains(keys(local.windows_provisioned), each.key)
+      ? proxmox_virtual_environment_file.firstboot_windows[each.key].id
+      : null
     )
   }
 

@@ -19,7 +19,7 @@ packer {
   required_version = ">= 1.12.0"
   required_plugins {
     proxmox = {
-      version = ">= 1.2.1"
+      version = ">= 1.2.1, < 2.0.0"
       source  = "github.com/hashicorp/proxmox"
     }
   }
@@ -61,13 +61,13 @@ variable "insecure_skip_tls_verify" {
 # snapshot, and the preseed full-upgrades to current during the install.
 variable "iso" {
   type        = string
-  description = "A URL to the ISO file; Packer downloads it to iso_storage_pool"
+  description = "ISO to download into iso_storage_pool when iso_file is empty"
   default     = "https://cdimage.kali.org/kali-2026.2/kali-linux-2026.2-installer-amd64.iso"
 }
 
 variable "checksum" {
   type        = string
-  description = "The checksum for the ISO file"
+  description = "Where var.iso's checksum comes from: sha256:<hex>, or file:<SHA256SUMS URL>"
   default     = "file:https://cdimage.kali.org/kali-2026.2/SHA256SUMS"
 }
 
@@ -143,8 +143,22 @@ variable "ssh_host" {
 # build wait out the SSH timeout.
 variable "ssh_username" {
   type        = string
-  description = "The username to connect to SSH"
+  description = "Account the seed creates, which Packer logs in as"
   default     = "syselement"
+}
+
+# The public key the seed authorizes for that account. Nothing is committed
+# in its place: set it in ../proxmox.pkrvars.hcl, or export
+# PKR_VAR_ssh_authorized_key. Its comment may hold no quote, dollar sign
+# or backslash, which the seed would have to escape.
+variable "ssh_authorized_key" {
+  type        = string
+  description = "Public key the seed authorizes, as one authorized_keys line"
+
+  validation {
+    condition     = can(regex("^(ssh-ed25519|ssh-rsa|ecdsa-sha2-nistp(256|384|521)|sk-ssh-ed25519@openssh\\.com|sk-ecdsa-sha2-nistp256@openssh\\.com) [A-Za-z0-9+/]+={0,3}( [^'\"\\\\$`]*)?$", var.ssh_authorized_key))
+    error_message = "Set ssh_authorized_key to one public key line, such as the content of ~/.ssh/id_ed25519.pub, with no quote, dollar sign or backslash in its comment."
+  }
 }
 
 # Not used to log in: the preseed turns password authentication off. Only
@@ -230,7 +244,11 @@ source "proxmox-iso" "kali" {
   cloud_init              = true
   cloud_init_storage_pool = var.storage_pool
 
-  http_directory    = "${path.root}/http"
+  # Served from memory rather than http/ on disk, so the seed authorizes
+  # var.ssh_authorized_key instead of a key committed to the repository.
+  http_content = {
+    "/kali.preseed" = replace(file("${path.root}/http/kali.preseed"), "@SSH_AUTHORIZED_KEY@", var.ssh_authorized_key)
+  }
   http_bind_address = var.http_bind_address
 
   # Under OVMF the ISO boots GRUB, not isolinux, so the BIOS-era "<esc> then

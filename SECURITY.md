@@ -2,6 +2,8 @@
 
 This repository builds lab VM templates. Read this before pointing anything it produces at a network you do not control.
 
+---
+
 ## The images ship a known password
 
 Every autoinstall seed - `scripts/ubuntu/autoinstall-*.yaml` and each `templates/*/*/http/user-data` - commits a SHA-512 crypt hash for the initial user, and the plaintext is documented in the file next to it.
@@ -13,7 +15,7 @@ It follows that:
 
 - Every machine built from this repository starts with the **same** console password.
 - The same seeds grant that user `NOPASSWD: ALL` sudo, permanently.
-- SSH password authentication is disabled (`allow-pw: false`) and a fixed ed25519 public key is authorized, so remote access depends on holding the matching private key - but console and GDM login do not.
+- SSH password authentication is disabled (`allow-pw: false`), and the only authorized key is the one the builder supplies: the seeds carry an `@SSH_AUTHORIZED_KEY@` placeholder, which Packer replaces with `ssh_authorized_key`. No key is committed, so a fork authorizes its own builder's key, not this repository owner's. Remote access depends on holding the matching private key - console and GDM login do not.
 - Because of that, the Proxmox build authenticates through the **SSH agent** (`ssh_agent_auth`), not a password and not a key file. No passphrase-less copy of a personal key has to exist on disk for a build to run.
 
 **Change the password on any machine that will be reachable by anyone else.**
@@ -28,7 +30,11 @@ It is not meant to reach a clone. Sysprep generalizes the image, and on the clon
 
 That depends on cloudbase-init running. **Until it has, assume a clone may still accept the build password for `Administrator` over SSH and RDP** - so do not put one on a network anyone else can reach before confirming it configured itself, and treat the build password as public like the Linux one.
 
+A clone provisioned with `provisioning_steps = "utils"`, and the VMware `win-srv-2025` box, also run a TightVNC server, as a service with a firewall exception for port 5900, and **with no password until you set one** in TightVNC's service configuration. Set it, or stop the service, before the clone reaches a network anyone else can reach.
+
 The clone's own password is exposed differently. Proxmox writes a Windows VM's password to its cloud-init drive in plain text, and the drive stays attached, so any local user can read it. Change it after the first login, or remove it from the drive with `qm set <vmid> --delete cipassword` and `qm cloudinit update <vmid>`.
+
+---
 
 ## Credentials belong in the environment
 
@@ -37,6 +43,7 @@ Nothing that authenticates to real infrastructure is committed. A value lands in
 | Kind | Where | Committed |
 | --- | --- | --- |
 | API token, SSH password | environment, `PKR_VAR_*` | **never** |
+| `deploy/` token, clone password, state passphrase | environment, `PROXMOX_VE_API_TOKEN` and `TF_VAR_*` | **never** |
 | Node name, storage pools, bridge | `templates/proxmox/proxmox.pkrvars.hcl` | no - only the `.example` |
 | ISO URL, checksum, sizing | the template's `.pkr.hcl` / `.auto.pkrvars.hcl` | yes |
 
@@ -52,8 +59,11 @@ export PKR_VAR_ssh_password="..."
 - The middle row is not secret, but it describes one person's network, so it is not shared either.
 - `.gitignore` excludes `proxmox.pkrvars.hcl` and any `*.local.pkrvars.hcl`, along with `*.tfvars`, `.env`, `*.kdbx` and private keys.
 - Only `proxmox.pkrvars.hcl.example` is tracked.
+- `deploy/` state holds the clone password in plaintext: it is gitignored, and stays on the machine that applies, readable only by its owner - see [`deploy/README.md`](deploy/README.md#state).
 
 A token in the environment cannot be committed by a mistake in a `.gitignore` rule, which is why the split is drawn there rather than at "sensitive files".
+
+---
 
 ## Per-machine identity in a cloned image
 
@@ -74,6 +84,8 @@ It also fails the build if subiquity's cloud-init pinning survived the install, 
 - The VMware templates keep their host keys, because subiquity leaves cloud-init pinned there and nothing would regenerate them: an image with no host keys cannot start `sshd`.
 - Treat a VMware image built from this repository as one machine, not a template to clone widely - or unpin cloud-init there first, the same way `templates/proxmox/ubuntu-24.04-server/http/user-data` does.
 
+---
+
 ## Supply chain
 
 - GitHub Actions are pinned to commit SHAs, not tags, with the version in a trailing comment. Dependabot proposes the updates.
@@ -81,6 +93,8 @@ It also fails the build if subiquity's cloud-init pinning survived the install, 
 - Every other workflow checks out with `persist-credentials: false`.
 - An ISO Packer downloads is verified on every build, either as a literal `sha256:` or via the distribution's signed `SHA256SUMS`. An ISO already staged on the node (`iso_file`, the default for the Proxmox templates) is not checked by Packer at all, so it is verified once when it is staged - each template's README has the commands.
 - Packer plugins are pinned. The one third-party plugin, `rgl/windows-update`, is pinned to an exact version because it runs as SYSTEM on the Windows build VMs; `packer init` checks it against its release's `SHA256SUMS`. virtio-win and cloudbase-init, which the Windows builds download, are pinned by SHA-256, and cloudbase-init's Authenticode signature is checked too.
+
+---
 
 ## Recommended repository settings
 
@@ -108,7 +122,7 @@ Do **not** require `Changelog CI`. It has no `pull_request` trigger, so it would
 
 The push is rejected:
 
-```
+```text
 remote: - 2 of 2 required status checks are expected.
 ```
 
@@ -130,6 +144,10 @@ The workflow therefore uses a `RELEASE_TOKEN` secret:
 - `git push --follow-tags` sends tags and the branch separately, so a blocked release leaves an orphan tag pointing at a commit that is not on `main`; the next run then treats it as the last release and skips the bump.
 - Check with `git ls-remote --tags origin` after any failed release, and delete the stray tag with `git push origin :refs/tags/vX.Y.Z`.
 
+---
+
 ## Reporting
 
 This is a personal lab project. Open an issue, or contact the repository owner directly for anything you would rather not file publicly.
+
+---

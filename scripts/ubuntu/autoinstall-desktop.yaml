@@ -53,8 +53,10 @@ autoinstall:
   # configure authorized keys
   ssh:
     install-server: true
+    # Replace the placeholder with your public key before use: README.md,
+    # "Autoinstall YAML files".
     authorized-keys:
-      - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPA3hxPOnJAjCFoZMz8mcT+fZTy5j0vjLWPGVM2vaA88
+      - "@SSH_AUTHORIZED_KEY@"
     allow-pw: false
 
   # Packages to install (via apt-get install)

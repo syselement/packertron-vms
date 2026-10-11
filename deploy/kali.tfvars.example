@@ -3,14 +3,14 @@
 #   cp kali.tfvars.example kali-01.tfvars       # *.tfvars is gitignored
 #   tofu workspace new kali-01                  # its own state, beside the others
 #   export PROXMOX_VE_API_TOKEN='automation@pve!deploy=xxxxxxxx-...'
-#   export TF_VAR_password='...'                # REQUIRED, see below
+#   export TF_VAR_password='...'                # REQUIRED: Xfce has no key login
 #   tofu apply -var-file=kali-01.tfvars
 #
 # THE API TOKEN DOES NOT BELONG HERE, and neither does the password.
 
-proxmox_endpoint = "https://proxmox.example.lan:8006/"   # no /api2/json, unlike Packer
+proxmox_endpoint = "https://proxmox.example.lan:8006/" # no /api2/json, unlike Packer
 proxmox_node     = "pve"
-proxmox_insecure = false                                 # true only for a self-signed node
+proxmox_insecure = false # true only for a self-signed node
 datastore_id     = "vmstore"
 
 ssh_authorized_keys = [
@@ -20,6 +20,7 @@ ssh_authorized_keys = [
 vms = {
   "kali-01" = {
     template_vm_id = 80200
+    os             = "kali"
     cores          = 4
     memory         = 4096
 
@@ -27,11 +28,8 @@ vms = {
     # cloned disk but never shrink one. The default of 32 fails the apply.
     disk_size = 50
 
+    # Kali ships its toolset in the image, so os = "kali" makes the module
+    # refuse provisioning_steps rather than start a first boot that cannot run.
     tags = ["opentofu", "kali"]
-
-    # Kali ships a full toolset already, and the 02/03 scripts are Ubuntu's -
-    # ubuntu-context.sh refuses to run on anything else. Setting this on a Kali
-    # clone gets a packertron-firstboot.service that fails and retries every
-    # five minutes forever. Leaving it out is the default and is correct here.
   }
 }

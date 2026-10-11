@@ -35,17 +35,26 @@ variable "datastore_id" {
 
 # The map key is the VM's name, and also the hostname cloud-init sets. Only
 # template_vm_id is required; every other field has the default a plain server
-# would want, so a one-line entry is a valid VM. username overrides the shared
-# account for one VM: a Windows Server clone keeps "Administrator".
+# would want, so a one-line entry is a valid VM.
+# - username overrides the shared account for one VM: a Windows Server clone
+#   keeps "Administrator".
+# - os is the template's system. It decides what provisioning_steps may ask
+#   for, so a request the clone cannot run fails at plan time instead of on
+#   its first boot.
+# - bridge and vlan_id are for a clone that needs another network than the
+#   template's NIC; left unset, the clone keeps that NIC exactly.
 variable "vms" {
   type = map(object({
     template_vm_id      = number
+    os                  = optional(string, "ubuntu")
     vm_id               = optional(number)
     username            = optional(string)
     cores               = optional(number, 2)
     memory              = optional(number, 2048)
     disk_size           = optional(number, 32)
     full_clone          = optional(bool, true)
+    bridge              = optional(string)
+    vlan_id             = optional(number)
     ipv4_address        = optional(string, "dhcp")
     ipv4_gateway        = optional(string)
     tags                = optional(list(string), ["opentofu"])
@@ -56,10 +65,29 @@ variable "vms" {
 
   validation {
     condition = alltrue([
-      for name, vm in var.vms :
-      can(regex("^([0-9]{2}(,[0-9]{2})*)?$", vm.provisioning_steps))
+      for name, vm in var.vms : contains(["ubuntu", "kali", "windows"], vm.os)
     ])
-    error_message = "provisioning_steps must be empty or a comma-separated list of two-digit step numbers, such as \"02,03\"."
+    error_message = "os must be \"ubuntu\", \"kali\" or \"windows\"."
+  }
+
+  validation {
+    condition = alltrue([
+      for name, vm in var.vms : (
+        vm.provisioning_steps == "" ? true : (
+          vm.os == "ubuntu" ? can(regex("^[0-9]{2}(,[0-9]{2})*$", vm.provisioning_steps)) : (
+            vm.os == "windows" ? vm.provisioning_steps == "utils" : false
+          )
+        )
+      )
+    ])
+    error_message = "provisioning_steps must be empty, or two-digit Ubuntu steps such as \"02,03\" when os is \"ubuntu\", or \"utils\" when os is \"windows\". A Kali clone cannot provision."
+  }
+
+  validation {
+    condition = alltrue([
+      for name, vm in var.vms : vm.vlan_id == null ? true : (vm.vlan_id >= 1 && vm.vlan_id <= 4094)
+    ])
+    error_message = "vlan_id must be between 1 and 4094."
   }
 }
 

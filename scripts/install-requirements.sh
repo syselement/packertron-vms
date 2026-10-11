@@ -63,6 +63,8 @@ tool_version() {
         xmllint) xmllint --version 2>&1 | head -1 ;;
         bats) bats --version 2>/dev/null | head -1 ;;
         gitleaks) gitleaks version 2>/dev/null | head -1 ;;
+        tofu) tofu version 2>/dev/null | head -1 ;;
+        markdownlint-cli2) markdownlint-cli2 --help 2>/dev/null | head -1 ;;
         *) "$command_name" --version 2>/dev/null | head -1 ;;
     esac
 }
@@ -73,9 +75,9 @@ report() {
 
     if [[ "$state" == ok ]]; then
         version="$(tool_version "$command_name" || true)"
-        printf '   ok      %-14s %s\n' "$command_name" "${version:-installed}"
+        printf '   ok      %-18s %s\n' "$command_name" "${version:-installed}"
     else
-        printf '   MISSING %-14s %s\n' "$command_name" "$purpose"
+        printf '   MISSING %-18s %s\n' "$command_name" "$purpose"
     fi
 }
 
@@ -89,7 +91,9 @@ check_core() {
         "xmllint:checks the Windows answer files are well-formed"
         "shellcheck:lints every Bash script"
         "shfmt:checks Bash formatting"
-        "bats:runs the scripts/ubuntu test suite"
+        "bats:runs the Bats suites"
+        "tofu:validates the deploy/ module"
+        "jq:reads JSON in the pin and state checks"
         "git:required by gitleaks and the release workflow"
     )
 
@@ -110,9 +114,13 @@ check_core() {
 check_optional() {
     local entry command_name purpose
     local -a optional=(
-        "gitleaks:scans the tree and history for committed secrets"
+        "gitleaks:scans the history for committed secrets"
         "xorriso:builds the answer-file CD for the Windows Proxmox templates"
         "pwsh:parses and lints the Windows PowerShell scripts"
+        "yamllint:lints the workflows and the seeds"
+        "actionlint:lints the GitHub Actions workflows"
+        "zizmor:audits the workflows for security mistakes"
+        "markdownlint-cli2:lints the Markdown"
     )
     if [[ "$WITH_VMWARE" == true ]]; then
         optional+=("vagrant:runs the VMware desktop boxes")
@@ -132,7 +140,7 @@ check_optional() {
     done
 
     if have_psscriptanalyzer; then
-        printf '   ok      %-14s %s\n' PSScriptAnalyzer "PowerShell module"
+        printf '   ok      %-18s %s\n' PSScriptAnalyzer "PowerShell module"
     else
         report missing PSScriptAnalyzer "lints the Windows PowerShell scripts (needs pwsh)"
         missing_optional=$((missing_optional + 1))
@@ -147,15 +155,15 @@ check_vmware_manual() {
     log ''
     log '== manual (VMware path)'
     if have vmware || have vmrun; then
-        printf '   ok      %-14s %s\n' vmware "VMware Workstation found"
+        printf '   ok      %-18s %s\n' vmware "VMware Workstation found"
     else
-        printf '   MANUAL  %-14s %s\n' vmware \
+        printf '   MANUAL  %-18s %s\n' vmware \
             "install VMware Workstation Pro: https://support.broadcom.com/group/ecx/free-downloads"
     fi
     if have vagrant && vagrant plugin list 2>/dev/null | grep -q vagrant-vmware-desktop; then
-        printf '   ok      %-14s %s\n' vagrant-plugin "vagrant-vmware-desktop installed"
+        printf '   ok      %-18s %s\n' vagrant-plugin "vagrant-vmware-desktop installed"
     else
-        printf '   MANUAL  %-14s %s\n' vagrant-plugin \
+        printf '   MANUAL  %-18s %s\n' vagrant-plugin \
             "vagrant plugin install vagrant-vmware-desktop (as your own user, not root)"
     fi
 }
@@ -225,6 +233,7 @@ install_core() {
     have cloud-init || apt_packages+=(cloud-init)
     # The command and the package it ships in are named differently.
     have xmllint || apt_packages+=(libxml2-utils)
+    have jq || apt_packages+=(jq)
     have git || apt_packages+=(git)
 
     if ((${#apt_packages[@]} > 0)); then
@@ -237,6 +246,10 @@ install_core() {
         log '   installing: packer'
         apt_install packer
     fi
+
+    # OpenTofu's own APT repository would be one more third-party source on
+    # this host, so it stays a pointer.
+    have tofu || warn "tofu is not packaged for Ubuntu; install it from https://opentofu.org/docs/intro/install/"
 }
 
 install_optional() {
@@ -262,6 +275,19 @@ install_optional() {
         apt_install xorriso
     fi
 
+    if ! have yamllint; then
+        log '   installing: yamllint'
+        apt_install yamllint
+    fi
+
+    # The other linters come from GitHub, PyPI and npm rather than the Ubuntu
+    # archive; CI installs pinned versions, and check-templates.sh skips them
+    # where they are missing.
+    have actionlint ||
+        warn "actionlint: download a release from https://github.com/rhysd/actionlint/releases and check its digest"
+    have zizmor || warn "zizmor: pipx install zizmor"
+    have markdownlint-cli2 || warn "markdownlint-cli2: npm install --global markdownlint-cli2"
+
     if [[ "$WITH_VMWARE" == true ]] && ! have vagrant; then
         ensure_hashicorp_repository
         log '   installing: vagrant'
@@ -284,8 +310,8 @@ summary() {
     ((missing_optional == 0)) || log "${missing_optional} optional tool(s) missing; see above"
     log ''
     log 'Next:'
-    log '  scripts/check-templates.sh          # the checks CI runs'
-    log '  (cd scripts/ubuntu && bats tests)   # the provisioning test suite'
+    log '  scripts/check-templates.sh               # every check CI runs'
+    log '  git config core.hooksPath .githooks      # optional: the fast ones before each commit'
 }
 
 usage() {

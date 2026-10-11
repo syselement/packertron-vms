@@ -1,10 +1,11 @@
-# Ubuntu Server 26.04 LTS template for VMware Workstation, built from ISO.
-# Adapted from the 24.04 template in ../ubuntu-24.04-server, which came from Yoann LAMY <https://github.com/ynlamy/packer-ubuntuserver24_04> (GPLv3).
+# Ubuntu Server 26.04 LTS for VMware Workstation, installed from the ISO by
+# autoinstall and provisioned at build time with scripts/ubuntu/.
 #
 # Docs:
 #   vmware-iso builder  https://developer.hashicorp.com/packer/integrations/hashicorp/vmware/latest/components/builder/iso
 #   Autoinstall         https://canonical-subiquity.readthedocs-hosted.com/en/latest/reference/autoinstall-reference.html
-#   README.md           build steps and the credential note
+#   Reference           https://github.com/ynlamy/packer-ubuntuserver24_04
+#   README.md           what this build bakes in, and the credential note
 #
 # Run:
 #   packer init .
@@ -15,7 +16,7 @@ packer {
   required_version = ">= 1.12.0"
   required_plugins {
     vmware = {
-      version = ">= 1.0.0"
+      version = "~> 2.1"
       source  = "github.com/hashicorp/vmware"
     }
   }
@@ -23,13 +24,13 @@ packer {
 
 variable "iso" {
   type        = string
-  description = "A URL to the ISO file"
+  description = "Ubuntu Server ISO to download, checked against var.checksum"
   default     = "https://releases.ubuntu.com/26.04.1/ubuntu-26.04.1-live-server-amd64.iso"
 }
 
 variable "checksum" {
   type        = string
-  description = "The checksum for the ISO file"
+  description = "Where var.iso's checksum comes from: sha256:<hex>, or file:<SHA256SUMS URL>"
   # The codename directory carries SHA256SUMS for whichever point release is
   # current, so this keeps matching when iso is bumped.
   default = "file:https://releases.ubuntu.com/resolute/SHA256SUMS"
@@ -37,31 +38,46 @@ variable "checksum" {
 
 variable "headless" {
   type        = bool
-  description = "When this value is set to true, the machine will start without a console"
+  description = "Build without opening the VM's console window"
   default     = true
 }
 
 variable "name" {
   type        = string
-  description = "This is the name of the new virtual machine"
-  default     = "vm-ubuntuserver26_04"
+  description = "Name of the VM, and of its disk file"
+  default     = "ubuntu-26.04-server"
 }
 
-# Must match the identity block in http/user-data; a mismatch makes every build wait out the 30m SSH timeout.
+# Must match the identity block in http/user-data; a mismatch makes every
+# build wait out the 30m SSH timeout.
 variable "username" {
   type        = string
-  description = "The username to connect to SSH"
+  description = "Account the seed creates, which Packer logs in as"
   default     = "syselement"
+}
+
+# The public key the seed authorizes for that account. Nothing is committed
+# in its place: export PKR_VAR_ssh_authorized_key, or pass
+# -var ssh_authorized_key=.... Its comment may hold no quote, dollar sign
+# or backslash, which the seed would have to escape.
+variable "ssh_authorized_key" {
+  type        = string
+  description = "Public key the seed authorizes, as one authorized_keys line"
+
+  validation {
+    condition     = can(regex("^(ssh-ed25519|ssh-rsa|ecdsa-sha2-nistp(256|384|521)|sk-ssh-ed25519@openssh\\.com|sk-ecdsa-sha2-nistp256@openssh\\.com) [A-Za-z0-9+/]+={0,3}( [^'\"\\\\$`]*)?$", var.ssh_authorized_key))
+    error_message = "Set ssh_authorized_key to one public key line, such as the content of ~/.ssh/id_ed25519.pub, with no quote, dollar sign or backslash in its comment."
+  }
 }
 
 variable "password" {
   type        = string
-  description = "A plaintext password to authenticate with SSH"
+  description = "That account's password, the plaintext of the hash in http/user-data"
   sensitive   = true
   default     = "packer"
 }
 
-source "vmware-iso" "ubuntuserver26_04" {
+source "vmware-iso" "ubuntu" {
   iso_url      = var.iso
   iso_checksum = var.checksum
 
@@ -86,7 +102,12 @@ source "vmware-iso" "ubuntuserver26_04" {
 
   shutdown_command = "echo '${var.password}' | sudo -S systemctl poweroff"
 
-  http_directory = "${path.root}/http"
+  # Served from memory rather than http/ on disk, so the seed authorizes
+  # var.ssh_authorized_key instead of a key committed to the repository.
+  http_content = {
+    "/user-data" = replace(file("${path.root}/http/user-data"), "@SSH_AUTHORIZED_KEY@", var.ssh_authorized_key)
+    "/meta-data" = file("${path.root}/http/meta-data")
+  }
 
   boot_command = [
     "<esc><wait>",
@@ -109,7 +130,7 @@ source "vmware-iso" "ubuntuserver26_04" {
 }
 
 build {
-  sources = ["source.vmware-iso.ubuntuserver26_04"]
+  sources = ["source.vmware-iso.ubuntu"]
 
   # 00 has no library dependencies, so the shell provisioner can upload it on
   # its own.

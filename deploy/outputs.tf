@@ -24,8 +24,8 @@ output "provisioning_steps" {
 # where to watch it rather than implying the VMs are ready.
 output "next" {
   description = "What to do once apply returns"
-  value = length(local.provisioned) == 0 ? "VMs are up; no first-boot provisioning was requested." : join(" ", [
-    "First-boot provisioning is running on: ${join(", ", sort(keys(local.provisioned)))}.",
-    "Follow it with: ssh ${var.username}@<address> sudo tail -f /var/log/packertron-firstboot.log",
-  ])
+  value = length(local.provisioned) + length(local.windows_provisioned) == 0 ? "VMs are up; no first-boot provisioning was requested." : join(" ", compact([
+    length(local.provisioned) == 0 ? "" : "First-boot provisioning is running on: ${join(", ", sort(keys(local.provisioned)))}. Follow it with: ssh ${var.username}@<address> sudo tail -f /var/log/packertron-firstboot.log",
+    length(local.windows_provisioned) == 0 ? "" : "cloudbase-init runs install_utils.ps1 on: ${join(", ", sort(keys(local.windows_provisioned)))}. Its output lands in C:\\Program Files\\Cloudbase Solutions\\Cloudbase-Init\\log\\cloudbase-init.log.",
+  ]))
 }

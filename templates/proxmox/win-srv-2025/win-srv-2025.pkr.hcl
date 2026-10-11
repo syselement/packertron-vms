@@ -19,7 +19,7 @@ packer {
   required_version = ">= 1.12.0"
   required_plugins {
     proxmox = {
-      version = ">= 1.2.1"
+      version = ">= 1.2.1, < 2.0.0"
       source  = "github.com/hashicorp/proxmox"
     }
     # Pinned exactly: third-party, and it runs as SYSTEM on the build VM.
@@ -181,6 +181,16 @@ variable "ssh_password" {
   description = "Build-time password for the built-in Administrator"
   sensitive   = true
   default     = "packer"
+}
+
+# Shared with the Linux templates through ../proxmox.pkrvars.hcl and unused
+# here: the Windows build logs in with ssh_password, and a clone takes its
+# keys from the cloud-init drive. Declared so the shared file sets no
+# undeclared variable.
+variable "ssh_authorized_key" {
+  type        = string
+  description = "Unused by the Windows templates; see the Linux ones"
+  default     = ""
 }
 
 locals {

@@ -12,34 +12,35 @@
 #   vagrant up
 
 packer {
+  required_version = ">= 1.12.0"
   required_plugins {
     vmware = {
       source  = "github.com/hashicorp/vmware"
-      version = "~> 1"
+      version = "~> 2.1"
     }
     vagrant = {
       source  = "github.com/hashicorp/vagrant"
-      version = "~> 1"
+      version = "~> 1.1"
     }
   }
 }
 
 variable "iso_checksum" {
   type        = string
-  description = "The checksum for the ISO file"
+  description = "Checksum of iso_url: sha256:<hex>, file:<SHA256SUMS URL>, or the bare hex"
   default     = "file:https://releases.ubuntu.com/noble/SHA256SUMS"
 }
 
 variable "iso_url" {
   type        = string
-  description = "A URL to the ISO file"
-  default     = "https://releases.ubuntu.com/noble/ubuntu-24.04.4-desktop-amd64.iso"
+  description = "ISO to install from: a URL, or a path on the build host"
+  default     = "https://releases.ubuntu.com/noble/ubuntu-24.04.5.1-desktop-amd64.iso"
 }
 
 variable "iso_fallback_url" {
   type        = string
   description = "Fallback URL used when iso_url points to a missing local file"
-  default     = "https://releases.ubuntu.com/noble/ubuntu-24.04.4-desktop-amd64.iso"
+  default     = "https://releases.ubuntu.com/noble/ubuntu-24.04.5.1-desktop-amd64.iso"
 }
 
 variable "output_dir" {
@@ -56,6 +57,20 @@ variable "ssh_password" {
 variable "ssh_username" {
   type    = string
   default = "syselement"
+}
+
+# The public key the seed authorizes for that account. Nothing is committed
+# in its place: export PKR_VAR_ssh_authorized_key, or pass
+# -var ssh_authorized_key=.... Its comment may hold no quote, dollar sign
+# or backslash, which the seed would have to escape.
+variable "ssh_authorized_key" {
+  type        = string
+  description = "Public key the seed authorizes, as one authorized_keys line"
+
+  validation {
+    condition     = can(regex("^(ssh-ed25519|ssh-rsa|ecdsa-sha2-nistp(256|384|521)|sk-ssh-ed25519@openssh\\.com|sk-ecdsa-sha2-nistp256@openssh\\.com) [A-Za-z0-9+/]+={0,3}( [^'\"\\\\$`]*)?$", var.ssh_authorized_key))
+    error_message = "Set ssh_authorized_key to one public key line, such as the content of ~/.ssh/id_ed25519.pub, with no quote, dollar sign or backslash in its comment."
+  }
 }
 
 variable "vm_cpu_cores" {
@@ -100,10 +115,15 @@ source "vmware-iso" "ubuntu2404_desktop" {
   disk_size         = var.vm_disk_size
   disk_type_id      = "0"
   guest_os_type     = "ubuntu-64"
-  http_directory    = local.http_dir
-  iso_checksum      = var.iso_checksum
-  iso_url           = local.effective_iso_url
-  memory            = var.vm_memory
+  # Served from memory rather than http/ on disk, so the seed authorizes
+  # var.ssh_authorized_key instead of a key committed to the repository.
+  http_content = {
+    "/user-data" = replace(file("${local.http_dir}/user-data"), "@SSH_AUTHORIZED_KEY@", var.ssh_authorized_key)
+    "/meta-data" = file("${local.http_dir}/meta-data")
+  }
+  iso_checksum = var.iso_checksum
+  iso_url      = local.effective_iso_url
+  memory       = var.vm_memory
   # Required since packer-plugin-vmware v2.1.6; builds fail validation without it.
   network_adapter_type = "vmxnet3"
   output_directory     = "${var.output_dir}/${var.vm_name}"

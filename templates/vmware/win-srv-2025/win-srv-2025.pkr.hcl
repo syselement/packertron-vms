@@ -12,14 +12,20 @@
 #   vagrant up
 
 packer {
+  required_version = ">= 1.12.0"
   required_plugins {
     vmware = {
       source  = "github.com/hashicorp/vmware"
-      version = "~> 1"
+      version = "~> 2.1"
     }
     vagrant = {
       source  = "github.com/hashicorp/vagrant"
-      version = "~> 1"
+      version = "~> 1.1"
+    }
+    # Pinned exactly: third-party, and it runs as SYSTEM on the build VM.
+    windows-update = {
+      version = "0.18.5"
+      source  = "github.com/rgl/windows-update"
     }
   }
 }
@@ -41,13 +47,13 @@ variable "vm_disk_size" {
 # .\26100.1742.240906-0331.ge_release_svc_refresh_SERVER_EVAL_x64FRE_en-us.iso
 variable "iso_checksum" {
   type        = string
-  description = "The checksum for the ISO file"
+  description = "Checksum of iso_url: sha256:<hex>, file:<SHA256SUMS URL>, or the bare hex"
   default     = "D0EF4502E350E3C6C53C15B1B3020D38A5DED011BF04998E950720AC8579B23D"
 }
 
 variable "iso_url" {
   type        = string
-  description = "A URL to the ISO file"
+  description = "ISO to install from: a URL, or a path on the build host"
   default     = "https://software-static.download.prss.microsoft.com/dbazure/888969d5-f34g-4e03-ac9d-1f9786c66749/26100.1742.240906-0331.ge_release_svc_refresh_SERVER_EVAL_x64FRE_en-us.iso"
 }
 
@@ -118,7 +124,9 @@ source "vmware-iso" "winsrv2025" {
 }
 
 
-# Build block
+# The same chain as the Proxmox Windows templates, with VMware Tools in place
+# of the virtio drivers and no cloudbase-init: settings, the update loop, a
+# servicing check, then cleanup and sysprep in the last provisioner.
 build {
   sources = ["source.vmware-iso.winsrv2025"]
 
@@ -128,8 +136,13 @@ build {
     scripts      = ["${path.root}/../../../scripts/windows/01_vmware_tools.ps1"]
   }
 
-  # Copy unattend.xml to the VM for the final sysprep shutdown step in the
-  # packer_shutdown.bat script
+  # Machine-wide settings: Edge, diagnostic data, power plan, password expiry.
+  provisioner "powershell" {
+    scripts = ["${path.root}/../../../scripts/windows/09_system_settings.ps1"]
+  }
+
+  # The answer file 12_sysprep.ps1 generalizes with; its first logon runs the
+  # startup scripts below.
   provisioner "file" {
     source      = "config/unattend.xml"
     destination = "C:/Windows/Panther/unattend.xml"
@@ -151,32 +164,39 @@ build {
     destination = "c:/tmp/startup.ps1"
   }
 
+  # VMware Tools asked for one with REBOOT=R.
   provisioner "windows-restart" {
     restart_timeout = "30m"
   }
 
-  # First round of Windows Updates
-  provisioner "powershell" {
-    scripts = ["${path.root}/../../../scripts/windows/02_win_updates.ps1"]
-  }
-
-  provisioner "windows-restart" {
+  # Installs, restarts and searches again until nothing is left, restarting
+  # again while a reboot is still pending - a cumulative update's second stage
+  # is one. A download that fails is retried, then fails the build.
+  provisioner "windows-update" {
+    filters = [
+      "exclude:$_.Title -like '*Preview*'",
+      # The plugin's own templates exclude the Defender platform update: it can
+      # stay applicable after installing and repeat the loop forever. Defender
+      # updates its platform itself.
+      "exclude:$_.Title -like '*KB5007651*'",
+      "include:$true",
+    ]
     restart_timeout = "30m"
   }
 
-  # Second round of Windows Updates
+  # A last check before sysprep; 12_sysprep.ps1 also refuses a pending reboot.
   provisioner "powershell" {
-    scripts = ["${path.root}/../../../scripts/windows/02_win_updates.ps1"]
+    scripts = ["${path.root}/../../../scripts/windows/10_wait_for_servicing.ps1"]
   }
 
-  provisioner "windows-restart" {
-    restart_timeout = "30m"
-  }
-
-  # Final cleanup before packaging the box
+  # Must run last. The box has no cloudbase-init for sysprep to check for;
+  # shutdown_command then blocks SSH and shuts the generalized image down.
   provisioner "powershell" {
-    pause_before = "1m0s"
-    scripts      = ["${path.root}/../../../scripts/windows/03_cleanup.ps1"]
+    environment_vars = ["PACKERTRON_CLOUDBASE_INIT=false"]
+    scripts = [
+      "${path.root}/../../../scripts/windows/03_cleanup.ps1",
+      "${path.root}/../../../scripts/windows/12_sysprep.ps1"
+    ]
   }
 
   post-processor "vagrant" {

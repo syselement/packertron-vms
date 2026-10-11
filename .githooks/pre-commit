@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+#
+# Pre-commit checks: a secret scan of what is staged, then the fast static
+# scopes of check-templates.sh. Packer, OpenTofu and the Bats suites take
+# minutes, so they stay with the full run before pushing.
+#
+# Docs:
+#   githooks   https://git-scm.com/docs/githooks#_pre_commit
+#   README.md  ../scripts/README.md, the checks and this hook
+#
+# Run:
+#   git config core.hooksPath .githooks     # once per clone; opts this hook in
+#   git commit --no-verify                  # skip it for one commit
+
+set -Eeuo pipefail
+
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+
+if command -v gitleaks >/dev/null 2>&1; then
+    gitleaks git "$REPO_ROOT" --pre-commit --staged --no-banner --redact --log-level error
+else
+    printf 'pre-commit: gitleaks is not installed; the staged changes were not scanned for secrets\n' >&2
+fi
+
+exec "$REPO_ROOT/scripts/check-templates.sh" \
+    shell powershell docs markdown links yaml workflows matrix firstboot unattend

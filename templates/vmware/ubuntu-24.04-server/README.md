@@ -1,34 +1,16 @@
-# Ubuntu Server 24.04 (VMware Workstation)
+# Ubuntu Server 24.04 - VMware template
 
-Builds a VMware Workstation VM with the `vmware-iso` builder.
+Ubuntu Server 24.04 LTS for VMware Workstation, installed by the autoinstall seed in `http/` and provisioned at build time. Requirements and the build are in [README.md](../README.md).
 
-- The full provisioning chain runs at build time - `00-update-system.sh`, then the whole `scripts/ubuntu/` bundle is staged, then `02` and `01`.
-- The result is a fat image: everything is baked in, nothing is deferred to first boot.
-- That is the opposite of the Proxmox template beside it ([proxmox/ubuntu-24.04-server](../../proxmox/ubuntu-24.04-server/README.md)), which stays thin and provisions per VM.
+Written with [ynlamy/packer-ubuntuserver24_04](https://github.com/ynlamy/packer-ubuntuserver24_04) as a reference for the `vmware-iso` settings.
 
-Adapted from [ynlamy/packer-ubuntuserver24_04](https://github.com/ynlamy/packer-ubuntuserver24_04) (GPLv3).
+| | |
+| --- | --- |
+| Result | a VM in `output/`, named `ubuntu-24.04-server` |
+| ISO | `ubuntu-24.04.5-live-server-amd64.iso`, checked against `releases.ubuntu.com/noble/SHA256SUMS` |
+| `cpus` / `memory` / `disk_size` | 2 / 2048 / 30 GB |
+| Provisioning | `00-update-system.sh`, then the whole `scripts/ubuntu/` tree staged for `02-provision-system.sh`, then `01-cleanup-system.sh` last |
 
-## Layout
+A fat image: everything is baked in at build time, the opposite of the thin [Proxmox template](../../proxmox/ubuntu-24.04-server/README.md). cloud-init stays pinned, and the SSH host keys are kept, so treat a VM built from it as one machine, not an image to clone - see [SECURITY.md](../../../SECURITY.md).
 
-- `ubuntu-24.04-server.pkr.hcl` - builder, variables and build block
-- `http/user-data`, `http/meta-data` - the autoinstall seed served to subiquity
-
-## Build
-
-```bash
-cd templates/vmware/ubuntu-24.04-server
-packer init .
-packer validate .
-packer build .
-```
-
-## Credentials
-
-- The seed commits a SHA-512 crypt hash whose plaintext is documented next to it, so every machine built from it starts with the same console password.
-- Change it on anything reachable by anyone else - see [SECURITY.md](../../../SECURITY.md).
-
-## Checks
-
-```bash
-../../../scripts/check-templates.sh
-```
+---

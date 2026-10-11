@@ -1,0 +1,16 @@
+# zizmor, the GitHub Actions security linter: findings reviewed and accepted.
+#
+# Docs:
+#   zizmor     https://docs.zizmor.sh/configuration/
+#   README.md  ../scripts/README.md, which checks run where
+#
+# Run:
+#   scripts/check-templates.sh workflows
+
+rules:
+  # The release job commits the version bump and pushes the tag, so its
+  # checkout keeps the token it was given. It is the only job that does, and
+  # the only one with contents: write.
+  artipacked:
+    ignore:
+      - changelog-ci.yml

@@ -1,5 +1,5 @@
 iso_checksum = "file:https://releases.ubuntu.com/resolute/SHA256SUMS"
-iso_url      = "C:/ISO/linux/ubuntu-26.04-desktop-amd64.iso"
+iso_url      = "C:/ISO/linux/ubuntu-26.04.1-desktop-amd64.iso"
 output_dir   = "output"
 ssh_password = "packer"
 ssh_username = "syselement"

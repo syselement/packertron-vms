@@ -1,11 +1,11 @@
 # Last provisioner: check what sysprep depends on, remove what must not reach a
-# clone, then generalize. The builder shuts the VM down and converts it once
-# this returns.
+# clone, then generalize. The builder shuts the VM down once this returns.
 #
-# sysprep runs with /quit rather than /shutdown because proxmox-iso has no
-# shutdown_command - it stops the VM itself after the last provisioner. That
-# also means a failed generalize is reported here, by name, instead of as a
-# build that times out waiting for a shutdown that never comes.
+# sysprep runs with /quit rather than /shutdown, inside a provisioner rather
+# than as a shutdown command, so a failed generalize is reported here, by
+# name, instead of as a build that times out waiting for a shutdown that never
+# comes. proxmox-iso then stops the VM itself; the VMware box's
+# shutdown_command shuts it down.
 #
 # Docs:
 #   Sysprep    https://learn.microsoft.com/en-us/windows-hardware/manufacture/desktop/sysprep-command-line-options
@@ -21,18 +21,24 @@ $ProgressPreference = 'SilentlyContinue'
 $Unattend = 'C:\Windows\Panther\unattend.xml'
 $SysprepDir = Join-Path $env:SystemRoot 'System32\Sysprep'
 $SucceededTag = Join-Path $SysprepDir 'Sysprep_succeeded.tag'
+# The Proxmox templates configure every clone through cloudbase-init, so its
+# files are required. The VMware box has none, and says so with
+# PACKERTRON_CLOUDBASE_INIT=false; anything else keeps the check.
+$RequireCloudbaseInit = $env:PACKERTRON_CLOUDBASE_INIT -ne 'false'
 
 function Assert-SysprepInput {
-    $required = @(
-        $Unattend,
-        'C:\Program Files\Cloudbase Solutions\Cloudbase-Init\Python\Scripts\cloudbase-init.exe',
-        'C:\Program Files\Cloudbase Solutions\Cloudbase-Init\conf\cloudbase-init.conf',
-        'C:\Program Files\Cloudbase Solutions\Cloudbase-Init\conf\cloudbase-init-unattend.conf',
-        (Join-Path $env:SystemRoot 'Setup\Scripts\SetupComplete.cmd')
-    )
+    $required = @($Unattend)
+    if ($RequireCloudbaseInit) {
+        $required += @(
+            'C:\Program Files\Cloudbase Solutions\Cloudbase-Init\Python\Scripts\cloudbase-init.exe',
+            'C:\Program Files\Cloudbase Solutions\Cloudbase-Init\conf\cloudbase-init.conf',
+            'C:\Program Files\Cloudbase Solutions\Cloudbase-Init\conf\cloudbase-init-unattend.conf',
+            (Join-Path $env:SystemRoot 'Setup\Scripts\SetupComplete.cmd')
+        )
+    }
     foreach ($path in $required) {
         if (-not (Test-Path -LiteralPath $path)) {
-            throw "$path is missing; sysprep would produce a template whose clones never configure themselves"
+            throw "$path is missing; sysprep would produce an image whose machines never configure themselves"
         }
     }
 }
@@ -133,4 +139,4 @@ Disable-Hibernation
 Disable-OsVolumeEncryption
 Assert-NoPendingReboot
 Invoke-Sysprep
-Write-Output 'Generalized; the builder shuts the VM down and converts it next'
+Write-Output 'Generalized; the builder shuts the VM down next'

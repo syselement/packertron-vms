@@ -1,0 +1,64 @@
+# Weekly: compare the pins Dependabot cannot see - ISOs, virtio-win,
+# cloudbase-init, Packer plugins, the OpenTofu provider, the CI linters - with
+# upstream, and keep one issue open while anything is behind.
+#
+# Docs:
+#   check-pins.sh  ../../scripts/check-pins.sh, what is compared and how
+#   README.md      ../../scripts/README.md
+
+name: Watch pins
+
+on:
+  schedule:
+    - cron: "17 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  pins:
+    name: Pinned versions
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      # One issue, found by its exact title: opened when a pin falls behind,
+      # updated while one stays behind, closed once every pin is current.
+      - name: Compare with upstream, and update the issue
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TITLE: Pinned versions behind upstream
+        run: |
+          status=0
+          scripts/check-pins.sh --markdown >"$RUNNER_TEMP/table.md" || status=$?
+          cat "$RUNNER_TEMP/table.md"
+          if [ "$status" -eq 2 ]; then
+            echo "an upstream lookup failed; see the table" >&2
+            exit 1
+          fi
+
+          number="$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --search "in:title \"$TITLE\"" \
+            --json number,title --jq ".[] | select(.title == \"$TITLE\") | .number" | head -n 1)"
+
+          if [ "$status" -eq 1 ]; then
+            {
+              printf 'Pins that scripts/check-pins.sh found behind their latest upstream release.\n\n'
+              cat "$RUNNER_TEMP/table.md"
+              printf '\nUpdated by the Watch pins workflow on %s.\n' "$(date -u +%Y-%m-%d)"
+            } >"$RUNNER_TEMP/body.md"
+            if [ -n "$number" ]; then
+              gh issue edit "$number" --repo "$GITHUB_REPOSITORY" --body-file "$RUNNER_TEMP/body.md"
+            else
+              gh issue create --repo "$GITHUB_REPOSITORY" --title "$TITLE" --body-file "$RUNNER_TEMP/body.md"
+            fi
+          elif [ -n "$number" ]; then
+            gh issue close "$number" --repo "$GITHUB_REPOSITORY" --comment "Every pin is current again."
+          fi

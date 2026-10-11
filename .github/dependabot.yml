@@ -9,10 +9,10 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
-    commit-message:
-      prefix: "chore(ci)"
     # - No "labels:" key on purpose.
     # - Dependabot creates its own default "dependencies" label when it is
     #   missing, but any label named here must already exist in the repository,
     #   and it refuses the whole config when one does not.
     # - Create the labels first if you want custom ones.
+    commit-message:
+      prefix: "chore(ci)"

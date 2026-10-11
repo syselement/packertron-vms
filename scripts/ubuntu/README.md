@@ -40,6 +40,7 @@ Both scripts log in one format, with `STEP` section banners and `INFO` / `OK` / 
 ## Files
 
 ### `00-update-system.sh`
+
 Updates the base system and installs a minimal baseline required for the VM itself. It:
 
 - runs `apt-get update` and `apt-get dist-upgrade`
@@ -52,9 +53,8 @@ Updates the base system and installs a minimal baseline required for the VM itse
 
 Use this during a VM template build. Bare-metal provisioning intentionally skips it because guest agents are not applicable there.
 
----
-
 ### `01-cleanup-system.sh`
+
 Seals a VM template so clones start clean. It:
 
 - runs `apt autoremove` and `apt clean`
@@ -75,9 +75,8 @@ Run it last in a template build, after every other provisioning step.
 
 `90-bootstrap-baremetal.sh` never calls it.
 
----
-
 ### `02-provision-system.sh`
+
 Installs the main tooling stack for Ubuntu Desktop or Server. It:
 
 - logs to `/var/log/provision-system-<run_id>.log`
@@ -111,9 +110,8 @@ Group membership is granted after the service is up, not before. A `usermod -aG`
 
 This script can be used by itself when only system provisioning is required.
 
----
-
 ### `03-customize-system.sh`
+
 Installs common user tooling on both variants and applies the Desktop layer only when Ubuntu Desktop is detected. It:
 
 - logs to `/var/log/customize-system-<run_id>.log`
@@ -144,8 +142,6 @@ Desktop packages are installed with an availability check rather than a hard fai
 
 On Server, Syncthing's user unit is enabled by linking it into the target user's `default.target.wants`, but it only starts once that user logs in - systemd does not run a user manager for an account with no session. Lingering is deliberately not enabled; start it by hand, or enable `loginctl enable-linger`, if the service is wanted on a headless host.
 
----
-
 ### `90-bootstrap-baremetal.sh`
 
 Orchestrates first-boot provisioning for autoinstall and bare-metal systems. It:
@@ -175,8 +171,6 @@ It deliberately skips `00` (guest agents do not apply to bare metal) and `01` (t
 
 An unrecognised step fails the run rather than being skipped. Silently provisioning less than was asked for is the failure that gets noticed last, and the usual cause is a typo in a deployment's `firstboot.conf`.
 
----
-
 ### `firstboot/`
 
 The per-VM provisioning runner, as three files rather than text inside a YAML seed:
@@ -191,8 +185,6 @@ cloud-init has no include directive, so every seed must carry its own copy of `s
 
 `run.sh` is executed from a copy in `/run` rather than from the checkout, because it moves that checkout between revisions and Bash re-reads a script file as it executes.
 
----
-
 ### Autoinstall YAML files
 
 - `autoinstall-desktop.yaml` installs Ubuntu Desktop and creates the retryable first-boot service.
@@ -200,6 +192,24 @@ cloud-init has no include directive, so every seed must carry its own copy of `s
 - `autoinstall-noscripts.yaml` is the intentional negative control: it performs the unattended installation but invokes no provisioning scripts.
 
 The scripted YAML files embed `firstboot/stub.sh` and the systemd unit, plus a `/etc/packertron/firstboot.conf` naming the target user and the steps to run.
+
+The seeds carry an `@SSH_AUTHORIZED_KEY@` placeholder rather than a key. Render one with yours and publish it as a secret gist; the gist's raw URL is then a NoCloud seed:
+
+```bash
+# render the seed with your public key, beside an empty meta-data
+
+sed "s|@SSH_AUTHORIZED_KEY@|$(cat ~/.ssh/id_ed25519.pub)|" scripts/ubuntu/autoinstall-server.yaml > user-data
+touch meta-data
+# publish both as one secret gist, and print its URL
+
+gh gist create user-data meta-data
+# on the installer's kernel line, quoted so GRUB does not end the command at ';':
+
+#   autoinstall 'ds=nocloud;s=https://gist.githubusercontent.com/<user>/<gist-id>/raw/'
+
+```
+
+A secret gist is unlisted, not private: anyone with the URL can read it. It holds only a public key and the published password hash, so that is the same exposure as this repository.
 
 - The runner checks out one fixed repository revision and invokes `90-bootstrap-baremetal.sh`.
 - Transient failures are retried.
@@ -241,10 +251,10 @@ Rules that follow from this:
 The autoinstall YAML files and the Packer `http/user-data` files contain **hardcoded credentials**, intentionally, for a single-operator lab:
 
 - the `syselement` account's SHA-512 password hash is the same in every file, and the plaintext (`packer`) is documented alongside it - a published salt plus a published plaintext is a published console password. `allow-pw: false` only disables SSH password authentication; console, TTY and GDM login are unaffected.
-- a fixed ed25519 public key is authorized on every image.
+- no key is committed: each seed carries an `@SSH_AUTHORIZED_KEY@` placeholder, which Packer replaces with `ssh_authorized_key` and a bare-metal install replaces before use - see [Autoinstall YAML files](#autoinstall-yaml-files).
 - `/etc/sudoers.d/99-syselement` grants permanent `NOPASSWD:ALL` and is never removed after bootstrap.
 
-These images are not suitable for a shared or internet-reachable network as shipped. Change the hash (`mkpasswd -m sha-512`), the authorized key and the sudoers rule before building anything that leaves the lab.
+These images are not suitable for a shared or internet-reachable network as shipped. Change the hash (`mkpasswd -m sha-512`) and the sudoers rule before building anything that leaves the lab.
 
 ---
 
@@ -254,9 +264,11 @@ These images are not suitable for a shared or internet-reachable network as ship
 
 ```text
 # Desktop templates
+
 00-update-system.sh → 01-cleanup-system.sh
 
 # 24.04 Server
+
 00-update-system.sh → 02-provision-system.sh → 01-cleanup-system.sh
 ```
 
@@ -327,6 +339,8 @@ Each script must remain independently executable and cannot assume a previous ph
 
 `02` and `03` therefore both run `dist-upgrade` unconditionally, including when `90` invokes them back to back.
 
+---
+
 ## Validation
 
 ### Static checks
@@ -365,7 +379,7 @@ Snapshot before each run. Record the release, the detected variant and the exact
 | 1 | 24.04 Desktop | Vagrant (`02` → `03`) | full toolchain; GNOME applied; `variant=desktop` in the log; the `24.*` release arm is taken (`software-properties-common`, fastfetch PPA); any package missing on noble is listed in the skip warning rather than failing the run |
 | 2 | 24.04 Server | bare-metal autoinstall | no GNOME, dconf, flatpak or snap work attempted; VS Code **absent** and `02` still passes its toolchain validation; Syncthing's user unit is linked into `~/.config/systemd/user/default.target.wants` and the run logs the deferred-start warning - it is **not** running before the user logs in, and lingering is deliberately not enabled (see above); `stat -c '%A' /var/log` is still group-writable (`drwxrwxr-x`) |
 | 3 | 26.04 Desktop | Vagrant and bare-metal | as #1 but the `26.*` arm (PPA skipped) |
-| 4 | 26.04 Server | bare-metal autoinstall only | as #2. No Packer or Vagrant path exists for this combination |
+| 4 | 26.04 Server | bare-metal autoinstall, and the Proxmox and VMware templates | as #2 |
 | 5 | Second execution | all four above | no `installing` or `downloading` lines; no repository rewrites; Cockpit not restarted; `SET … dock-position` is expected (a deliberate persisted value) |
 | 6 | Packer build | `00` → `01`, plus `02` on 24.04 Server | template seals; guest agent matches the hypervisor; `/etc/machine-id` is empty; the staged `/var/tmp/packertron-ubuntu` tree is gone |
 | 7 | Autoinstall | `autoinstall-{desktop,server}.yaml` | unattended completion; the firstboot service is created and enabled, and removes itself only after real work |
