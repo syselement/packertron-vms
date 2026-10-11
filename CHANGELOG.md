@@ -1,3 +1,12 @@
+## [1.0.3](https://github.com/syselement/packertron-vms/compare/v1.0.2...v1.0.3) (2026-10-11)
+
+
+### Bug Fixes
+
+* **deploy:** stop script edits from recreating provisioned VMs ([9169020](https://github.com/syselement/packertron-vms/commit/91690206970d436b60f36550a737bce468648546))
+
+
+
 ## [1.0.2](https://github.com/syselement/packertron-vms/compare/v1.0.1...v1.0.2) (2026-10-11)
 
 
