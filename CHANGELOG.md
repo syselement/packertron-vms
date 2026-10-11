@@ -1,3 +1,12 @@
+## [1.0.4](https://github.com/syselement/packertron-vms/compare/v1.0.3...v1.0.4) (2026-10-11)
+
+
+### Bug Fixes
+
+* **ubuntu:** follow Termix's switch to v-prefixed release tags ([455d251](https://github.com/syselement/packertron-vms/commit/455d2511f413a75b5e09f2e88b1b688dab239cea))
+
+
+
 ## [1.0.3](https://github.com/syselement/packertron-vms/compare/v1.0.2...v1.0.3) (2026-10-11)
 
 
