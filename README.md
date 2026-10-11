@@ -38,7 +38,7 @@ For VMware Workstation and Vagrant, start at [templates/vmware/README.md](templa
 | [templates/proxmox/WINDOWS.md](templates/proxmox/WINDOWS.md) | the Windows templates: build chain, cloudbase-init, evaluation period |
 | [templates/vmware/README.md](templates/vmware/README.md) | VMware Workstation and Vagrant |
 | [deploy/README.md](deploy/README.md) | OpenTofu: VMs from templates, first-boot provisioning, state |
-| [scripts/README.md](scripts/README.md) | the scripts and every check |
+| [scripts/README.md](scripts/README.md) | the scripts, every check, and the bare-metal Windows install |
 | [scripts/ubuntu/README.md](scripts/ubuntu/README.md) | the Ubuntu provisioning chain, bare metal and autoinstall |
 | [SECURITY.md](SECURITY.md) | the credential model - read it before putting a VM on a network |
 | [AGENTS.md](AGENTS.md) | the repository's standards |
