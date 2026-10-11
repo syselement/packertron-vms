@@ -1,3 +1,15 @@
+# [1.0.0](https://github.com/syselement/packertron-vms/compare/v0.83.0...v1.0.0) (2026-10-11)
+
+
+* feat!: release 1.0 - templates, deploy/ and checks reworked ([240bc48](https://github.com/syselement/packertron-vms/commit/240bc489bacf61c07785872f1fa28a0fa3f70f52))
+
+
+### BREAKING CHANGES
+
+* Linux builds need ssh_authorized_key; install_utils.ps1 moved to scripts/windows/; 02_win_updates.ps1 is gone; Windows deploy/ entries with provisioning_steps need os = "windows".
+
+
+
 # [0.83.0](https://github.com/syselement/packertron-vms/compare/v0.82.0...v0.83.0) (2026-10-11)
 
 
@@ -61,15 +73,6 @@
 * **deploy:** clone straight to datastore_id ([5280f6f](https://github.com/syselement/packertron-vms/commit/5280f6f5940f24b4edc10d723914cc0b756f32ac))
 * **deploy:** deploy the Windows templates ([8e0b63e](https://github.com/syselement/packertron-vms/commit/8e0b63e2edaff8020f8daa5d578b406297fb10c4))
 * **proxmox:** add Windows 10, 11 and Server 2025 templates ([f7e3336](https://github.com/syselement/packertron-vms/commit/f7e33362504160283200b91c54c9ef8d562ca1ea))
-
-
-
-# [0.79.0](https://github.com/syselement/packertron-vms/compare/v0.78.0...v0.79.0) (2026-09-27)
-
-
-### Features
-
-* update dock favorites to include Visual Studio Code ([5a4fed3](https://github.com/syselement/packertron-vms/commit/5a4fed3058ca085903d935eaf1ac29f7a2f4ccb9))
 
 
 
