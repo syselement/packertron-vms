@@ -167,4 +167,4 @@ if ($LASTEXITCODE -ne 0) {
     throw "install_utils.ps1 failed with exit code $LASTEXITCODE"
 }
 
-Write-Step 'Done. Run Windows Update, then restart.'
+Write-Step 'Done. Run Windows Update, then restart to apply everything.'
