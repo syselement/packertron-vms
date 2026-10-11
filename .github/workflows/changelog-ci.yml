@@ -51,3 +51,6 @@ jobs:
           skip-git-pull: "true"
           version-file: 'version.yaml'
           version-path: 'version'
+          # The default, 5, rewrites CHANGELOG.md from the last five releases
+          # only and drops every older entry; 0 regenerates it from every tag.
+          release-count: "0"

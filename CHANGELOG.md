@@ -1,16 +1,4 @@
-# [1.0.0](https://github.com/syselement/packertron-vms/compare/v0.83.0...v1.0.0) (2026-10-11)
-
-
-* feat!: release 1.0 - templates, deploy/ and checks reworked ([240bc48](https://github.com/syselement/packertron-vms/commit/240bc489bacf61c07785872f1fa28a0fa3f70f52))
-
-
-### BREAKING CHANGES
-
-* Linux builds need ssh_authorized_key; install_utils.ps1 moved to scripts/windows/; 02_win_updates.ps1 is gone; Windows deploy/ entries with provisioning_steps need os = "windows".
-
-
-
-# [0.83.0](https://github.com/syselement/packertron-vms/compare/v0.82.0...v0.83.0) (2026-10-11)
+# [1.0.0](https://github.com/syselement/packertron-vms/compare/v0.82.0...v1.0.0) (2026-10-11)
 
 
 ### Bug Fixes
@@ -33,6 +21,12 @@
 * **windows:** add HWiNFO and a WinUtil shortcut to the utilities ([72aad06](https://github.com/syselement/packertron-vms/commit/72aad0670ea0159cf76cedf39236495ce3ed6535))
 * **windows:** install the utilities through winget ([7a110dc](https://github.com/syselement/packertron-vms/commit/7a110dc6c5917945a6ddaf820f7cb1badb813923))
 * **windows:** install Windows on bare metal from a USB stick ([1a05532](https://github.com/syselement/packertron-vms/commit/1a05532da6d0e8824e571cea92a13c188c593fe7))
+* feat!: release 1.0 - templates, deploy/ and checks reworked ([240bc48](https://github.com/syselement/packertron-vms/commit/240bc489bacf61c07785872f1fa28a0fa3f70f52))
+
+
+### BREAKING CHANGES
+
+* Linux builds need ssh_authorized_key; install_utils.ps1 moved to scripts/windows/; 02_win_updates.ps1 is gone; Windows deploy/ entries with provisioning_steps need os = "windows".
 
 
 
