@@ -18,9 +18,9 @@ $ProgressPreference = 'SilentlyContinue'
 
 # Bump all three together. The hash is of the release asset itself, computed
 # when this version was pinned.
-$Version = '1.1.8'
+$Version = '1.1.9'
 $MsiUrl = "https://github.com/cloudbase/cloudbase-init/releases/download/$Version/CloudbaseInitSetup_$($Version -replace '\.', '_')_x64.msi"
-$MsiSha256 = '0E7FA42E0CBC0CE7657F85730B0C6CC7AFC4087A3639DF0FF51A721A0BE19BD5'
+$MsiSha256 = 'FFBF80515A7311ED00800276A6AF7AAB23B41D7ACF13E79CE3D2D56844F638F7'
 
 $InstallDir = 'C:\Program Files\Cloudbase Solutions\Cloudbase-Init'
 $ConfDir = Join-Path $InstallDir 'conf'

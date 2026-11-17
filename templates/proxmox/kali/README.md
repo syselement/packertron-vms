@@ -2,14 +2,14 @@
 
 Kali Linux from the official installer ISO, installed by the debian-installer preseed in `http/`. Shared Linux behaviour is in [LINUX.md](../LINUX.md); staging and building in [README.md](../README.md). This page covers what Kali does differently.
 
-> **Status: built and cloned on a real node** (Proxmox VE, q35/OVMF, Kali 2026.2, ~10 minutes; cloned through [`deploy/`](../../../deploy/README.md) with `kali.tfvars.example`).
+> **Status: built and cloned on a real node** (Proxmox VE, q35/OVMF, Kali 2026.2, ~10 minutes; cloned through [`deploy/`](../../../deploy/README.md) with `kali.tfvars.example`). The ISO pin has since moved to 2026.3, which has not been built; Kali is a rolling release, so a point release mainly changes how much `00` has to upgrade.
 
 Adapted from [mttaggart/seclab](https://github.com/mttaggart/seclab) (`Packer/kali/config.pkr.hcl`), without its KeePass and CA-certificate provisioners: credentials come from the environment, and the build runs the same `00` -> `01` -> seal chain as the Ubuntu templates.
 
 | | Ubuntu | Kali |
 | --- | --- | --- |
 | `vm_id` / `template_name` | 80024, 80026, 80126 | 80200 / `kali-template` |
-| `iso_file` | | `local:iso/kali-linux-2026.2-installer-amd64.iso`, checked against `cdimage.kali.org/kali-2026.2/SHA256SUMS` |
+| `iso_file` | | `local:iso/kali-linux-2026.3-installer-amd64.iso`, checked against `cdimage.kali.org/kali-2026.3/SHA256SUMS` |
 | Installer and seed | subiquity, `http/user-data` | debian-installer, `http/kali.preseed` |
 | Boot | `<esc>`, then edit the GRUB entry | `c` for GRUB's console, then start the kernel by hand |
 | Seed check | `cloud-init schema` | `debconf-set-selections --checkonly`, plus a type check |

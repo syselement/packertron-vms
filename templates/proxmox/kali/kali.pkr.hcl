@@ -62,13 +62,13 @@ variable "insecure_skip_tls_verify" {
 variable "iso" {
   type        = string
   description = "ISO to download into iso_storage_pool when iso_file is empty"
-  default     = "https://cdimage.kali.org/kali-2026.2/kali-linux-2026.2-installer-amd64.iso"
+  default     = "https://cdimage.kali.org/kali-2026.3/kali-linux-2026.3-installer-amd64.iso"
 }
 
 variable "checksum" {
   type        = string
   description = "Where var.iso's checksum comes from: sha256:<hex>, or file:<SHA256SUMS URL>"
-  default     = "file:https://cdimage.kali.org/kali-2026.2/SHA256SUMS"
+  default     = "file:https://cdimage.kali.org/kali-2026.3/SHA256SUMS"
 }
 
 # The default is the ISO staged on the node under its upstream name: nothing
@@ -78,7 +78,7 @@ variable "checksum" {
 variable "iso_file" {
   type        = string
   description = "ISO already on the node, as storage:iso/name.iso; \"\" downloads var.iso"
-  default     = "local:iso/kali-linux-2026.2-installer-amd64.iso"
+  default     = "local:iso/kali-linux-2026.3-installer-amd64.iso"
 }
 
 variable "iso_storage_pool" {
