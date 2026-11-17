@@ -1,3 +1,12 @@
+## [1.0.5](https://github.com/syselement/packertron-vms/compare/v1.0.4...v1.0.5) (2026-11-17)
+
+
+### Bug Fixes
+
+* **ubuntu:** keep Termix installable as upstream reshapes its releases ([8fbf219](https://github.com/syselement/packertron-vms/commit/8fbf2195232731e9d2925fee6ef7daca058e6a0f))
+
+
+
 ## [1.0.4](https://github.com/syselement/packertron-vms/compare/v1.0.3...v1.0.4) (2026-10-11)
 
 
