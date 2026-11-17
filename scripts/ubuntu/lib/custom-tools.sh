@@ -890,10 +890,22 @@ install_termix() (
     local newest_tag release_tag release_version
     local temporary_dir
     local was_installed=false
+    local page page_count releases_checked
+    # A full page means there may be more; a short one is the last.
+    local page_size=100
+    local max_pages=5
 
+    # The highest version across every installed branch, not the first row.
+    # Upstream builds the bundle on a fixed branch and has moved it once
+    # (master -> stable), and flatpak treats a different branch as a separate
+    # app rather than an update, so both end up installed. Reading the first
+    # row then reports whichever branch flatpak lists first - the stale one -
+    # and the post-install check fails on an install that actually worked.
     termix_installed_version() {
         run_as_target_user flatpak list --user --app --columns=application,version |
-            awk -F '\t' -v app_id="$app_id" '$1 == app_id { print $2; exit }'
+            awk -F '\t' -v app_id="$app_id" '$1 == app_id { print $2 }' |
+            sort -V |
+            tail -n 1
     }
 
     if [[ "$ARCH" != "amd64" ]]; then
@@ -907,21 +919,53 @@ install_termix() (
     trap 'rm -rf -- "$temporary_dir"' EXIT
 
     info "checking latest Termix GitHub release"
-    fetch_file "https://api.github.com/repos/Termix-SSH/Termix/releases?per_page=10" \
-        "$temporary_dir/releases.json" ||
-        die "failed downloading Termix release metadata"
-    # Termix publishes a release before its CI has uploaded the bundles, so for
-    # a while the newest release has no Flatpak. Take the newest stable app
-    # release that has one; a later run picks up the new release once it is
-    # complete. The sdk-v* releases in the same repository carry no app.
-    # shellcheck disable=SC2016 # $app and $bundle are expanded by jq.
-    jq --arg app "$app_tag_pattern" --arg bundle "$bundle_name" '
-        first(.[] | select(((.draft or .prerelease) | not) and (.tag_name | test($app)) and
-            any(.assets[]; .name == $bundle and .state == "uploaded"))) // empty
-    ' "$temporary_dir/releases.json" >"$temporary_dir/release.json" ||
+    # Termix publishes its plugin SDK as sdk-v* releases in the same
+    # repository, and far more often than the app: in November 2026 nine of the
+    # ten newest releases were SDK ones, which pushed every app release off a
+    # single short page and failed this install outright. So page through the
+    # list until an app release turns up rather than assuming one is near the
+    # top.
+    jq -n '[]' >"$temporary_dir/releases.json" ||
         die "could not read the Termix release metadata"
-    [[ -s "$temporary_dir/release.json" ]] ||
-        die "no recent stable Termix release has ${bundle_name}"
+    : >"$temporary_dir/release.json"
+
+    for ((page = 1; page <= max_pages; page++)); do
+        fetch_file \
+            "https://api.github.com/repos/Termix-SSH/Termix/releases?per_page=${page_size}&page=${page}" \
+            "$temporary_dir/page.json" ||
+            die "failed downloading Termix release metadata"
+        page_count="$(jq -r 'length' "$temporary_dir/page.json")" ||
+            die "could not read the Termix release metadata"
+        ((page_count > 0)) || break
+
+        jq -s '.[0] + .[1]' \
+            "$temporary_dir/releases.json" "$temporary_dir/page.json" \
+            >"$temporary_dir/merged.json" ||
+            die "could not read the Termix release metadata"
+        mv -f "$temporary_dir/merged.json" "$temporary_dir/releases.json"
+
+        # Termix also publishes a release before its CI has uploaded the
+        # bundles, so for a while the newest app release has no Flatpak. Take
+        # the newest stable app release that has one; a later run picks up the
+        # new release once it is complete.
+        # shellcheck disable=SC2016 # $app and $bundle are expanded by jq.
+        jq --arg app "$app_tag_pattern" --arg bundle "$bundle_name" '
+            first(.[] | select(((.draft or .prerelease) | not) and (.tag_name | test($app)) and
+                any(.assets[]; .name == $bundle and .state == "uploaded"))) // empty
+        ' "$temporary_dir/releases.json" >"$temporary_dir/release.json" ||
+            die "could not read the Termix release metadata"
+
+        if [[ -s "$temporary_dir/release.json" ]]; then
+            break
+        fi
+        ((page_count == page_size)) || break
+    done
+
+    if [[ ! -s "$temporary_dir/release.json" ]]; then
+        releases_checked="$(jq -r 'length' "$temporary_dir/releases.json")" ||
+            releases_checked="?"
+        die "no stable Termix release carrying ${bundle_name} in the newest ${releases_checked} releases"
+    fi
     # shellcheck disable=SC2016 # $app is expanded by jq.
     newest_tag="$(
         jq -r --arg app "$app_tag_pattern" '
@@ -934,12 +978,18 @@ install_termix() (
         info "Termix ${newest_tag} has no Flatpak bundle yet; using ${release_tag}"
     fi
 
-    if run_as_target_user flatpak info --user "$app_id" >/dev/null 2>&1; then
+    # Whether it is installed comes from the same list, because
+    # `flatpak info <app-id>` exits non-zero with "Multiple branches available"
+    # once two branches are present. Probing with it there made an upgraded
+    # machine look like a fresh one, so the bundle was downloaded and
+    # reinstalled on every run and then failed the check below every time.
+    #
+    # A flatpak that cannot be listed is treated as absent rather than fatal:
+    # the install that follows still dies on failure, and so does the
+    # post-install verification, so nothing passes silently.
+    installed_version="$(termix_installed_version || true)"
+    if [[ -n "$installed_version" ]]; then
         was_installed=true
-        installed_version="$(termix_installed_version)" ||
-            die "installed Termix Flatpak version could not be read"
-        [[ -n "$installed_version" ]] ||
-            die "installed Termix Flatpak returned an empty version"
 
         if dpkg --compare-versions "$installed_version" ge "$release_version"; then
             info "Termix Flatpak ${installed_version} already matches latest release ${release_version}, skipping"
@@ -973,12 +1023,50 @@ install_termix() (
         die "Termix Flatpak ${release_version} installation could not be verified"
     fi
 
+    remove_superseded_termix_branches "$installed_version"
+
     if [[ "$was_installed" == true ]]; then
         ok "Termix Flatpak updated to ${installed_version} for ${TARGET_USER}"
     else
         ok "Termix Flatpak ${installed_version} installed for ${TARGET_USER}"
     fi
 )
+
+# Drop every installed branch of Termix except the version just verified.
+#
+# Upstream builds the bundle on a fixed branch and has moved it once (master ->
+# stable). flatpak keeps a new branch beside the old one instead of replacing
+# it, so without this the machine collects an app and a desktop entry per
+# branch, and the launcher offers a stale Termix next to the current one.
+#
+# Never --delete-data: ~/.var/app/com.karmaa.termix is keyed by application id
+# with no branch component, so the branches share one data directory and
+# deleting it would take the surviving install's configuration with it.
+#
+# A failure here warns rather than dies: the installation it is tidying up
+# after has already been verified, and leaving a stale branch behind is not
+# worth failing a provisioning run over.
+remove_superseded_termix_branches() {
+    local keep_version="$1"
+    local app_id="com.karmaa.termix"
+    local branch version
+
+    while read -r version branch; do
+        [[ -n "$branch" ]] || continue
+
+        info "removing superseded Termix Flatpak ${version} (${branch} branch)"
+        run_quiet_command "removing superseded Termix Flatpak ${branch} failed" \
+            run_as_target_user flatpak uninstall --user --noninteractive -y \
+            "${app_id}//${branch}" ||
+            warn "could not remove superseded Termix Flatpak ${branch} branch"
+    done < <(
+        run_as_target_user flatpak list --user --app \
+            --columns=application,version,branch |
+            awk -F '\t' -v app_id="$app_id" -v keep="$keep_version" \
+                '$1 == app_id && $2 != keep { printf "%s %s\n", $2, $3 }' ||
+            true
+    )
+}
 
 install_termius() {
     if [[ "$ARCH" != "amd64" ]]; then

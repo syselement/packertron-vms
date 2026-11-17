@@ -3299,6 +3299,8 @@ EOF
 }
 
 @test "Termix fails clearly when no recent release has a Flatpak bundle" {
+  local command_record="$BATS_TEST_TMPDIR/termix-nobundle-record"
+
   ARCH="amd64"
   TARGET_USER="testuser"
 
@@ -3309,13 +3311,327 @@ EOF
     "$@"
   }
   fetch_file() {
+    printf '%s\n' "$1" >>"$command_record"
     printf '[{"tag_name":"v2.7.0","draft":false,"prerelease":false,"assets":[]}]\n' >"$2"
   }
 
   run install_termix
 
   [[ "$status" -ne 0 ]]
-  [[ "$output" == *"no recent stable Termix release has termix_linux_flatpak.flatpak"* ]]
+  [[ "$output" == *"no stable Termix release carrying termix_linux_flatpak.flatpak"* ]]
+  # The message says how deep the search went, so the next failure of this
+  # kind is diagnosable from the log alone.
+  [[ "$output" == *"in the newest 1 releases"* ]]
+  # A short page is the last one, so there is no reason to ask for another.
+  [[ "$(grep -c 'releases?per_page=' "$command_record")" -eq 1 ]]
+}
+
+@test "Termix pages past a full page of SDK releases to reach the app bundle" {
+  local command_record="$BATS_TEST_TMPDIR/termix-paging-record"
+  local version_file="$BATS_TEST_TMPDIR/termix-paging-version"
+
+  ARCH="amd64"
+  TARGET_USER="testuser"
+  printf '26.10.6\n' >"$version_file"
+
+  flatpak() {
+    case "$1" in
+      info) ;;
+      list) printf 'com.karmaa.termix\t%s\n' "$(<"$version_file")" ;;
+      install) printf '26.11.1\n' >"$version_file" ;;
+      *) return 2 ;;
+    esac
+  }
+  run_as_target_user() {
+    "$@"
+  }
+  # Termix publishes its plugin SDK into the same repository and far more
+  # often than the app, so a whole page of releases can carry no app at all.
+  # This is what broke the install in November 2026.
+  fetch_file() {
+    printf '%s\n' "$1" >>"$command_record"
+    case "$1" in
+      *"/releases?per_page="*"page=1")
+        jq -n '[range(100) | {
+          tag_name: "sdk-v2.\(.).0", draft: false, prerelease: false, assets: []
+        }]' >"$2"
+        ;;
+      *"/releases?per_page="*"page=2")
+        cat >"$2" <<'EOF'
+[
+  {
+    "tag_name": "v26.11.1",
+    "draft": false,
+    "prerelease": false,
+    "assets": [
+      {
+        "name": "termix_linux_flatpak.flatpak",
+        "state": "uploaded",
+        "browser_download_url": "https://github.com/Termix-SSH/Termix/releases/download/v26.11.1/termix_linux_flatpak.flatpak"
+      }
+    ]
+  }
+]
+EOF
+        ;;
+      *"/releases?per_page="*)
+        printf '[]\n' >"$2"
+        ;;
+      *)
+        printf 'test Flatpak bundle\n' >"$2"
+        ;;
+    esac
+  }
+  verify_github_asset_digest() {
+    return 0
+  }
+
+  run install_termix
+
+  [[ "$status" -eq 0 ]]
+  [[ "$output" == *"updating Termix Flatpak from 26.10.6 to 26.11.1 for testuser"* ]]
+  grep -Fq 'page=2' "$command_record"
+  grep -Fq 'v26.11.1/termix_linux_flatpak.flatpak' "$command_record"
+  # The SDK releases must not be mistaken for a newer app release.
+  [[ "$output" != *"has no Flatpak bundle yet"* ]]
+}
+
+@test "Termix reads the newest installed branch, not the first one listed" {
+  local command_record="$BATS_TEST_TMPDIR/termix-branches-record"
+
+  ARCH="amd64"
+  TARGET_USER="testuser"
+
+  # Upstream builds the bundle on a fixed branch and moved it from master to
+  # stable, so an upgraded machine has both installed and flatpak lists the
+  # stale one first. `flatpak info <app-id>` also stops working at that point:
+  # it exits non-zero with "Multiple branches available".
+  flatpak() {
+    printf '%s\n' "$*" >>"$command_record"
+    case "$1" in
+      info) return 1 ;;
+      list)
+        printf 'com.karmaa.termix\t26.11.0\n'
+        printf 'com.karmaa.termix\t26.11.1\n'
+        ;;
+      *) return 2 ;;
+    esac
+  }
+  run_as_target_user() {
+    "$@"
+  }
+  fetch_file() {
+    if [[ "$1" == *"/releases?per_page="* ]]; then
+      cat >"$2" <<'EOF'
+[
+  {
+    "tag_name": "v26.11.1",
+    "draft": false,
+    "prerelease": false,
+    "assets": [
+      {
+        "name": "termix_linux_flatpak.flatpak",
+        "state": "uploaded",
+        "browser_download_url": "https://github.com/Termix-SSH/Termix/releases/download/v26.11.1/termix_linux_flatpak.flatpak"
+      }
+    ]
+  }
+]
+EOF
+      return
+    fi
+    printf 'unexpected Termix bundle download\n' >&2
+    return 99
+  }
+
+  run install_termix
+
+  [[ "$status" -eq 0 ]]
+  [[ "$output" == *"Termix Flatpak 26.11.1 already matches latest release 26.11.1, skipping"* ]]
+  # Reading 26.11.0 from the first row would re-download the bundle on every run.
+  [[ "$output" != *"unexpected Termix bundle download"* ]]
+}
+
+@test "Termix verifies an install that lands beside an older branch" {
+  local command_record="$BATS_TEST_TMPDIR/termix-newbranch-record"
+  local installed_marker="$BATS_TEST_TMPDIR/termix-newbranch-installed"
+
+  ARCH="amd64"
+  TARGET_USER="testuser"
+
+  # The install adds the stable branch next to the existing master one rather
+  # than replacing it, and the stale row is listed first. Verifying against
+  # that row failed a good install on a real desktop.
+  flatpak() {
+    printf '%s\n' "$*" >>"$command_record"
+    case "$1" in
+      info) return 1 ;;
+      list)
+        printf 'com.karmaa.termix\t26.11.0\n'
+        if [[ -e "$installed_marker" ]]; then
+          printf 'com.karmaa.termix\t26.11.1\n'
+        fi
+        ;;
+      install) touch "$installed_marker" ;;
+      *) return 2 ;;
+    esac
+  }
+  run_as_target_user() {
+    "$@"
+  }
+  fetch_file() {
+    if [[ "$1" == *"/releases?per_page="* ]]; then
+      cat >"$2" <<'EOF'
+[
+  {
+    "tag_name": "v26.11.1",
+    "draft": false,
+    "prerelease": false,
+    "assets": [
+      {
+        "name": "termix_linux_flatpak.flatpak",
+        "state": "uploaded",
+        "browser_download_url": "https://github.com/Termix-SSH/Termix/releases/download/v26.11.1/termix_linux_flatpak.flatpak"
+      }
+    ]
+  }
+]
+EOF
+      return
+    fi
+    printf 'test Flatpak bundle\n' >"$2"
+  }
+  verify_github_asset_digest() {
+    return 0
+  }
+
+  run install_termix
+
+  [[ "$status" -eq 0 ]]
+  [[ "$output" == *"updating Termix Flatpak from 26.11.0 to 26.11.1 for testuser"* ]]
+  [[ "$output" == *"Termix Flatpak updated to 26.11.1 for testuser"* ]]
+  [[ "$output" != *"installation could not be verified"* ]]
+}
+
+@test "Termix removes a superseded branch without deleting shared app data" {
+  local command_record="$BATS_TEST_TMPDIR/termix-cleanup-record"
+  local rows="$BATS_TEST_TMPDIR/termix-cleanup-rows"
+
+  ARCH="amd64"
+  TARGET_USER="testuser"
+  # One row per installed branch: version, then branch.
+  printf '26.11.0\tmaster\n' >"$rows"
+
+  flatpak() {
+    printf '%s\n' "$*" >>"$command_record"
+    case "$1" in
+      info) return 1 ;;
+      list)
+        awk -F '\t' '{ printf "com.karmaa.termix\t%s\t%s\n", $1, $2 }' "$rows"
+        ;;
+      install)
+        # The bundle's branch is stable now, so this lands beside master.
+        printf '26.11.1\tstable\n' >>"$rows"
+        ;;
+      uninstall)
+        local ref branch
+        ref="${*##* }"
+        branch="${ref##*//}"
+        awk -F '\t' -v b="$branch" '$2 != b' "$rows" >"$rows.tmp"
+        mv "$rows.tmp" "$rows"
+        ;;
+      *) return 2 ;;
+    esac
+  }
+  run_as_target_user() {
+    "$@"
+  }
+  fetch_file() {
+    if [[ "$1" == *"/releases?per_page="* ]]; then
+      cat >"$2" <<'EOF'
+[
+  {
+    "tag_name": "v26.11.1",
+    "draft": false,
+    "prerelease": false,
+    "assets": [
+      {
+        "name": "termix_linux_flatpak.flatpak",
+        "state": "uploaded",
+        "browser_download_url": "https://github.com/Termix-SSH/Termix/releases/download/v26.11.1/termix_linux_flatpak.flatpak"
+      }
+    ]
+  }
+]
+EOF
+      return
+    fi
+    printf 'test Flatpak bundle\n' >"$2"
+  }
+  verify_github_asset_digest() {
+    return 0
+  }
+
+  run install_termix
+
+  [[ "$status" -eq 0 ]]
+  [[ "$output" == *"removing superseded Termix Flatpak 26.11.0 (master branch)"* ]]
+  grep -Fq 'uninstall --user --noninteractive -y com.karmaa.termix//master' "$command_record"
+  # ~/.var/app/<app-id> has no branch component, so the branches share one data
+  # directory: deleting it would take the surviving install's config with it.
+  ! grep -Fq -- '--delete-data' "$command_record"
+  # The verified branch must survive.
+  ! grep -Fq 'com.karmaa.termix//stable' "$command_record"
+  [[ "$(cat "$rows")" == "26.11.1	stable" ]]
+}
+
+@test "Termix leaves a single installed branch alone" {
+  local command_record="$BATS_TEST_TMPDIR/termix-single-record"
+
+  ARCH="amd64"
+  TARGET_USER="testuser"
+
+  flatpak() {
+    printf '%s\n' "$*" >>"$command_record"
+    case "$1" in
+      info) return 1 ;;
+      list) printf 'com.karmaa.termix\t26.11.1\tstable\n' ;;
+      *) return 2 ;;
+    esac
+  }
+  run_as_target_user() {
+    "$@"
+  }
+  fetch_file() {
+    if [[ "$1" == *"/releases?per_page="* ]]; then
+      cat >"$2" <<'EOF'
+[
+  {
+    "tag_name": "v26.11.1",
+    "draft": false,
+    "prerelease": false,
+    "assets": [
+      {
+        "name": "termix_linux_flatpak.flatpak",
+        "state": "uploaded",
+        "browser_download_url": "https://github.com/Termix-SSH/Termix/releases/download/v26.11.1/termix_linux_flatpak.flatpak"
+      }
+    ]
+  }
+]
+EOF
+      return
+    fi
+    printf 'unexpected Termix bundle download\n' >&2
+    return 99
+  }
+
+  run install_termix
+
+  [[ "$status" -eq 0 ]]
+  [[ "$output" == *"already matches latest release 26.11.1, skipping"* ]]
+  ! grep -Fq 'uninstall' "$command_record"
+  [[ "$output" != *"removing superseded"* ]]
 }
 
 @test "current Typora Themeable release repairs directory ownership before skipping download" {
